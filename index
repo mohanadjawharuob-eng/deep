@@ -1,21 +1,72 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Deep AR Brochure</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: black;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        transition: opacity 1s;
+      }
+      .instructions {
+        position: fixed;
+        bottom: 30px;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        color: white;
+        background: rgba(0,0,0,0.7);
+        padding: 15px;
+        z-index: 100;
+        font-size: 18px;
+      }
+    </style>
   </head>
-  <body style="margin: 0; overflow: hidden;">
-    <!-- The 'scene' holds all 3D elements -->
+  <body>
+    <!-- Simple loading screen -->
+    <div class="loading" id="loading">
+      <div>
+        <h2>Loading AR Experience...</h2>
+        <p>Please wait</p>
+      </div>
+    </div>
+    
+    <!-- Instructions overlay -->
+    <div class="instructions" id="instructions">
+      🔍 Point your camera at the brochure
+    </div>
+
+    <!-- The AR scene -->
     <a-scene
       embedded
       arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
       renderer="antialias: true; alpha: false;"
+      vr-mode-ui="enabled: false"
     >
-      <!-- This asset pre-loads the video to ensure smooth playback -->
+      <!-- Assets that need to load before the scene starts -->
       <a-assets>
         <video
           id="brochure-video"
-          src="path/to/your/video.mp4"
+          src="ethno-3.mp4"
           preload="auto"
           crossorigin="anonymous"
           loop
@@ -24,44 +75,83 @@
         ></video>
       </a-assets>
 
-      <!-- The camera entity required for AR -->
+      <!-- The camera -->
       <a-camera static></a-camera>
 
-      <!-- This entity represents the marker (the brochure) -->
+      <!-- The marker (your brochure) -->
       <a-nft
         type="nft"
-        url="path/to/your/marker/file.patt"
+        url="pattern-223.patt"
         smooth="true"
         smoothCount="5"
         smoothTolerance="0.01"
         smoothThreshold="5"
+        id="marker"
       >
-        <!-- This plane will hold the video. It matches the brochure dimensions -->
+        <!-- Video plane that appears on the marker -->
         <a-plane
           rotation="-90 0 0"
-          width="1.33"  <!-- Adjust based on your brochure aspect ratio -->
-          height="1"    <!-- e.g., for a landscape brochure -->
+          width="1.33"
+          height="1"
           position="0 0 0"
           material="shader: flat; src: #brochure-video; transparent: true;"
-          eventsource
+          class="clickable"
         ></a-plane>
       </a-nft>
     </a-scene>
 
-    <!-- Simple script to handle video playback once marker is found -->
+    <!-- Script to handle video playback and hide loading screen -->
     <script>
+      // Hide loading screen after a timeout (or when marker is found)
+      setTimeout(function() {
+        document.getElementById('loading').style.opacity = '0';
+        setTimeout(function() {
+          document.getElementById('loading').style.display = 'none';
+        }, 1000);
+      }, 3000);
+      
+      // Handle video playback with marker detection
       AFRAME.registerComponent('eventsource', {
         init: function() {
-          let video = document.querySelector('#brochure-video');
-          // When the marker is detected, play the video
-          this.el.sceneEl.addEventListener('nftmarkerfound', function() {
-            video.play().catch(e => console.log("Playback failed (expected if no interaction): ", e));
+          console.log("Component initialized");
+        }
+      });
+      
+      // Add event listeners for marker detection
+      document.addEventListener('DOMContentLoaded', function() {
+        const scene = document.querySelector('a-scene');
+        const video = document.getElementById('brochure-video');
+        const instructions = document.getElementById('instructions');
+        
+        if (scene) {
+          scene.addEventListener('nftmarkerfound', function(event) {
+            console.log('Marker found!', event);
+            instructions.innerHTML = '✅ Video playing! Move slowly';
+            instructions.style.background = 'rgba(0,100,0,0.7)';
+            
+            // Try to play video (must be muted for autoplay)
+            video.play().then(() => {
+              console.log('Video playing');
+            }).catch(error => {
+              console.log('Video play failed:', error);
+              instructions.innerHTML = '⚠️ Tap screen to play video';
+            });
           });
-          // Optional: Pause video when marker is lost
-          this.el.sceneEl.addEventListener('nftmarkerlost', function() {
+          
+          scene.addEventListener('nftmarkerlost', function() {
+            console.log('Marker lost');
+            instructions.innerHTML = '🔍 Brochure lost - point camera at it again';
+            instructions.style.background = 'rgba(0,0,0,0.7)';
             video.pause();
           });
         }
+        
+        // Fallback: try to play video on first user interaction
+        document.body.addEventListener('click', function() {
+          if (video.paused) {
+            video.play().catch(e => console.log('Play failed:', e));
+          }
+        });
       });
     </script>
   </body>
