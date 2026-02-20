@@ -3,33 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>AR Brochure with Slide Effect</title>
+  <title>AR Brochure – Debug</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
-    .instructions {
-      position: fixed; bottom: 30px; left: 0; width: 100%;
-      text-align: center; color: white; background: rgba(0,0,0,0.7);
-      padding: 15px; z-index: 100; font-size: 18px;
-      pointer-events: none;
+    body { margin: 0; overflow: hidden; }
+    #status {
+      position: fixed; top: 20px; left: 20px; right: 20px;
+      background: rgba(0,0,0,0.8); color: white; padding: 15px;
+      border-radius: 10px; z-index: 1000; font-family: monospace;
+      white-space: pre-wrap; word-break: break-word;
     }
   </style>
 </head>
 <body>
-  <div class="instructions" id="instructions">
-    🔍 Point your camera at the brochure
-  </div>
+  <div id="status">Initializing...</div>
 
   <a-scene
     embedded
     arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
     vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: false;"
+    arjs-log="console"
   >
     <a-assets>
-      <!-- Use your own video hosted on GitHub or elsewhere -->
+      <!-- Public test video (replace with your own later) -->
       <video id="brochure-video"
-             src="ethno-3.mp4"   <!-- Replace with your video file -->
+             src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
              preload="auto"
              loop
              muted
@@ -40,54 +40,49 @@
 
     <a-camera static></a-camera>
 
-    <!-- Your custom marker -->
-    <a-nft type="nft" url="brochure.patt" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="5">
-      <!-- Video plane with scale animation (slides in) -->
+    <!-- Use your marker file – make sure the path is correct -->
+    <a-nft type="nft" url="brochure.patt" smooth="true">
       <a-plane
         rotation="-90 0 0"
         width="1.33"
         height="1"
         position="0 0 0"
-        material="shader: flat; src: #brochure-video; transparent: true;"
-        scale="0 0 0"                 <!-- Start invisible -->
+        material="shader: flat; src: #brochure-video; opacity: 0;"
+        scale="0 0 0"
         animation__slide="property: scale; to: 1 1 1; dur: 500; easing: easeOutElastic; startEvents: markerFound"
-        animation__fade="property: material.opacity; to: 1; dur: 300; startEvents: markerFound"
-      ></a-plane>
-
-      <!-- Optional tracer: a wireframe border that appears around the video -->
-      <a-ring
-        radius-inner="0.68"
-        radius-outer="0.7"
-        rotation="-90 0 0"
-        position="0 0.01 0"
-        color="cyan"
-        material="wireframe: true; opacity: 0.8"
-        visible="false"
-        animation__showborder="property: visible; to: true; dur: 1; startEvents: markerFound"
-      ></a-ring>
+        animation__fade="property: material.opacity; to: 1; dur: 300; startEvents: markerFound">
+      </a-plane>
     </a-nft>
   </a-scene>
 
   <script>
-    const video = document.getElementById('brochure-video');
-    const instructions = document.getElementById('instructions');
+    const statusDiv = document.getElementById('status');
+    
+    // Show messages
+    window.onerror = function(msg, url, line) {
+      statusDiv.innerHTML += `\n❌ ERROR: ${msg} at line ${line}`;
+    };
 
+    // Log AR events
     document.querySelector('a-scene').addEventListener('nftmarkerfound', () => {
-      video.play().catch(e => console.log('Autoplay failed:', e));
-      instructions.innerHTML = '✅ Video sliding in!';
-      instructions.style.background = 'rgba(0,100,0,0.7)';
+      statusDiv.innerHTML = '✅ Marker found! Video should play.';
+      document.getElementById('brochure-video').play().catch(e => {
+        statusDiv.innerHTML += `\n⚠️ Video play error: ${e.message}`;
+      });
     });
 
     document.querySelector('a-scene').addEventListener('nftmarkerlost', () => {
-      video.pause();
-      instructions.innerHTML = '🔍 Brochure lost – point again';
-      instructions.style.background = 'rgba(0,0,0,0.7)';
+      statusDiv.innerHTML = '🔍 Marker lost';
     });
 
-    // Fallback for autoplay restrictions
-    document.body.addEventListener('click', () => {
-      if (video.paused) video.play().catch(e => console.log(e));
+    document.querySelector('a-scene').addEventListener('camera-error', (e) => {
+      statusDiv.innerHTML = `❌ Camera error: ${e.detail.error}`;
     });
+
+    // Check if camera access is granted
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(() => statusDiv.innerHTML = '📷 Camera access granted. Looking for marker...')
+      .catch(err => statusDiv.innerHTML = `❌ Camera permission denied: ${err.message}`);
   </script>
 </body>
 </html>
