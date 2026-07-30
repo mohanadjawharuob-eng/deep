@@ -1,7 +1,9 @@
 {
   "name": "Kitchen — Recipes, Meal Plan & Shopping",
   "short_name": "Kitchen",
+  "description": "Kitchen — Recipes, Meal Plan & Shopping",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "start_url": "./kitchen.html",
   "scope": "./",
   "background_color": "#f4f1ea",
@@ -18,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "./icons/kitchen-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

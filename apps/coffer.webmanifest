@@ -1,7 +1,9 @@
 {
   "name": "Coffer — Personal Finance",
   "short_name": "Coffer",
+  "description": "Coffer — Personal Finance",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "start_url": "./coffer.html",
   "scope": "./",
   "background_color": "#eff1ed",
@@ -18,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "./icons/coffer-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -1,7 +1,9 @@
 {
   "name": "Daybook — Focus, Tasks & Habits",
   "short_name": "Daybook",
+  "description": "Daybook — Focus, Tasks & Habits",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "start_url": "./daybook.html",
   "scope": "./",
   "background_color": "#eceff5",
@@ -18,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "./icons/daybook-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

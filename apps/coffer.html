@@ -3995,3 +3995,15 @@
   else boot();
 })();
 </script>
+
+<script>
+  // Registers the offline worker. Only meaningful over https (or localhost) —
+  // opening this file straight from disk simply skips it, and the app still
+  // works because everything it needs is already inside the file.
+  if ('serviceWorker' in navigator &&
+      (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+</script>

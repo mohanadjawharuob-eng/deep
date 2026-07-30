@@ -1,7 +1,9 @@
 {
   "name": "Timesheet — Hours & Invoices",
   "short_name": "Timesheet",
+  "description": "Timesheet — Hours & Invoices",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "start_url": "./timesheet.html",
   "scope": "./",
   "background_color": "#eceff1",
@@ -18,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "./icons/timesheet-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
