@@ -1,5 +1,5 @@
 /* Offline shell for the apps in this folder. */
-var CACHE = 'apps-v3';
+var CACHE = 'apps-v4';
 var PRECACHE = [
   "./index.html",
   "./daybook.html",
@@ -12,13 +12,19 @@ var PRECACHE = [
   "./timesheet.webmanifest",
   "./icons/daybook-192.png",
   "./icons/daybook-512.png",
+  "./icons/daybook-512-maskable.png",
   "./icons/coffer-192.png",
   "./icons/coffer-512.png",
+  "./icons/coffer-512-maskable.png",
   "./icons/kitchen-192.png",
   "./icons/kitchen-512.png",
+  "./icons/kitchen-512-maskable.png",
   "./icons/timesheet-192.png",
   "./icons/timesheet-512.png",
-  "./icons/apps-192.png"
+  "./icons/timesheet-512-maskable.png",
+  "./icons/apps-192.png",
+  "./icons/apps-512.png",
+  "./icons/apps-512-maskable.png"
 ];
 
 self.addEventListener('install', function (e) {

@@ -1,15 +1,30 @@
 {
   "name": "Apps",
   "short_name": "Apps",
-  "description": "Daybook, Coffer, Kitchen and Timesheet — all offline, all local.",
+  "description": "Daybook, Coffer, Kitchen and Timesheet \u2014 all offline, all local.",
   "display": "standalone",
   "start_url": "./index.html",
   "scope": "./",
   "background_color": "#f2f2ef",
   "theme_color": "#3d4a52",
   "icons": [
-    { "src": "./icons/apps-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "./icons/apps-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "./icons/apps-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "./icons/apps-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/apps-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/apps-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

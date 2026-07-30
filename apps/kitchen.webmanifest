@@ -22,7 +22,7 @@
       "purpose": "any"
     },
     {
-      "src": "./icons/kitchen-512.png",
+      "src": "./icons/kitchen-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
