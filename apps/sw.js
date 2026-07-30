@@ -1,5 +1,5 @@
 /* Offline shell for the apps in this folder. */
-var CACHE = 'apps-v4';
+var CACHE = 'apps-v5';
 var PRECACHE = [
   "./index.html",
   "./daybook.html",

@@ -2535,11 +2535,11 @@
     html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Backup and restore</h3>' +
       '<span class="sub">' + (bytesUsed() / 1024).toFixed(1) + " KB stored</span></div><div class=\"card-body\">" +
       '<div class="btn-row">' +
-      '<button class="btn primary" data-act="export-json">Export backup (.json)</button>' +
+      '<button class="btn primary" data-act="export-json">Back up my data</button>' +
       '<button class="btn" data-act="export-csv">Export transactions (.csv)</button>' +
-      '<button class="btn" data-act="import-json">Import a backup</button>' +
-      "</div><p class=\"hint\" style=\"margin-top:0.75rem\">Importing replaces everything currently in this browser. " +
-      "You'll be asked to confirm first.</p></div></div>";
+      '<button class="btn" data-act="import-json">Restore a backup</button>' +
+      "</div><p class=\"hint\" style=\"margin-top:0.75rem\">Back up gives you the text and a file — copy the text if " +
+      "your browser blocks downloads. Restoring replaces everything currently in this browser, after a confirmation.</p></div></div>";
 
     /* currency */
     html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Currency</h3></div><div class="card-body">' +
@@ -3321,8 +3321,7 @@
 
     /* ---- data ---- */
     "export-json": function () {
-      download("coffer-backup-" + today() + ".json", JSON.stringify(state, null, 2), "application/json");
-      toast("Backup downloaded.");
+      backupDialog("coffer-backup-" + today() + ".json", JSON.stringify(state, null, 2));
     },
 
     "export-csv": function () {
@@ -3342,51 +3341,36 @@
     },
 
     "import-json": function () {
-      var inp = document.createElement("input");
-      inp.type = "file";
-      inp.accept = "application/json,.json";
-      inp.addEventListener("change", function () {
-        var file = inp.files && inp.files[0];
-        if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function () {
-          var parsed;
-          try { parsed = JSON.parse(reader.result); }
-          catch (e) { toast("That file isn't valid JSON."); return; }
-          if (!parsed || typeof parsed !== "object" || (!parsed.accounts && !parsed.transactions)) {
-            toast("That doesn't look like a Coffer backup.");
-            return;
+      restoreDialog(function (parsed) {
+        var counts = (parsed.accounts || []).length + " accounts, " +
+          (parsed.transactions || []).length + " transactions";
+        confirmAction({
+          title: "Replace everything with this backup?",
+          message: "The backup holds <b>" + counts + "</b>. Everything currently in this browser will be " +
+            "replaced. This can't be undone.",
+          confirmLabel: "Replace my data"
+        }, function () {
+          var incoming = parsed.version === 2 || parsed.categories ? parsed : migrateV1(parsed);
+          var fresh = blank();
+          if (incoming.settings) {
+            fresh.settings.currency = incoming.settings.currency || "$";
+            fresh.settings.lock = incoming.settings.lock || null;
           }
-          var counts = (parsed.accounts || []).length + " accounts, " + (parsed.transactions || []).length + " transactions";
-          confirmAction({
-            title: "Replace everything with this backup?",
-            message: "The file holds <b>" + counts + "</b>. Everything currently in this browser will be replaced. This can't be undone.",
-            confirmLabel: "Replace my data"
-          }, function () {
-            var incoming = parsed.version === 2 || parsed.categories ? parsed : migrateV1(parsed);
-            var fresh = blank();
-            if (incoming.settings) {
-              fresh.settings.currency = incoming.settings.currency || "$";
-              fresh.settings.lock = incoming.settings.lock || null;
-            }
-            if (incoming.categories) {
-              if (Array.isArray(incoming.categories.expense) && incoming.categories.expense.length) fresh.categories.expense = incoming.categories.expense;
-              if (Array.isArray(incoming.categories.income) && incoming.categories.income.length) fresh.categories.income = incoming.categories.income;
-            }
-            ["accounts", "transactions", "goals", "debts", "recurring", "quick"].forEach(function (k) {
-              if (Array.isArray(incoming[k])) fresh[k] = incoming[k];
-            });
-            if (incoming.budgets && typeof incoming.budgets === "object") fresh.budgets = incoming.budgets;
-            fresh.extraDebtPayment = num(incoming.extraDebtPayment);
-            state = fresh;
-            viewMonth = thisMonth();
-            save(); render();
-            toast("Backup restored.");
+          if (incoming.categories) {
+            if (Array.isArray(incoming.categories.expense) && incoming.categories.expense.length) fresh.categories.expense = incoming.categories.expense;
+            if (Array.isArray(incoming.categories.income) && incoming.categories.income.length) fresh.categories.income = incoming.categories.income;
+          }
+          ["accounts", "transactions", "goals", "debts", "recurring", "quick"].forEach(function (k) {
+            if (Array.isArray(incoming[k])) fresh[k] = incoming[k];
           });
-        };
-        reader.readAsText(file);
+          if (incoming.budgets && typeof incoming.budgets === "object") fresh.budgets = incoming.budgets;
+          fresh.extraDebtPayment = num(incoming.extraDebtPayment);
+          state = fresh;
+          viewMonth = thisMonth();
+          save(); render();
+          toast("Backup restored — " + counts + ".");
+        });
       });
-      inp.click();
     },
 
     "wipe": function () {
@@ -3712,8 +3696,121 @@
       document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
     } catch (e) {
-      toast("This browser blocked the download. Try opening the file directly rather than in a preview frame.");
+      toast("This browser blocked the download. Copy the text instead.");
     }
+  }
+
+  /* Saving a file is not always allowed. Inside an embedded frame the browser
+     can ignore the download without raising anything at all, so a plain
+     "saved!" message would be a lie. Always show the text as well, so there
+     is a route out of the app that cannot silently fail. */
+  function backupDialog(name, text) {
+    closeModal();
+    overlay.innerHTML = '<div class="scrim" data-scrim="1"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Your backup">' +
+      '<div class="modal-head"><h3>Your backup</h3>' +
+      "<p>Two ways to keep this. <b>Save as file</b> puts it in your downloads — but some browsers block that " +
+      "silently, so if nothing shows up there, use <b>Copy</b> and paste it somewhere safe (a note to yourself, " +
+      "an email, a message). Either one can be restored later.</p></div>" +
+      '<div class="modal-body">' +
+      '<textarea id="bkText" readonly rows="9" spellcheck="false" ' +
+      'style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.76rem;padding:0.6rem;' +
+      'border-radius:8px;border:1px solid var(--rule-mid);background:var(--raised);color:var(--ink);resize:vertical">' +
+      esc(text) + "</textarea>" +
+      '<p class="hint" style="margin-top:0.5rem">' + (text.length / 1024).toFixed(1) + " KB · " +
+      state.transactions.length + " transactions · " + state.accounts.length + " accounts</p></div>" +
+      '<div class="modal-foot">' +
+      '<button class="btn quiet" data-mclose="1">Done</button>' +
+      '<button class="btn" id="bkFile">Save as file</button>' +
+      '<button class="btn primary" id="bkCopy">Copy</button>' +
+      "</div></div></div>";
+
+    var ta = document.getElementById("bkText");
+    overlay.querySelector("[data-mclose]").addEventListener("click", closeModal);
+    overlay.querySelector("[data-scrim]").addEventListener("mousedown", function (e) {
+      if (e.target === e.currentTarget) closeModal();
+    });
+    document.getElementById("bkFile").addEventListener("click", function () {
+      download(name, text, "application/json");
+      toast("If nothing appears in your downloads, this browser blocked it — use Copy.");
+    });
+    document.getElementById("bkCopy").addEventListener("click", function () {
+      function fallback() {
+        ta.removeAttribute("readonly");
+        ta.focus();
+        ta.setSelectionRange(0, ta.value.length);
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) {}
+        ta.setAttribute("readonly", "readonly");
+        toast(ok ? "Backup copied — paste it somewhere safe."
+                 : "Couldn't copy automatically. The text is selected — copy it by hand.");
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          toast("Backup copied — paste it somewhere safe.");
+        }, fallback);
+      } else { fallback(); }
+    });
+  }
+
+  // Restoring has the same problem in reverse: a file picker can be awkward or
+  // blocked, so pasting the text back in is always available.
+  function restoreDialog(onJson) {
+    closeModal();
+    overlay.innerHTML = '<div class="scrim" data-scrim="1"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Restore a backup">' +
+      '<div class="modal-head"><h3>Restore a backup</h3>' +
+      "<p>Paste the backup text below, or pick the .json file if you saved one. Everything currently in this " +
+      "browser will be replaced — you'll get one more chance to confirm.</p></div>" +
+      '<div class="modal-body">' +
+      '<textarea id="rsText" rows="9" spellcheck="false" placeholder=\'{ "version": 2, "accounts": [ … ] }\' ' +
+      'style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.76rem;padding:0.6rem;' +
+      'border-radius:8px;border:1px solid var(--rule-mid);background:var(--surface);color:var(--ink);resize:vertical"></textarea>' +
+      '<div id="rsInfo" class="hint" style="margin-top:0.5rem">Nothing pasted yet.</div></div>' +
+      '<div class="modal-foot">' +
+      '<button class="btn quiet" data-mclose="1">Cancel</button>' +
+      '<label class="btn" style="cursor:pointer">Choose a file' +
+      '<input type="file" id="rsFile" accept="application/json,.json" style="display:none" /></label>' +
+      '<button class="btn primary" id="rsGo">Restore</button>' +
+      "</div></div></div>";
+
+    var ta = document.getElementById("rsText");
+    var info = document.getElementById("rsInfo");
+
+    function peek() {
+      var t = ta.value.trim();
+      if (!t) { info.textContent = "Nothing pasted yet."; info.style.color = ""; return null; }
+      var p;
+      try { p = JSON.parse(t); }
+      catch (e) { info.textContent = "That isn't valid JSON yet — make sure you pasted all of it."; info.style.color = "var(--warn)"; return null; }
+      if (!p || (!p.accounts && !p.transactions)) {
+        info.textContent = "Valid JSON, but it doesn't look like a Coffer backup.";
+        info.style.color = "var(--warn)";
+        return null;
+      }
+      info.textContent = "Looks good — " + (p.accounts || []).length + " accounts, " +
+        (p.transactions || []).length + " transactions.";
+      info.style.color = "var(--gain)";
+      return p;
+    }
+
+    ta.addEventListener("input", peek);
+    overlay.querySelector("[data-mclose]").addEventListener("click", closeModal);
+    overlay.querySelector("[data-scrim]").addEventListener("mousedown", function (e) {
+      if (e.target === e.currentTarget) closeModal();
+    });
+    document.getElementById("rsFile").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var r = new FileReader();
+      r.onload = function () { ta.value = r.result; peek(); };
+      r.readAsText(file);
+    });
+    document.getElementById("rsGo").addEventListener("click", function () {
+      var parsed = peek();
+      if (!parsed) { toast("Paste a valid backup first."); return; }
+      closeModal();
+      onJson(parsed);
+    });
+    ta.focus();
   }
 
   /* ---------------- screen lock (obfuscation, not encryption) ---------------- */
