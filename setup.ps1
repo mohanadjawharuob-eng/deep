@@ -35,12 +35,36 @@ if (Test-Path ".env") {
 
 function New-RandomString {
     param([int]$Length)
+
     # Letters and digits only: the value ends up in a .env file and in a
     # database URL, where punctuation would need escaping.
     $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    $bytes = [byte[]]::new($Length)
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-    -join ($bytes | ForEach-Object { $alphabet[$_ % $alphabet.Length] })
+
+    # RandomNumberGenerator::Create() exists on both .NET Framework — which is
+    # what Windows PowerShell 5.1 runs on, and 5.1 is what Windows ships by
+    # default — and modern .NET. The static Fill() method does not: it is .NET
+    # Core 2.1 and later only, so calling it fails on a stock Windows machine.
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $result = New-Object System.Text.StringBuilder
+
+        # 62 characters do not divide 256 evenly. Values landing in the final
+        # partial block are discarded rather than wrapped, so every character
+        # stays equally likely instead of the first few being slightly favoured.
+        $limit = 256 - (256 % $alphabet.Length)
+        $buffer = New-Object byte[] 1
+
+        while ($result.Length -lt $Length) {
+            $rng.GetBytes($buffer)
+            if ($buffer[0] -lt $limit) {
+                [void]$result.Append($alphabet[$buffer[0] % $alphabet.Length])
+            }
+        }
+        $result.ToString()
+    }
+    finally {
+        $rng.Dispose()
+    }
 }
 
 $secretKey    = New-RandomString -Length 64
@@ -53,7 +77,11 @@ Copy-Item ".env.example" ".env" -Force
 
 # Read as lines, swap the four values, write back as UTF-8 without a byte-order
 # mark: a BOM would end up inside the first variable's name and break parsing.
-$lines = Get-Content ".env"
+#
+# ``-Encoding UTF8`` is needed because Windows PowerShell 5.1 otherwise reads a
+# UTF-8 file as the system code page, which garbles the punctuation in the
+# template's comments on the round trip.
+$lines = Get-Content ".env" -Encoding UTF8
 $replacements = @{
     "SECRET_KEY"           = $secretKey
     "POSTGRES_PASSWORD"    = $dbPassword
