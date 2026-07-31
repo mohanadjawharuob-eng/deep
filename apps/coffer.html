@@ -1,7 +1,7 @@
 <title>Coffer — Personal Finance, Fully Local</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#eff1ed" media="(prefers-color-scheme: light)" />
-<meta name="theme-color" content="#0b1110" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef1ec" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#101f1b" media="(prefers-color-scheme: dark)" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -1107,6 +1107,11 @@
      which are blocked in a sandboxed frame.
      ============================================================ */
 
+  // Sentinel for the "add one" row in a category dropdown. Plain printable
+  // text only — a NUL byte is invalid in an HTML attribute and the browser
+  // mangles it, so the option would never match on the way back.
+  var NEW_CAT = "::add-new-category::";
+
   var overlay = document.getElementById("overlay");
   var escHandler = null;
 
@@ -1133,7 +1138,14 @@
             var val = typeof o === "string" ? o : o.value;
             var lab = typeof o === "string" ? o : o.label;
             return '<option value="' + esc(val) + '"' + (String(val) === String(f.value) ? " selected" : "") + ">" + esc(lab) + "</option>";
-          }).join("") + "</select>";
+          }).join("") +
+            // let the list grow instead of being stuck with the ones I picked
+            (f.catKind ? '<option value="' + NEW_CAT + '">\uFF0B New category\u2026</option>' : "") +
+            "</select>" +
+            (f.catKind
+              ? '<input id="' + id + '_new" type="text" placeholder="Name it, e.g. Childcare" ' +
+                'autocomplete="off" aria-label="New category name" style="display:none;margin-top:0.4rem" />'
+              : "");
         } else {
           inner = '<input id="' + id + '" type="' + (f.type || "text") + '"' +
             ' value="' + esc(f.value == null ? "" : f.value) + '"' +
@@ -1157,21 +1169,57 @@
 
     function collect() {
       var out = {};
+      out.__newCats = [];
       fields.forEach(function (f) {
         var el = document.getElementById("mf_" + f.key);
-        out[f.key] = f.type === "number" ? num(el.value) : el.value;
+        if (f.catKind && el.value === NEW_CAT) {
+          var box = document.getElementById("mf_" + f.key + "_new");
+          var typed = (box ? box.value : "").trim();
+          out[f.key] = typed;
+          out.__newCats.push({ key: f.key, kind: f.catKind, name: typed });
+        } else {
+          out[f.key] = f.type === "number" ? num(el.value) : el.value;
+        }
       });
       return out;
     }
 
     function accept() {
       var vals = collect();
+
+      // Whether a new name belongs to expenses or income is only knowable
+      // once the type field has been read, hence kind "auto".
+      var i, nc;
+      for (i = 0; i < vals.__newCats.length; i++) {
+        nc = vals.__newCats[i];
+        nc.kind = nc.kind === "auto" ? (vals.type === "income" ? "income" : "expense") : nc.kind;
+        if (!nc.name) { toast("Type a name for the new category."); return; }
+        // typing one that already exists just picks it, rather than duplicating
+        var clash = state.categories[nc.kind].filter(function (c) {
+          return c.toLowerCase() === nc.name.toLowerCase();
+        })[0];
+        if (clash) { vals[nc.key] = clash; nc.added = false; }
+        else { nc.added = true; }
+      }
+
       if (opts.validate) {
         var problem = opts.validate(vals);
         if (problem) { toast(problem); return; }
       }
+
+      var addedAny = false;
+      for (i = 0; i < vals.__newCats.length; i++) {
+        nc = vals.__newCats[i];
+        if (nc.added) { state.categories[nc.kind].push(nc.name); addedAny = true; }
+      }
+      if (addedAny) save();
+
       closeModal();
       if (opts.onConfirm) opts.onConfirm(vals);
+      for (i = 0; i < vals.__newCats.length; i++) {
+        nc = vals.__newCats[i];
+        if (nc.added) toast("\u201C" + nc.name + "\u201D added to your " + nc.kind + " categories.");
+      }
     }
 
     overlay.querySelector("[data-mok]").addEventListener("click", accept);
@@ -1184,6 +1232,17 @@
     });
     overlay.querySelectorAll(".modal input").forEach(function (inp) {
       inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); accept(); } });
+    });
+    fields.forEach(function (f) {
+      if (!f.catKind) return;
+      var sel = document.getElementById("mf_" + f.key);
+      var box = document.getElementById("mf_" + f.key + "_new");
+      if (!sel || !box) return;
+      sel.addEventListener("change", function () {
+        var isNew = sel.value === NEW_CAT;
+        box.style.display = isNew ? "" : "none";
+        if (isNew) box.focus();
+      });
     });
 
     escHandler = function (e) {
@@ -2627,7 +2686,10 @@
       '<div class="field"><label class="label" for="omni_cat">Category</label><select id="omni_cat">' +
       cats.map(function (c) {
         return '<option value="' + esc(c) + '"' + (c === cat ? " selected" : "") + ">" + esc(c) + "</option>";
-      }).join("") + "</select></div>" +
+      }).join("") +
+      '<option value="' + NEW_CAT + '">\uFF0B New category\u2026</option></select>' +
+      '<input id="omni_cat_new" type="text" placeholder="Name it" autocomplete="off" ' +
+      'aria-label="New category name" style="display:none;margin-top:0.4rem" /></div>' +
       '<div class="field"><label class="label" for="omni_acc">Account</label><select id="omni_acc">' +
       state.accounts.map(function (a) {
         return '<option value="' + a.id + '"' + (a.id === acc ? " selected" : "") + ">" + esc(a.name) + "</option>";
@@ -2682,7 +2744,16 @@
 
   function wireOmniPreview() {
     var c = document.getElementById("omni_cat");
-    if (c) c.addEventListener("change", function () { omni.touched.category = c.value; });
+    var cNew = document.getElementById("omni_cat_new");
+    if (c) c.addEventListener("change", function () {
+      if (c.value === NEW_CAT) {
+        // keep the typed name out of touched.category until it's committed
+        if (cNew) { cNew.style.display = ""; cNew.focus(); }
+      } else {
+        if (cNew) cNew.style.display = "none";
+        omni.touched.category = c.value;
+      }
+    });
     var a = document.getElementById("omni_acc");
     if (a) a.addEventListener("change", function () { omni.touched.accountId = a.value; });
     var d = document.getElementById("omni_date");
@@ -2707,8 +2778,20 @@
   function commitOmni() {
     var p = parseEntry(omni.text);
     if (!p || !p.ok) { toast(p && p.reason ? p.reason : "Type an amount and what it was for."); return; }
-    var cats = state.categories[p.type === "income" ? "income" : "expense"];
+    var kind = p.type === "income" ? "income" : "expense";
+    var cats = state.categories[kind];
     var cat = omni.touched.category && cats.indexOf(omni.touched.category) >= 0 ? omni.touched.category : p.category;
+
+    // a category typed into the quick box joins the list for good
+    var sel = document.getElementById("omni_cat");
+    var box = document.getElementById("omni_cat_new");
+    if (sel && sel.value === NEW_CAT) {
+      var typed = (box ? box.value : "").trim();
+      if (!typed) { toast("Type a name for the new category."); return; }
+      var clash = cats.filter(function (c) { return c.toLowerCase() === typed.toLowerCase(); })[0];
+      if (clash) { cat = clash; }
+      else { cats.push(typed); cat = typed; toast("\u201C" + typed + "\u201D added to your " + kind + " categories."); }
+    }
     var tx = {
       id: uid(),
       date: omni.touched.date || p.date,
@@ -2840,7 +2923,7 @@
           { key: "type", label: "Type", type: "select", options: ["expense", "income"], value: k },
           { key: "date", label: "Date", type: "date", value: today() },
           { key: "desc", label: "Description", placeholder: "e.g. Weekly shop", span: true },
-          { key: "category", label: "Category", type: "select", options: catOptions(k) },
+          { key: "category", label: "Category", type: "select", options: catOptions(k), catKind: "auto" },
           { key: "account", label: "Account", type: "select", options: accountOptions() },
           { key: "amount", label: "Amount", type: "number", min: 0 }
         ];
@@ -2916,7 +2999,7 @@
           { key: "type", label: "Type", type: "select", options: ["expense", "income"], value: t.type },
           { key: "date", label: "Date", type: "date", value: t.date },
           { key: "desc", label: "Description", value: t.desc, span: true },
-          { key: "category", label: "Category", type: "select", options: catOptions(t.type).concat(
+          { key: "category", label: "Category", type: "select", catKind: "auto", options: catOptions(t.type).concat(
               catOptions(t.type).indexOf(t.category) === -1 ? [t.category] : []), value: t.category },
           { key: "account", label: "Account", type: "select", options: accountOptions(), value: t.accountId },
           { key: "amount", label: "Amount", type: "number", value: t.amount, min: 0 }
@@ -2977,7 +3060,7 @@
       openModal({
         title: "Set a budget",
         fields: [
-          { key: "category", label: "Category", type: "select", options: free },
+          { key: "category", label: "Category", type: "select", options: free, catKind: "expense" },
           { key: "limit", label: "Monthly limit", type: "number", min: 0 }
         ],
         validate: function (v) { if (v.limit <= 0) return "Enter a limit above zero."; },
@@ -3015,7 +3098,8 @@
           { key: "name", label: "Name", placeholder: "e.g. Rent", span: true },
           { key: "type", label: "Type", type: "select", options: ["expense", "income"], value: "expense" },
           { key: "amount", label: "Amount", type: "number", min: 0 },
-          { key: "category", label: "Category", type: "select", options: catOptions("expense").concat(catOptions("income")) },
+          { key: "category", label: "Category", type: "select", catKind: "auto",
+            options: catOptions("expense").concat(catOptions("income")) },
           { key: "account", label: "Account", type: "select", options: accountOptions() },
           { key: "frequency", label: "Repeats", type: "select", options: FREQ, value: "monthly" },
           { key: "nextDate", label: "Next due", type: "date", value: today() }
@@ -3044,7 +3128,7 @@
           { key: "name", label: "Name", value: r.name, span: true },
           { key: "type", label: "Type", type: "select", options: ["expense", "income"], value: r.type },
           { key: "amount", label: "Amount", type: "number", value: r.amount, min: 0 },
-          { key: "category", label: "Category", type: "select",
+          { key: "category", label: "Category", type: "select", catKind: "auto",
             options: catOptions("expense").concat(catOptions("income")), value: r.category },
           { key: "account", label: "Account", type: "select", options: accountOptions(), value: r.accountId },
           { key: "frequency", label: "Repeats", type: "select", options: FREQ, value: r.frequency },
@@ -3652,7 +3736,7 @@
         fields: [
           { key: "label", label: "Label", placeholder: "e.g. Taxi", span: true },
           { key: "type", label: "Type", type: "select", options: ["expense", "income"], value: "expense" },
-          { key: "category", label: "Category", type: "select", options: allCats },
+          { key: "category", label: "Category", type: "select", options: allCats, catKind: "auto" },
           { key: "accountId", label: "Account", type: "select", options: accountOptions() },
           { key: "amount", label: "Amount", type: "number", placeholder: "leave blank to ask", min: 0 }
         ],
@@ -4091,6 +4175,7 @@
   if (state.settings.lock) showLockScreen(boot);
   else boot();
 })();
+
 </script>
 
 <script>

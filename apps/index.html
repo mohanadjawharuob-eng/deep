@@ -61,6 +61,13 @@
   .note b { color: var(--ink); font-weight: 620; }
   .note ol { padding-left: 1.1rem; margin: 0.5rem 0 0; }
   .note li { margin-bottom: 0.3rem; }
+  .install {
+    display: none; width: 100%; margin-top: 1rem; padding: 0.8rem 1rem;
+    font: inherit; font-weight: 620; font-size: 0.95rem;
+    background: var(--ink); color: var(--page);
+    border: 0; border-radius: 12px; cursor: pointer;
+  }
+  .install:active { opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -92,19 +99,49 @@
     </a>
   </div>
 
+  <button class="install" id="install" type="button">Install this page as one app</button>
+
   <div class="note">
-    <b>Install one to your home screen</b>
+    <b>Install one app to your home screen</b>
     <ol>
       <li>Open the app itself (tap it above) — not this page.</li>
-      <li>Chrome menu <b>⋮</b> → <b>Add to Home screen</b>. On iPhone: Share → Add to Home Screen.</li>
+      <li>Chrome menu <b>⋮</b> → <b>Install app</b>. On iPhone: Share → Add to Home Screen.</li>
       <li>It gets its own icon and opens full-screen, without the browser bar.</li>
     </ol>
-    <p style="margin:0.8rem 0 0">Each app stores its data separately per device. Use the <b>Export backup</b> button in
+
+    <p style="margin:1rem 0 0"><b>Installed it but can't find the icon?</b> Android puts installed web apps in the
+    <b>app drawer</b> (swipe up from the bottom), not always on the home screen. Find it there, press and hold, then
+    drag it onto your home screen. That's your shortcut — it opens straight into the app with no browser bar,
+    which is the same thing Chrome's <b>Open app</b> button does.</p>
+
+    <p style="margin:0.9rem 0 0"><b>Want one icon instead of four?</b> Install <i>this</i> page. You get a single
+    <b>Apps</b> icon that opens the list above, and you tap through from there.</p>
+
+    <p style="margin:0.9rem 0 0">Each app stores its data separately per device. Use the <b>Export backup</b> button in
     each app's settings if the data matters to you.</p>
   </div>
 </main>
 
 <script>
+  // Chrome hands us the install prompt instead of showing its own banner.
+  // Park it on a button so there is always something to press.
+  (function () {
+    var btn = document.getElementById('install');
+    var deferred = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferred = e;
+      btn.style.display = 'block';
+    });
+    btn.addEventListener('click', function () {
+      if (!deferred) return;
+      deferred.prompt();
+      deferred.userChoice.then(function () { deferred = null; btn.style.display = 'none'; });
+    });
+    // Already running as an installed app — nothing to offer.
+    window.addEventListener('appinstalled', function () { btn.style.display = 'none'; });
+  })();
+
   if ('serviceWorker' in navigator &&
       (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
     window.addEventListener('load', function () {
