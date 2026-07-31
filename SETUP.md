@@ -236,6 +236,25 @@ icon to settle, then try again.
 **"Cannot connect to the Docker daemon"**
 Docker Desktop is installed but not running. Open it.
 
+**"password authentication failed for user"**
+The database keeps its password from the moment it was first created. If you
+re-ran the setup script, your `.env` now holds a *new* password while the
+stored database still expects the old one. Wipe it and start again:
+
+```
+docker compose down -v
+docker compose up
+```
+
+`down -v` deletes the database and everything in it. That is fine before you
+have entered real records — the demonstration data is recreated automatically —
+but not afterwards. To change the password later without losing data, change it
+inside PostgreSQL rather than in `.env`.
+
+Note that the database is shared between copies of the project on your machine:
+its name is fixed, so running from a second folder reuses the same database, not
+a fresh one.
+
 **"port is already allocated"**
 Something else on your computer is using port 8000. Open `.env`, find the line
 `API_PORT=8000`, change it to `API_PORT=8080`, save, and run
@@ -249,6 +268,13 @@ starting with a dot are hidden in Finder — press `⌘ Shift .` to show them.)
 **The page will not load**
 Check the terminal actually says "Application startup complete". If it is still
 scrolling, wait. If it stopped with red text, copy that text and send it to me.
+
+**A fix you were told to apply seems to have vanished**
+Extracting the ZIP again overwrites your files with whatever that download
+contained, so a newer fix applied by hand is undone — and `.env` is deleted with
+it, since it is generated rather than downloaded. Either download a fresh ZIP
+(it contains every fix) and re-run the setup script, or refresh individual files
+in place. Do not re-extract an old ZIP over a working folder.
 
 **Anything else**
 Copy the last twenty or so lines from the terminal and send them to me — the
