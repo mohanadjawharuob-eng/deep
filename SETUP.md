@@ -23,24 +23,48 @@ into your operating system, and removing it later is one command.
 
 ## Step 1 — Install Docker Desktop
 
-Download the version for your computer:
+Click the link for **your** computer. Ignore every other row — and if you land
+on a page listing Ubuntu, Debian, Fedora, CentOS or Raspberry Pi, you are on
+the Linux page by mistake; go back.
 
-| Your computer | Download |
-|---|---|
-| **Windows 10 or 11** | <https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe> |
-| **Mac, Apple silicon** (M1/M2/M3/M4) | <https://desktop.docker.com/mac/main/arm64/Docker.dmg> |
-| **Mac, Intel** | <https://desktop.docker.com/mac/main/amd64/Docker.dmg> |
-| **Linux** | <https://docs.docker.com/desktop/install/linux-install/> |
+### Windows 10 or 11
 
-Not sure which Mac you have? Click the  menu → *About This Mac*. If it says
-"Apple M1/M2/M3/M4", choose Apple silicon. If it says "Intel", choose Intel.
+**Download:**
+<https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe>
 
-Run the installer and accept the defaults. On Windows it may ask to enable
-something called WSL and restart your computer — allow it.
+1. Open your **Downloads** folder and double-click `Docker Desktop Installer.exe`.
+2. Leave the checkboxes ticked — one mentions WSL 2, which is required.
+3. Click **OK** and wait a few minutes.
+4. At "Installation succeeded", click **Close and restart**. Your PC restarts.
+5. After restarting, open **Docker Desktop** from the Start menu.
+6. Accept the agreement. If it asks you to sign in, look for
+   **Continue without signing in** — an account is not needed.
+7. Wait for the whale icon at the bottom left to turn green and read
+   **Engine running**.
 
-**Then open Docker Desktop and leave it running.** It needs to be running
-whenever you use the platform. You will see a whale icon in your menu bar (Mac)
-or system tray (Windows). Wait until it stops saying "starting".
+Not sure your Windows is new enough? Press `Windows key + R`, type `winver`,
+press Enter. Windows 10 (64-bit) or Windows 11 is fine.
+
+### Mac
+
+Click the  menu → *About This Mac* to see which you have.
+
+- **Apple silicon** (it says M1, M2, M3 or M4):
+  <https://desktop.docker.com/mac/main/arm64/Docker.dmg>
+- **Intel**: <https://desktop.docker.com/mac/main/amd64/Docker.dmg>
+
+Open the downloaded `.dmg`, drag the Docker icon into Applications, then launch
+Docker from Applications. Wait for the whale icon in the menu bar to settle.
+
+### Linux
+
+<https://docs.docker.com/desktop/setup/install/linux/> — pick the page matching
+your distribution.
+
+### Either way, before continuing
+
+**Leave Docker Desktop running.** It must be running whenever you use the
+platform. If you close it, the platform stops.
 
 ---
 
