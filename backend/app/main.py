@@ -83,7 +83,13 @@ app = FastAPI(
 
 # Order matters: middleware added last runs first, so the request id is
 # assigned before anything else can log or fail.
-app.add_middleware(SecurityHeadersMiddleware)
+# The documentation routes need a looser content policy than API responses;
+# see SecurityHeadersMiddleware. Their paths come from the app itself so the
+# two cannot drift apart.
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    doc_paths={app.docs_url, app.redoc_url, app.swagger_ui_oauth2_redirect_url},
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
