@@ -45,17 +45,22 @@ what makes the permission model meaningful rather than advisory.
 
 ## Quick start
 
+**New to this, or not a developer?** Follow [`SETUP.md`](SETUP.md) instead — it
+covers installing Docker, downloading the code and signing in, with nothing
+assumed.
+
 ```bash
-git clone <this repository>
+git clone <your repo url>
 cd deep
 
-cp .env.example .env
-# Edit .env: set SECRET_KEY, POSTGRES_PASSWORD and FIRST_ADMIN_PASSWORD.
-# Generate a good secret with:
-#   python -c "import secrets; print(secrets.token_urlsafe(48))"
-
+bash setup.sh          # Windows: powershell -ExecutionPolicy Bypass -File setup.ps1
 docker compose up --build
 ```
+
+`setup.sh` writes `.env` with a strong random `SECRET_KEY`, database password
+and admin password, and prints the admin password for you. To configure it by
+hand instead, copy `.env.example` to `.env` and fill in those three values
+yourself — the stack refuses to start on the placeholders.
 
 That is all. On first boot the stack will:
 
