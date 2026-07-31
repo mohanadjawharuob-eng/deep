@@ -20,19 +20,46 @@ from datetime import UTC
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.permissions import Capability, has_capability
 from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.models.enums import UserRole
 from app.models.user import User
 
-#: ``auto_error=False`` so the optional dependency can distinguish "no token"
-#: from "bad token" instead of the scheme raising 403 for both.
-bearer_scheme = HTTPBearer(auto_error=False, description="JWT access token")
+#: Two ways to present the same credential, both reading ``Authorization:
+#: Bearer <token>``.
+#:
+#: ``HTTPBearer`` is for clients that already hold a token. ``OAuth2PasswordBearer``
+#: exists so the interactive documentation's *Authorize* dialog can offer a
+#: username and password box and fetch the token itself — without it the dialog
+#: demands a raw JWT, which nobody has to hand when they first open the page.
+#:
+#: ``auto_error=False`` on both so the optional dependency can tell "no token"
+#: from "bad token" instead of the scheme raising 403 for either.
+bearer_scheme = HTTPBearer(auto_error=False, description="Paste a JWT access token")
+password_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_PREFIX}/auth/token",
+    auto_error=False,
+    description="Sign in with an e-mail address or username and a password",
+)
+
+
+def _presented_token(
+    credentials: HTTPAuthorizationCredentials | None, password_token: str | None
+) -> str | None:
+    """The token from whichever scheme the client used.
+
+    Both read the same header, so at most one is populated per request.
+    """
+    if credentials is not None:
+        return credentials.credentials
+    return password_token
+
 
 CREDENTIALS_EXCEPTION = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -88,15 +115,17 @@ def _user_from_token(session: Session, token: str) -> User:
 def current_user_optional(
     session: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
+    password_token: Annotated[str | None, Depends(password_scheme)] = None,
 ) -> User | None:
     """The signed-in user, or ``None`` for anonymous visitors.
 
     A malformed or expired token is still an error: silently treating it as
     anonymous would hide expiry from the client and mask token bugs.
     """
-    if credentials is None:
+    token = _presented_token(credentials, password_token)
+    if token is None:
         return None
-    return _user_from_token(session, credentials.credentials)
+    return _user_from_token(session, token)
 
 
 CurrentUserOptional = Annotated[User | None, Depends(current_user_optional)]
@@ -105,11 +134,13 @@ CurrentUserOptional = Annotated[User | None, Depends(current_user_optional)]
 def current_user(
     session: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
+    password_token: Annotated[str | None, Depends(password_scheme)] = None,
 ) -> User:
     """A signed-in, active user; raises 401 otherwise."""
-    if credentials is None:
+    token = _presented_token(credentials, password_token)
+    if token is None:
         raise CREDENTIALS_EXCEPTION
-    return _user_from_token(session, credentials.credentials)
+    return _user_from_token(session, token)
 
 
 CurrentUser = Annotated[User, Depends(current_user)]

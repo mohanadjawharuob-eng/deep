@@ -391,3 +391,53 @@ class TestEmailHandling:
             json={**REGISTRATION, "email": "someone@museum.local"},
         )
         assert response.status_code == 422
+
+
+class TestInteractiveDocsLogin:
+    """The Authorize dialog in /docs posts a form to /auth/token.
+
+    Both security schemes have to be advertised or that dialog offers no way in
+    but pasting a raw JWT, which nobody has when they first open the page.
+    """
+
+    def test_openapi_offers_a_username_and_password_flow(self, client: TestClient) -> None:
+        schemes = client.get("/api/v1/openapi.json").json()["components"]["securitySchemes"]
+
+        assert "OAuth2PasswordBearer" in schemes, "the Authorize dialog needs this to show a form"
+        password_flow = schemes["OAuth2PasswordBearer"]["flows"]["password"]
+        assert password_flow["tokenUrl"].endswith("/auth/token")
+
+        assert "HTTPBearer" in schemes, "clients holding a token must still be able to say so"
+
+    def test_the_token_url_accepts_the_form_the_dialog_posts(
+        self, client: TestClient, db: Session, researcher: User
+    ) -> None:
+        response = client.post(
+            "/api/v1/auth/token",
+            data={
+                "username": "researcher@example.org",
+                "password": "TestPassword1",
+                "grant_type": "password",
+            },
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["token_type"] == "bearer"
+
+    def test_a_token_from_that_url_authenticates(
+        self, client: TestClient, db: Session, researcher: User
+    ) -> None:
+        token = client.post(
+            "/api/v1/auth/token",
+            data={"username": "researcher", "password": "TestPassword1"},
+        ).json()["access_token"]
+
+        response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200
+        assert response.json()["username"] == "researcher"
+
+    def test_bad_credentials_are_still_refused(self, client: TestClient, db: Session) -> None:
+        response = client.post(
+            "/api/v1/auth/token",
+            data={"username": "nobody", "password": "WrongPassword1"},
+        )
+        assert response.status_code == 401
