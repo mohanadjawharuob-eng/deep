@@ -34,6 +34,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+# Settings fields are UPPER_CASE because they mirror environment variable
+# names. Ruff reads an upper-case attribute as a constant, so it flags every
+# `settings.FIELD == expected` as a Yoda condition, which it is not.
+"tests/test_config.py" = ["S101", "SIM300"]
 
 [tool.coverage.run]
 source = ["app"]

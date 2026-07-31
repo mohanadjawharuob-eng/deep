@@ -6,13 +6,14 @@ so the same image can be promoted from development to production untouched.
 
 from __future__ import annotations
 
+import json
 import secrets
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, PostgresDsn, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -51,8 +52,17 @@ class Settings(BaseSettings):
     #: bcrypt work factor. 12 is a sane 2020s default; raise as hardware improves.
     BCRYPT_ROUNDS: int = 12
     PASSWORD_MIN_LENGTH: int = 10
-    #: Comma-separated list of origins allowed by CORS.
-    CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    #: Origins allowed by CORS, as ``a,b`` or as a JSON array.
+    #:
+    #: ``NoDecode`` is essential: without it pydantic-settings runs json.loads
+    #: on any list-typed environment variable *inside the source*, before field
+    #: validators are reached, so a plain comma-separated value fails to parse
+    #: and the process exits before it can explain itself. NoDecode hands the
+    #: raw string to the validator below instead.
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
 
     # --- First administrator ---------------------------------------------
     # Created by ``scripts/seed.py`` so a fresh deployment is usable at once.
@@ -65,15 +75,31 @@ class Settings(BaseSettings):
     STORAGE_BACKEND: Literal["local"] = "local"
     STORAGE_ROOT: Path = Path("/data/uploads")
     MAX_UPLOAD_SIZE_MB: int = 200
-    THUMBNAIL_SIZES: list[int] = [200, 800]
+    THUMBNAIL_SIZES: Annotated[list[int], NoDecode] = [200, 800]
 
     @field_validator("CORS_ORIGINS", "THUMBNAIL_SIZES", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
-        """Accept both ``a,b`` and JSON list syntax for list-valued env vars."""
-        if isinstance(value, str) and not value.strip().startswith("["):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return value
+        """Accept both ``a,b`` and JSON array syntax for list-valued settings.
+
+        Comma-separated is what a person writes in a ``.env`` file or a Compose
+        environment block, so it has to work; JSON is what pydantic-settings
+        documents, so it has to keep working.
+        """
+        if not isinstance(value, str):
+            return value
+
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"Value looks like a JSON array but could not be parsed: {exc}"
+                ) from exc
+        return [item.strip() for item in text.split(",") if item.strip()]
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> Settings:
