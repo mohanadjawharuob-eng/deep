@@ -1,0 +1,39 @@
+# --- Secrets -----------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Runtime data ------------------------------------------------------------
+# Uploads and dumps live in Docker volumes; these are the local-run equivalents.
+backend/var/
+uploads/
+backups/
+*.dump
+
+# --- Node (frontend, milestone 2) --------------------------------------------
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# --- Editors and OS ----------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

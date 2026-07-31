@@ -1,0 +1,222 @@
+# Backend — Archaeological Research & Heritage Management Platform
+
+FastAPI service backed by PostgreSQL + PostGIS. This is the **only** component
+that talks to the database; clients reach the data exclusively through this API.
+
+---
+
+## Layout
+
+```
+backend/
+├── app/
+│   ├── main.py               # application, middleware, error handlers
+│   ├── core/
+│   │   ├── config.py         # settings, from the environment
+│   │   ├── security.py       # password hashing, JWT issue/verify
+│   │   ├── permissions.py    # the authorisation policy
+│   │   └── middleware.py     # request ids, security headers
+│   ├── db/
+│   │   ├── base.py           # declarative base and mixins
+│   │   ├── session.py        # engine and session factory
+│   │   └── migrations/       # Alembic
+│   ├── models/               # ORM models — one module per domain area
+│   ├── schemas/              # Pydantic request/response models
+│   ├── services/             # business logic that endpoints call
+│   └── api/
+│       ├── deps.py           # DI: sessions, current user, role guards
+│       └── v1/               # versioned routes
+├── scripts/seed.py           # idempotent reference + sample data
+├── tests/                    # pytest, against a real PostgreSQL
+└── docker/entrypoint.sh      # wait for db → migrate → seed → serve
+```
+
+The dependency direction is strictly one way:
+`api → services → models → db`. Nothing in `models/` imports from `api/` or
+`services/`, which is what keeps the ORM usable from scripts and migrations.
+
+---
+
+## Running locally
+
+Requires Python 3.11+ and a PostgreSQL 14+ with PostGIS 3.
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+cp .env.example .env          # edit the connection details
+alembic upgrade head          # create the schema
+python -m scripts.seed --with-samples
+
+uvicorn app.main:app --reload
+```
+
+- API: <http://localhost:8000>
+- Interactive docs: <http://localhost:8000/docs>
+- Alternative docs: <http://localhost:8000/redoc>
+
+For Docker, see the repository root `README.md` — `docker compose up` does all
+of the above in one step.
+
+---
+
+## Tests
+
+Tests run against a **real PostgreSQL**, not SQLite: the schema uses PostGIS
+geometry, JSONB, arrays and native enums, none of which SQLite models. A
+throwaway database (`<your-db>_test`) is created and dropped per session.
+
+```bash
+pytest                      # all tests
+pytest --cov=app            # with coverage
+pytest tests/test_permissions.py -v
+TEST_DATABASE_URL=postgresql+psycopg://user:pw@host/db_test pytest
+```
+
+Linting and formatting use ruff:
+
+```bash
+ruff check app tests scripts
+ruff format app tests scripts
+```
+
+---
+
+## Migrations
+
+```bash
+alembic upgrade head                              # apply
+alembic revision --autogenerate -m "add x to y"   # generate after model edits
+alembic downgrade -1                              # step back
+alembic check                                     # models vs. migrations in sync?
+```
+
+Two migrations exist so far:
+
+| Revision | Purpose |
+|----------|---------|
+| `0001_extensions` | `postgis`, `pg_trgm`, `unaccent`, `btree_gin` |
+| `0002_initial_schema` | every table, index and constraint |
+
+`0001` is separate because PostGIS must exist before any geometry column is
+created. Always read a generated migration before committing it — autogenerate
+does not detect renames, and it will happily emit a drop-and-create that loses
+data.
+
+---
+
+## Authentication
+
+`POST /api/v1/auth/login` returns:
+
+| Token | Lifetime | Stored server-side? |
+|-------|----------|---------------------|
+| access | 30 min (configurable) | no |
+| refresh | 14 days | SHA-256 digest, in `refresh_tokens` |
+
+Send the access token as `Authorization: Bearer <token>`. When it expires,
+`POST /api/v1/auth/refresh` exchanges the refresh token for a new pair and
+**revokes the presented one**.
+
+Presenting a refresh token that was already rotated revokes every session for
+that user. That is deliberate: a replayed token means either the client has a
+bug or the token leaked, and the safe reading is the second.
+
+Other properties worth knowing:
+
+- Failed logins are counted; 8 consecutive failures lock the account for 15
+  minutes. A successful login or an administrative reset clears the counter.
+- Unknown users and wrong passwords return the same status and message, and a
+  dummy hash is verified for unknown users so response timing does not reveal
+  which addresses are registered.
+- Changing a password, deactivating an account, or an administrative reset sets
+  `tokens_valid_after`, which invalidates every access token issued earlier —
+  no blacklist needed.
+
+---
+
+## Authorisation
+
+Three sources combine, and the **most permissive wins**:
+
+1. **Global role** — a ceiling. A visitor writes nothing, ever.
+2. **Project membership** — the normal path: joining a team confers a level on
+   everything in that project.
+3. **Per-record grants** — `record_permissions` rows, for sharing one record
+   outside the team.
+
+Ownership and the public flag sit on top: an owner always holds `OWNER` on
+their own record, and a public record is readable by anyone including anonymous
+visitors.
+
+| | visitor | student | researcher | admin |
+|---|:---:|:---:|:---:|:---:|
+| Browse public records, search, map | ✅ | ✅ | ✅ | ✅ |
+| Create records in own projects | ❌ | ✅ | ✅ | ✅ |
+| Upload images / documents | ❌ | ✅ | ✅ | ✅ |
+| Edit own records | ❌ | ✅ | ✅ | ✅ |
+| Edit others' records in a project | ❌ | ❌ | ✅ | ✅ |
+| Create projects | ❌ | ❌ | ✅ | ✅ |
+| Approve submissions | ❌ | ❌ | ✅ | ✅ |
+| Delete a project | ❌ | ❌ | director only | ✅ |
+| Manage users, roles, settings | ❌ | ❌ | ❌ | ✅ |
+
+Records created by students start as `pending` and are invisible to readers
+until a researcher on the same project approves them. Researchers cannot
+approve work in projects they are not members of.
+
+Every check lives in `app/core/permissions.py`. Endpoints call it; they never
+re-implement it. `tests/test_permissions.py` is the executable specification of
+the table above.
+
+---
+
+## Data model
+
+25 tables. The core chain is:
+
+```
+Project ──< Site ──< ExcavationContext ──< Artifact
+                 └──< Photograph / Document / Model3D / GisLayer
+```
+
+Design decisions that are not obvious from the schema:
+
+- **UUID primary keys.** Record ids appear in QR codes and public URLs;
+  sequential integers would leak collection size and invite enumeration.
+- **Signed integer years.** `date_from = -2900` means 2900 BCE. Range queries
+  stay plain integer comparisons, and Python's `date` cannot represent BCE.
+- **Coordinates stored twice.** `latitude`/`longitude` columns *and* a PostGIS
+  `geom`. The plain columns are what forms, CSV exports and imports use; `geom`
+  is what spatial queries and the map hit.
+- **Bidirectional stratigraphic edges.** "A above B" is stored alongside
+  "B below A" so reading a context's relationships never needs a `UNION`.
+- **`metadata_json` on the main records.** Every institution has fields nobody
+  else wants. JSONB is queryable and indexable, so this is an escape hatch, not
+  a dumping ground.
+- **Media links are denormalised.** A photograph carries `project_id`,
+  `site_id`, `artifact_id` and `context_id`, so the gallery at any level is one
+  indexed query rather than a recursive join.
+
+---
+
+## Security summary
+
+| Concern | Measure |
+|---|---|
+| Password storage | bcrypt, cost 12, per-password salt |
+| Password policy | ≥10 chars, mixed case, digit; 72-byte cap enforced (bcrypt truncates silently past it) |
+| Session theft | Refresh rotation with reuse detection |
+| Token forgery | HS256 with required claims; `alg: none` and wrong-key tokens rejected |
+| Privilege escalation | Role is never read from the request body; authorisation re-reads the user row rather than trusting the token's role claim |
+| SQL injection | SQLAlchemy parameter binding throughout; no string-built SQL |
+| User enumeration | Identical responses and comparable timing for unknown vs. wrong password |
+| Brute force | Per-account lockout after 8 failures |
+| Audit | Every write, login and failure appended to `activity_logs` |
+| Transport | Security headers on every response; HSTS in production |
+
+Deliberate non-goals at this stage, to be picked up in later milestones: rate
+limiting per IP (belongs at the reverse proxy), e-mail verification delivery,
+and secret storage in a manager rather than environment variables.

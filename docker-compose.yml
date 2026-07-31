@@ -1,0 +1,110 @@
+# Development / single-host deployment stack.
+#
+#     cp .env.example .env      # then edit the secrets
+#     docker compose up --build
+#
+# The API is on http://localhost:8000 with documentation at /docs.
+# PostgreSQL is *not* published to the host by default — the backend is the
+# only component that talks to it, which is the architecture the platform
+# requires. Uncomment the port mapping under ``db`` if you need psql access
+# while developing.
+
+name: archeo
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: archeo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-archeo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-archeo}
+      # Data checksums catch silent corruption early; worth the few percent.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # ``pg_isready`` alone returns true while the init scripts are still
+      # running, so also require the database to accept a real query.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-archeo} -d ${POSTGRES_DB:-archeo} && psql -U ${POSTGRES_USER:-archeo} -d ${POSTGRES_DB:-archeo} -c 'SELECT 1' > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    networks:
+      - backend
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: archeo-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-false}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-archeo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-archeo}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-14}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      FIRST_ADMIN_EMAIL: ${FIRST_ADMIN_EMAIL:-admin@example.org}
+      FIRST_ADMIN_USERNAME: ${FIRST_ADMIN_USERNAME:-admin}
+      FIRST_ADMIN_PASSWORD: ${FIRST_ADMIN_PASSWORD:?FIRST_ADMIN_PASSWORD must be set in .env}
+      STORAGE_ROOT: /data/uploads
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_SEED: ${RUN_SEED:-true}
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
+    volumes:
+      - uploads:/data/uploads
+      - backups:/data/backups
+    ports:
+      - "${API_PORT:-8000}:8000"
+    networks:
+      - backend
+
+  # Nightly ``pg_dump``, kept for ``backup.retention_days``. Runs in the same
+  # image as the database so the dump utilities always match the server
+  # version — a mismatch is the usual reason a restore fails.
+  backup:
+    image: postgis/postgis:16-3.4
+    container_name: archeo-backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-archeo}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      PGDATABASE: ${POSTGRES_DB:-archeo}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - backups:/backups
+      - ./docker/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/backup.sh"]
+    networks:
+      - backend
+
+volumes:
+  db_data:
+  uploads:
+  backups:
+
+networks:
+  backend:
+    driver: bridge
