@@ -1,28 +1,29 @@
 {
+  "id": "/deep/apps/timesheet/",
   "name": "Timesheet — Hours & Invoices",
   "short_name": "Timesheet",
   "description": "Timesheet — Hours & Invoices",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "start_url": "./timesheet.html",
+  "start_url": "./",
   "scope": "./",
   "background_color": "#eceff1",
   "theme_color": "#1f6f8b",
   "icons": [
     {
-      "src": "./icons/timesheet-192.png",
+      "src": "../icons/timesheet-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/timesheet-512.png",
+      "src": "../icons/timesheet-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/timesheet-512-maskable.png",
+      "src": "../icons/timesheet-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

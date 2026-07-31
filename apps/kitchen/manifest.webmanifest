@@ -1,28 +1,29 @@
 {
+  "id": "/deep/apps/kitchen/",
   "name": "Kitchen — Recipes, Meal Plan & Shopping",
   "short_name": "Kitchen",
   "description": "Kitchen — Recipes, Meal Plan & Shopping",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "start_url": "./kitchen.html",
+  "start_url": "./",
   "scope": "./",
   "background_color": "#f4f1ea",
   "theme_color": "#b0562a",
   "icons": [
     {
-      "src": "./icons/kitchen-192.png",
+      "src": "../icons/kitchen-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/kitchen-512.png",
+      "src": "../icons/kitchen-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/kitchen-512-maskable.png",
+      "src": "../icons/kitchen-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

@@ -1,0 +1,1772 @@
+<title>Daybook — Focus, Tasks & Habits</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#eceff5" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0c1526" media="(prefers-color-scheme: dark)" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Daybook" />
+<link rel="apple-touch-icon" sizes="192x192" href="../icons/daybook-192.png" />
+<link rel="icon" type="image/png" href="../icons/daybook-192.png" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<style>
+  :root {
+    --page: #eceff5;
+    --surface: #ffffff;
+    --raised: #f6f8fb;
+    --ink: #16202f;
+    --dim: rgba(22,32,47,0.64);
+    --faint: rgba(22,32,47,0.42);
+    --rule: rgba(22,32,47,0.10);
+    --rule-mid: rgba(22,32,47,0.16);
+    --rule-strong: rgba(22,32,47,0.26);
+    --accent: #2a5699;
+    --accent-soft: rgba(42,86,153,0.11);
+    --on-accent: #f7fafe;
+    --gain: #0a7f36;
+    --loss: #b5342c;
+    --warn: #9a6a08;
+    --gain-bg: rgba(10,127,54,0.12);
+    --loss-bg: rgba(181,52,44,0.12);
+    --warn-bg: rgba(250,178,25,0.18);
+    --shadow: 0 1px 1px rgba(22,32,47,0.04), 0 12px 28px -18px rgba(22,32,47,0.28);
+    --scrim: rgba(22,32,47,0.45);
+    --grid: rgba(22,32,47,0.09);
+    --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
+    --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7; --c8: #e34948;
+    color-scheme: light;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      --page: #0c1526;
+      --surface: #131f36;
+      --raised: #1a2843;
+      --ink: #e3e9f3;
+      --dim: rgba(227,233,243,0.68);
+      --faint: rgba(227,233,243,0.44);
+      --rule: rgba(227,233,243,0.11);
+      --rule-mid: rgba(227,233,243,0.18);
+      --rule-strong: rgba(227,233,243,0.30);
+      --accent: #8ab4ea;
+      --accent-soft: rgba(138,180,234,0.16);
+      --on-accent: #0b1626;
+      --gain: #4fbe6a;
+      --loss: #e8756c;
+      --warn: #f0b03c;
+      --gain-bg: rgba(79,190,106,0.14);
+      --loss-bg: rgba(232,117,108,0.14);
+      --warn-bg: rgba(240,176,60,0.16);
+      --shadow: 0 1px 1px rgba(0,0,0,0.3), 0 16px 32px -20px rgba(0,0,0,0.7);
+      --scrim: rgba(3,7,15,0.62);
+      --grid: rgba(227,233,243,0.10);
+      --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+      --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --page: #0c1526;
+    --surface: #131f36;
+    --raised: #1a2843;
+    --ink: #e3e9f3;
+    --dim: rgba(227,233,243,0.68);
+    --faint: rgba(227,233,243,0.44);
+    --rule: rgba(227,233,243,0.11);
+    --rule-mid: rgba(227,233,243,0.18);
+    --rule-strong: rgba(227,233,243,0.30);
+    --accent: #8ab4ea;
+    --accent-soft: rgba(138,180,234,0.16);
+    --on-accent: #0b1626;
+    --gain: #4fbe6a;
+    --loss: #e8756c;
+    --warn: #f0b03c;
+    --gain-bg: rgba(79,190,106,0.14);
+    --loss-bg: rgba(232,117,108,0.14);
+    --warn-bg: rgba(240,176,60,0.16);
+    --shadow: 0 1px 1px rgba(0,0,0,0.3), 0 16px 32px -20px rgba(0,0,0,0.7);
+    --scrim: rgba(3,7,15,0.62);
+    --grid: rgba(227,233,243,0.10);
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+    --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --page: #eceff5;
+    --surface: #ffffff;
+    --raised: #f6f8fb;
+    --ink: #16202f;
+    --dim: rgba(22,32,47,0.64);
+    --faint: rgba(22,32,47,0.42);
+    --rule: rgba(22,32,47,0.10);
+    --rule-mid: rgba(22,32,47,0.16);
+    --rule-strong: rgba(22,32,47,0.26);
+    --accent: #2a5699;
+    --accent-soft: rgba(42,86,153,0.11);
+    --on-accent: #f7fafe;
+    --gain: #0a7f36;
+    --loss: #b5342c;
+    --warn: #9a6a08;
+    --gain-bg: rgba(10,127,54,0.12);
+    --loss-bg: rgba(181,52,44,0.12);
+    --warn-bg: rgba(250,178,25,0.18);
+    --shadow: 0 1px 1px rgba(22,32,47,0.04), 0 12px 28px -18px rgba(22,32,47,0.28);
+    --scrim: rgba(22,32,47,0.45);
+    --grid: rgba(22,32,47,0.09);
+    --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
+    --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7; --c8: #e34948;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { overflow-x: hidden; }
+
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; margin: 0; text-wrap: balance; }
+  .fig, td.num, th.num, input, .hero-fig, .tile-fig { font-variant-numeric: tabular-nums; }
+
+  .label {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.09em;
+    font-weight: 600; color: var(--faint);
+  }
+  button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  /* ---- shell ---- */
+  .shell { display: grid; grid-template-columns: 216px minmax(0, 1fr); min-height: 100vh; }
+  .rail {
+    background: var(--surface); border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column; gap: 1.4rem; padding: 1.3rem 0.85rem;
+  }
+  .brand { display: flex; align-items: center; gap: 0.55rem; padding: 0 0.5rem; }
+  .brand-mark {
+    width: 27px; height: 27px; border-radius: 8px;
+    background: var(--accent); color: var(--on-accent);
+    display: grid; place-items: center; font-size: 0.95rem; flex-shrink: 0;
+  }
+  .brand h1 { font-size: 1.1rem; letter-spacing: -0.01em; }
+
+  .rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+  .tab {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.55rem 0.65rem; border-radius: 7px;
+    color: var(--dim); font-size: 0.885rem; text-align: left;
+  }
+  .tab:hover { background: var(--raised); color: var(--ink); }
+  .tab .ico { width: 1.1rem; text-align: center; font-size: 0.95rem; opacity: 0.85; }
+  .tab[aria-current="page"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .tab[aria-current="page"] .ico { opacity: 1; }
+
+  .rail-foot { margin-top: auto; padding: 0 0.5rem; }
+  .rail-foot p { font-size: 0.7rem; color: var(--faint); line-height: 1.45; margin: 0; }
+
+  main.view { padding: 1.5rem 1.75rem 3.5rem; max-width: 1120px; min-width: 0; }
+
+  /* ---- page head ---- */
+  .page-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--rule-mid); margin-bottom: 1.25rem;
+  }
+  .page-head h2 { font-size: 1.55rem; letter-spacing: -0.015em; }
+  .page-head p { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--dim); max-width: 60ch; }
+
+  .stepper { display: flex; align-items: center; gap: 0.15rem; }
+  .stepper > button {
+    width: 32px; height: 32px; border-radius: 6px; color: var(--dim);
+    display: grid; place-items: center; font-size: 1rem;
+  }
+  .stepper > button:hover:not(:disabled) { background: var(--raised); color: var(--ink); }
+  .stepper > button:disabled { opacity: 0.3; cursor: default; }
+  .stepper .m { min-width: 9.5rem; text-align: center; font-size: 0.86rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---- surfaces ---- */
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); }
+  .card > .card-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 0.75rem; flex-wrap: wrap; padding: 0.95rem 1.15rem 0.7rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .card > .card-head h3 { font-size: 0.98rem; }
+  .card > .card-head .sub { font-size: 0.74rem; color: var(--faint); }
+  .card > .card-body { padding: 1.05rem 1.15rem 1.15rem; }
+  .card > .card-body.flush { padding: 0.35rem 1.15rem 0.8rem; }
+
+  .stack { display: flex; flex-direction: column; gap: 1rem; }
+  .cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  @media (max-width: 900px) { .cols-2, .cols-3 { grid-template-columns: minmax(0, 1fr); } }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+  @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .tile {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 0.85rem 1rem 0.9rem;
+    display: flex; flex-direction: column; gap: 0.1rem; min-width: 0;
+  }
+  .tile-fig { font-size: 1.35rem; font-weight: 650; letter-spacing: -0.015em; margin-top: 0.2rem; }
+  .tile-foot { font-size: 0.72rem; color: var(--faint); margin-top: 0.15rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+
+  .hero-fig {
+    font-family: var(--serif); font-size: clamp(2rem, 4.4vw, 2.9rem);
+    font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; margin-top: 0.3rem;
+  }
+
+  .delta { display: inline-flex; align-items: center; gap: 0.2rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .delta.up { color: var(--gain); } .delta.down { color: var(--loss); } .delta.flat { color: var(--faint); }
+
+  /* ---- ruled rows ---- */
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.65rem 0; border-bottom: 1px solid var(--rule); min-width: 0;
+  }
+  .row:last-child { border-bottom: none; }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-size: 0.9rem; font-weight: 550; overflow-wrap: anywhere; }
+  .row-sub { font-size: 0.73rem; color: var(--faint); margin-top: 0.1rem; }
+  .row-end { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+  .row-fig { font-size: 0.9rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row-fig.gain { color: var(--gain); } .row-fig.loss { color: var(--loss); }
+  .row.done .row-title { text-decoration: line-through; color: var(--faint); }
+
+  .empty { padding: 1.1rem 0; color: var(--faint); font-size: 0.86rem; line-height: 1.55; }
+  .empty strong { color: var(--dim); font-weight: 600; }
+  .hint { font-size: 0.76rem; color: var(--faint); line-height: 1.5; }
+
+  /* ---- buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+    padding: 0.5rem 0.9rem; border-radius: 7px; font-size: 0.85rem; font-weight: 600;
+    background: var(--raised); border: 1px solid var(--rule-mid); color: var(--ink); white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--rule-strong); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .btn.primary:hover { filter: brightness(1.07); }
+  .btn.quiet { background: transparent; border-color: transparent; color: var(--dim); font-weight: 500; }
+  .btn.quiet:hover { background: var(--raised); color: var(--ink); }
+  .btn.danger { color: var(--loss); border-color: var(--loss-bg); background: var(--loss-bg); }
+  .btn.sm { padding: 0.33rem 0.6rem; font-size: 0.77rem; }
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+  .ibtn {
+    width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center;
+    color: var(--faint); font-size: 0.9rem; flex-shrink: 0;
+  }
+  .ibtn:hover { background: var(--raised); color: var(--ink); }
+  .ibtn.danger:hover { background: var(--loss-bg); color: var(--loss); }
+
+  /* ---- forms ---- */
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.7rem 0.75rem; align-items: end; }
+  .field { display: flex; flex-direction: column; gap: 0.28rem; min-width: 0; }
+  .field.wide { grid-column: span 2; }
+  @media (max-width: 620px) { .field.wide { grid-column: span 1; } }
+
+  input, select, textarea {
+    font: inherit; font-size: 0.875rem; width: 100%;
+    padding: 0.48rem 0.6rem; border-radius: 7px;
+    border: 1px solid var(--rule-mid); background: var(--surface); color: var(--ink); min-width: 0;
+  }
+  textarea { resize: vertical; line-height: 1.5; }
+  input::placeholder, textarea::placeholder { color: var(--faint); }
+  input:hover, select:hover, textarea:hover { border-color: var(--rule-strong); }
+  input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--accent); flex-shrink: 0; }
+
+  .seg { display: flex; gap: 0.2rem; background: var(--raised); border: 1px solid var(--rule-mid); border-radius: 8px; padding: 0.18rem; }
+  .seg button { flex: 1; padding: 0.36rem 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; color: var(--dim); white-space: nowrap; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.09); }
+
+  /* ---- table ---- */
+  .tscroll { overflow-x: auto; margin: 0 -1.15rem; padding: 0 1.15rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.855rem; }
+  th {
+    text-align: left; white-space: nowrap; font-size: 0.64rem; text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 600; color: var(--faint);
+    padding: 0.45rem 0.55rem; border-bottom: 1px solid var(--rule-mid);
+  }
+  th.num, td.num { text-align: right; }
+  td { padding: 0.55rem 0.55rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--raised); }
+  td.num { white-space: nowrap; font-weight: 600; }
+
+  /* ---- pills, meters, chips ---- */
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.7rem; font-weight: 650;
+    padding: 0.18rem 0.5rem; border-radius: 999px; white-space: nowrap;
+  }
+  .pill.ok { background: var(--gain-bg); color: var(--gain); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.bad { background: var(--loss-bg); color: var(--loss); }
+  .pill.mute { background: var(--raised); color: var(--dim); border: 1px solid var(--rule); }
+  .pill.accent { background: var(--accent-soft); color: var(--accent); }
+
+  .meter { height: 7px; border-radius: 999px; background: var(--rule); overflow: hidden; position: relative; }
+  .meter-fill { height: 100%; border-radius: 999px; }
+  .meter-pace { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: 0.5; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--raised); border: 1px solid var(--rule-mid);
+    padding: 0.28rem 0.4rem 0.28rem 0.6rem; border-radius: 999px; font-size: 0.79rem;
+  }
+  .chip > button { color: var(--faint); font-size: 0.85rem; line-height: 1; padding: 0 0.15rem; }
+  .chip > button:hover { color: var(--loss); }
+  .chip.tap { padding: 0.42rem 0.7rem; gap: 0.45rem; cursor: pointer; font-size: 0.83rem; }
+  .chip.tap:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .chip.tap b { font-weight: 600; }
+  .chip.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ---- notes ---- */
+  .notes { display: flex; flex-direction: column; }
+  .note {
+    display: flex; gap: 0.7rem; align-items: flex-start;
+    padding: 0.7rem 0; border-bottom: 1px solid var(--rule);
+    font-size: 0.855rem; line-height: 1.5;
+  }
+  .note:last-child { border-bottom: none; }
+  .note-mark {
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; margin-top: 0.05rem;
+  }
+  .note-mark.ok { background: var(--gain-bg); color: var(--gain); }
+  .note-mark.warn { background: var(--warn-bg); color: var(--warn); }
+  .note-mark.bad { background: var(--loss-bg); color: var(--loss); }
+  .note-mark.info { background: var(--accent-soft); color: var(--accent); }
+  .note b { font-weight: 650; }
+
+  /* ---- charts ---- */
+  .chart { width: 100%; display: block; overflow: visible; }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; margin-top: 0.7rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; color: var(--dim); }
+
+  .tip {
+    position: fixed; z-index: 90; pointer-events: none;
+    background: var(--ink); color: var(--page);
+    font-size: 0.73rem; font-weight: 500; padding: 0.36rem 0.55rem; border-radius: 6px;
+    transform: translate(-50%, -128%); white-space: pre; opacity: 0;
+    transition: opacity 0.1s ease; font-variant-numeric: tabular-nums;
+    box-shadow: 0 6px 18px -8px rgba(0,0,0,0.5);
+  }
+  .tip.on { opacity: 1; }
+
+  /* ---- modal ---- */
+  .scrim {
+    position: fixed; inset: 0; z-index: 100; background: var(--scrim);
+    display: grid; place-items: center; padding: 1rem; overflow-y: auto;
+  }
+  .modal {
+    background: var(--surface); border: 1px solid var(--rule-mid); border-radius: 14px;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.5); width: 100%; max-width: 440px; margin: auto;
+  }
+  .modal-head { padding: 1.1rem 1.25rem 0.6rem; }
+  .modal-head h3 { font-size: 1.1rem; }
+  .modal-head p { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--dim); line-height: 1.5; }
+  .modal-body { padding: 0.5rem 1.25rem 0.3rem; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 1rem 1.25rem 1.15rem; flex-wrap: wrap; }
+
+  /* ---- toast ---- */
+  .toasts {
+    position: fixed; z-index: 120; left: 50%; transform: translateX(-50%);
+    bottom: calc(1.1rem + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 0.5rem; width: min(420px, calc(100vw - 2rem));
+  }
+  .toast {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: var(--ink); color: var(--page);
+    padding: 0.65rem 0.75rem 0.65rem 0.95rem; border-radius: 9px; font-size: 0.84rem;
+    box-shadow: 0 14px 34px -14px rgba(0,0,0,0.6);
+  }
+  .toast span { flex: 1; }
+  .toast button {
+    color: var(--page); font-weight: 700; font-size: 0.8rem;
+    padding: 0.3rem 0.55rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.28);
+  }
+  .toast button:hover { background: rgba(255,255,255,0.14); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .meter-fill { transition: width 0.25s ease; }
+    .tab, .btn, .ibtn, .chip { transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease; }
+  }
+
+  /* ---- phone: rail becomes a bottom tab bar (last, so it wins) ---- */
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    .rail {
+      position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 40;
+      flex-direction: row; gap: 0;
+      padding: 0.3rem 0.25rem calc(0.3rem + env(safe-area-inset-bottom));
+      border-right: none; border-top: 1px solid var(--rule-mid);
+      box-shadow: 0 -8px 24px -16px rgba(0,0,0,0.4);
+    }
+    .rail .brand, .rail .rail-foot { display: none; }
+    .rail nav { flex-direction: row; gap: 0.1rem; width: 100%; }
+    .tab {
+      flex: 1; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.12rem; padding: 0.35rem 0.1rem; font-size: 0.58rem; font-weight: 600;
+      min-height: 50px; border-radius: 8px; white-space: nowrap;
+    }
+    .tab .ico { font-size: 1.1rem; width: auto; }
+    main.view { padding: 1.15rem 1rem calc(4.9rem + env(safe-area-inset-bottom)); }
+    .toasts { bottom: calc(4.6rem + env(safe-area-inset-bottom)); }
+  }
+
+  @media (max-width: 620px) {
+    input, select, textarea { font-size: 16px; padding: 0.58rem 0.65rem; }
+    .btn { min-height: 42px; padding: 0.55rem 0.9rem; }
+    .btn.sm { min-height: 34px; }
+    .ibtn { width: 38px; height: 38px; font-size: 1rem; }
+    .chip.tap { min-height: 40px; font-size: 0.86rem; }
+    .fields { grid-template-columns: minmax(0, 1fr); }
+    .page-head h2 { font-size: 1.35rem; }
+    .tiles { gap: 0.65rem; }
+    .card > .card-head, .card > .card-body { padding-left: 0.95rem; padding-right: 0.95rem; }
+    .card > .card-body.flush { padding-left: 0.95rem; padding-right: 0.95rem; }
+    .tscroll { margin: 0 -0.95rem; padding: 0 0.95rem; }
+    .stepper .m { min-width: 7.6rem; font-size: 0.82rem; }
+  }
+
+  /* ---- habit history grid: 7 rows (weekdays) x N week columns ---- */
+  .hgrid-wrap { margin: 0.9rem 0 0.2rem; overflow-x: auto; padding-bottom: 0.2rem; }
+  /* rows and columns are both pinned to the square size, otherwise the week
+     columns stretch to fill the card and the grid stops reading as a calendar */
+  .hgrid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 15px);
+    grid-auto-columns: 15px;
+    gap: 3px;
+    justify-content: start;
+    width: max-content;
+  }
+  .hsq {
+    width: 15px; height: 15px; border-radius: 4px;
+    border: 1px solid var(--rule-mid);
+    background: var(--raised);
+    padding: 0; cursor: pointer;
+  }
+  .hsq:hover:not(:disabled) { border-color: var(--accent); }
+  .hsq:disabled { opacity: 0.25; cursor: default; }
+  .hsq.now { box-shadow: 0 0 0 2px var(--accent); }
+
+  .hgrid-legend {
+    display: flex; justify-content: space-between;
+    font-size: 0.66rem; color: var(--faint); margin-top: 0.35rem;
+  }
+
+  .hstats {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem; margin-top: 0.95rem;
+    padding-top: 0.85rem; border-top: 1px solid var(--rule);
+  }
+  .hstats > div { display: flex; flex-direction: column; gap: 0.15rem; }
+  .hstats b { font-size: 0.92rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 620px) {
+    .hgrid { grid-template-rows: repeat(7, 17px); grid-auto-columns: 17px; }
+    .hsq { width: 17px; height: 17px; }
+    .hstats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; }
+    .hstats b { font-size: 0.85rem; }
+  }
+
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><span class="brand-mark">☀</span><h1>Daybook</h1></div>
+    <nav id="nav" aria-label="Sections"></nav>
+    <div class="rail-foot"><p>Stored only on this device. No account, no server, no network.</p></div>
+  </aside>
+  <main class="view" id="view"></main>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+<div id="overlay"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================================================
+     Daybook — today's focus, tasks and habit streaks.
+     ============================================================ */
+
+  var FOCUS_MAX = 3;
+  var omni = { text: "", touched: {} };
+  var histWeeks = 9;          // weeks shown in the habit grid
+  var showDone = true;
+
+  var APP = {
+    storeKey: "daybook.v2",
+    tabs: [
+      { id: "today", label: "Today", ico: "☀" },
+      { id: "habits", label: "Habits", ico: "◎" },
+      { id: "review", label: "Review", ico: "◐" },
+      { id: "settings", label: "Settings", ico: "⚙" }
+    ],
+
+    blank: function () {
+      return { version: 2, tasks: [], habits: [], settings: { weekStartsMonday: true } };
+    },
+
+    // v1 kept {tasks:[{text,time,done,focus}], habits:[{name,history}]} — same shape,
+    // so migration is mostly a case of filling in the fields v2 added.
+    hydrate: function (p, fresh) {
+      if (Array.isArray(p.tasks)) {
+        fresh.tasks = p.tasks.map(function (t) {
+          return {
+            id: t.id || uid(), text: t.text || "", done: !!t.done, focus: !!t.focus,
+            time: t.time || null, date: t.date || today(),
+            notes: t.notes || "", doneAt: t.doneAt || (t.done ? today() : null)
+          };
+        });
+      }
+      if (Array.isArray(p.habits)) {
+        fresh.habits = p.habits.map(function (h) {
+          return {
+            id: h.id || uid(), name: h.name || "Habit",
+            history: h.history && typeof h.history === "object" ? h.history : {},
+            target: num(h.target) || 7, colour: h.colour || null
+          };
+        });
+      }
+      if (p.settings) fresh.settings.weekStartsMonday = p.settings.weekStartsMonday !== false;
+      return fresh;
+    },
+
+    renderView: function (v) {
+      if (v === "today") return renderToday();
+      if (v === "habits") return renderHabits();
+      if (v === "review") return renderReview();
+      return renderSettings();
+    },
+
+    afterRender: function () { wireOmni(); },
+    onTabChange: function () { omni = { text: "", touched: {} }; },
+    afterBoot: function () {
+      // roll yesterday's unfinished tasks forward rather than losing them
+      var stale = state.tasks.filter(function (t) { return !t.done && t.date < today(); });
+      if (stale.length) {
+        toast(stale.length + (stale.length === 1 ? " task" : " tasks") + " carried over from before today.");
+      }
+    },
+
+    actions: {}
+  };
+
+  /* ---------------- text entry ----------------
+     "gym 30m tomorrow 7am", "read 20 pages", "call mum friday 6pm"
+     Parses a time, a date and the leftover text as the task itself.
+     ------------------------------------------- */
+
+  var WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  var MONTHS3 = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+  function parseTask(raw) {
+    var text = String(raw || "").trim();
+    if (!text) return null;
+    var date = null, time = null, star = false;
+
+    // A focus marker is either a leading ! / * (attached or spaced) or a
+    // standalone one somewhere in the line. A "!" inside a word is left alone.
+    if (/^[!*]\s*/.test(text)) { star = true; text = text.replace(/^[!*]\s*/, ""); }
+    var t = " " + text + " ", m;
+    if (/\s[!*](\s|$)/.test(t)) { star = true; t = t.replace(/\s[!*](\s|$)/, " "); }
+
+    // ---- time: 7am, 7:30pm, 19:30, at 6 ----
+    if ((m = t.match(/\s(\d{1,2})[:.](\d{2})\s?(am|pm)?\s/i))) {
+      var hh = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+      if (m[3]) { var pm = /pm/i.test(m[3]); if (hh === 12) hh = pm ? 12 : 0; else if (pm) hh += 12; }
+      if (hh < 24 && mi < 60) { time = pad2(hh) + ":" + pad2(mi); t = t.replace(m[0], " "); }
+    } else if ((m = t.match(/\s(\d{1,2})\s?(am|pm)\s/i))) {
+      var h2 = parseInt(m[1], 10), pm2 = /pm/i.test(m[2]);
+      if (h2 === 12) h2 = pm2 ? 12 : 0; else if (pm2) h2 += 12;
+      if (h2 < 24) { time = pad2(h2) + ":00"; t = t.replace(m[0], " "); }
+    }
+
+    // ---- date ----
+    if ((m = t.match(/\s(today|tdy)\s/i))) { date = today(); t = t.replace(m[0], " "); }
+    else if ((m = t.match(/\s(tomorrow|tmr|tmrw)\s/i))) { date = addDays(today(), 1); t = t.replace(m[0], " "); }
+    else if ((m = t.match(/\s(\d{1,3})\s*(?:days?|d)\s+(?:from now|ahead)\s/i))) {
+      date = addDays(today(), parseInt(m[1], 10)); t = t.replace(m[0], " ");
+    } else if ((m = t.match(/\s(\d{4})-(\d{2})-(\d{2})\s/))) {
+      date = m[1] + "-" + m[2] + "-" + m[3]; t = t.replace(m[0], " ");
+    } else if ((m = t.match(new RegExp("\\s(\\d{1,2})\\s+(" + MONTHS3.join("|") + ")[a-z]*\\s", "i")))) {
+      var mo = MONTHS3.indexOf(m[2].slice(0, 3).toLowerCase());
+      var cand = new Date(new Date().getFullYear(), mo, parseInt(m[1], 10));
+      if (cand < parseISO(today())) cand.setFullYear(cand.getFullYear() + 1);
+      date = iso(cand); t = t.replace(m[0], " ");
+    } else {
+      for (var i = 0; i < WEEKDAYS.length; i++) {
+        var re = new RegExp("\\s(?:next\\s+)?(" + WEEKDAYS[i] + "|" + WEEKDAYS[i].slice(0, 3) + ")\\s", "i");
+        if ((m = t.match(re))) {
+          var d = new Date();
+          var delta = (i - d.getDay() + 7) % 7 || 7;   // next upcoming
+          d.setDate(d.getDate() + delta);
+          date = iso(d); t = t.replace(m[0], " ");
+          break;
+        }
+      }
+    }
+
+    var textOut = t.replace(/\s+/g, " ").replace(/^[\s\-–,;:.]+|[\s\-–,;:.]+$/g, "")
+      .replace(/^(?:at|on|by)\s+/i, "").replace(/\s+(?:at|on|by)$/i, "").trim();
+
+    if (!textOut) return { ok: false, reason: "Type what you want to do." };
+    return { ok: true, text: textOut, date: date || today(), time: time, focus: star };
+  }
+
+  function omniPreview() {
+    var p = parseTask(omni.text);
+    if (!p) {
+      return '<p class="hint" style="margin:0.55rem 0 0">Just type it. Time and date words are picked up — ' +
+        "<b>tomorrow</b>, <b>friday</b>, <b>7am</b>, <b>18:30</b>, <b>3 sep</b>. Start with <b>!</b> to make it a focus.</p>";
+    }
+    if (!p.ok) return '<p class="hint" style="margin:0.55rem 0 0;color:var(--warn)">' + esc(p.reason) + "</p>";
+
+    var date = omni.touched.date || p.date;
+    var time = omni.touched.time != null ? omni.touched.time : (p.time || "");
+    return '<div id="omniPreview" style="margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--rule)">' +
+      '<div style="display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem">' +
+      (p.focus ? '<span class="pill accent">focus</span>' : "") +
+      '<span style="font-size:1rem;font-weight:600">' + esc(p.text) + "</span>" +
+      '<span class="pill mute">' + esc(niceDate(date)) + (time ? " · " + esc(time) : "") + "</span></div>" +
+      '<div class="fields">' +
+      '<div class="field"><label class="label" for="omni_date">Day</label>' +
+      '<input id="omni_date" type="date" value="' + esc(date) + '" /></div>' +
+      '<div class="field"><label class="label" for="omni_time">Time <span style="text-transform:none;letter-spacing:0">(optional)</span></label>' +
+      '<input id="omni_time" type="time" value="' + esc(time) + '" /></div></div>' +
+      '<div class="btn-row" style="margin-top:0.75rem">' +
+      '<button class="btn primary" data-act="omni-commit">Add it</button>' +
+      '<button class="btn quiet" data-act="omni-clear">Clear</button></div></div>';
+  }
+
+  var omniTimer = null;
+  function wireOmni() {
+    var box = document.getElementById("omniBox");
+    if (box) {
+      box.addEventListener("input", function () {
+        omni.text = box.value;
+        clearTimeout(omniTimer);
+        omniTimer = setTimeout(refreshOmni, 120);
+      });
+      box.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); clearTimeout(omniTimer); omni.text = box.value; commitTask(); }
+      });
+    }
+    wirePreviewFields();
+  }
+  function wirePreviewFields() {
+    var d = document.getElementById("omni_date");
+    if (d) d.addEventListener("change", function () { omni.touched.date = d.value; });
+    var t = document.getElementById("omni_time");
+    if (t) t.addEventListener("change", function () { omni.touched.time = t.value; });
+  }
+  function refreshOmni() {
+    var z = document.getElementById("omniZone");
+    if (!z) return;
+    z.innerHTML = omniPreview();
+    wirePreviewFields();
+  }
+
+  function commitTask() {
+    var p = parseTask(omni.text);
+    if (!p || !p.ok) { toast(p && p.reason ? p.reason : "Type what you want to do."); return; }
+    if (p.focus && focusCount() >= FOCUS_MAX) {
+      toast("You already have " + FOCUS_MAX + " focus items — added as a normal task.");
+      p.focus = false;
+    }
+    var task = {
+      id: uid(), text: p.text, done: false, focus: p.focus,
+      date: omni.touched.date || p.date,
+      time: (omni.touched.time != null ? omni.touched.time : p.time) || null,
+      notes: "", doneAt: null
+    };
+    state.tasks.push(task);
+    omni = { text: "", touched: {} };
+    save(); render();
+    var box = document.getElementById("omniBox");
+    if (box) box.focus();
+    toast("Added “" + task.text + "”.", function () {
+      state.tasks = state.tasks.filter(function (t) { return t.id !== task.id; });
+    });
+  }
+
+  /* ---------------- helpers ---------------- */
+
+  function focusCount() {
+    return state.tasks.filter(function (t) { return t.focus && !t.done; }).length;
+  }
+  function openTasks() {
+    // anything not done, plus anything done today — older done tasks live in Review
+    return state.tasks.filter(function (t) { return !t.done || t.doneAt === today(); });
+  }
+  function todayTasks() {
+    return openTasks().filter(function (t) { return t.date <= today(); })
+      .sort(function (a, b) {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        if (a.focus !== b.focus) return a.focus ? -1 : 1;
+        return (a.time || "99:99").localeCompare(b.time || "99:99");
+      });
+  }
+  function laterTasks() {
+    return state.tasks.filter(function (t) { return !t.done && t.date > today(); })
+      .sort(function (a, b) { return a.date.localeCompare(b.date) || (a.time || "99:99").localeCompare(b.time || "99:99"); });
+  }
+  function fmtTime(t) {
+    if (!t) return "";
+    var p = t.split(":"), h = parseInt(p[0], 10);
+    var suffix = h >= 12 ? "pm" : "am", h12 = h % 12 === 0 ? 12 : h % 12;
+    return h12 + ":" + p[1] + suffix;
+  }
+
+  function habitDone(h, dateStr) { return !!h.history[dateStr]; }
+
+  // A streak shouldn't look broken before the day is over, so if today isn't
+  // ticked yet we start counting from yesterday.
+  function streak(h) {
+    var d = today(), n = 0;
+    if (!habitDone(h, d)) d = addDays(d, -1);
+    while (habitDone(h, d)) { n++; d = addDays(d, -1); }
+    return n;
+  }
+  function bestStreak(h) {
+    var days = Object.keys(h.history).filter(function (k) { return h.history[k]; }).sort();
+    var best = 0, run = 0, prev = null;
+    days.forEach(function (d) {
+      run = (prev && daysBetween(prev, d) === 1) ? run + 1 : 1;
+      if (run > best) best = run;
+      prev = d;
+    });
+    return best;
+  }
+  function doneInLast(h, n) {
+    var c = 0;
+    for (var i = 0; i < n; i++) if (habitDone(h, addDays(today(), -i))) c++;
+    return c;
+  }
+  function habitColour(h) {
+    var i = state.habits.indexOf(h);
+    return "var(--c" + ((i % 8) + 1) + ")";
+  }
+
+  /* ---------------- Today ---------------- */
+
+  function renderToday() {
+    var now = new Date();
+    var head = pageHead(
+      now.toLocaleDateString(undefined, { weekday: "long" }),
+      now.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }),
+      '<span class="pill mute">' + fmtTime(pad2(now.getHours()) + ":" + pad2(now.getMinutes())) + "</span>"
+    );
+
+    /* quick add */
+    var html = head + '<div class="card"><div class="card-head"><h3>Add something</h3>' +
+      '<span class="sub">type it however you like</span></div><div class="card-body">' +
+      '<input id="omniBox" type="text" value="' + esc(omni.text) + '" autocomplete="off" ' +
+      'placeholder="gym 7am   ·   call mum friday   ·   !finish the report" ' +
+      'style="font-size:1rem;padding:0.6rem 0.7rem" aria-label="Describe the task" />' +
+      '<div id="omniZone">' + omniPreview() + "</div></div></div>";
+
+    /* the day at a glance */
+    var tt = todayTasks();
+    var doneToday = tt.filter(function (t) { return t.done; }).length;
+    var hDone = state.habits.filter(function (h) { return habitDone(h, today()); }).length;
+    var focus = tt.filter(function (t) { return t.focus; });
+
+    html += '<div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:1rem">' +
+      tile("Tasks done", doneToday + " / " + tt.length,
+        tt.length ? Math.round(doneToday / tt.length * 100) + "% of today" : "nothing scheduled") +
+      tile("Habits ticked", state.habits.length ? hDone + " / " + state.habits.length : "—",
+        state.habits.length ? (hDone === state.habits.length ? "all done" : state.habits.length - hDone + " to go") : "none yet",
+        state.habits.length && hDone === state.habits.length ? "gain" : "") +
+      tile("Longest run", state.habits.length ? Math.max.apply(null, state.habits.map(streak).concat([0])) + "d" : "—",
+        "current best streak") +
+      "</div>";
+
+    /* focus */
+    html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Today\'s focus</h3>' +
+      '<span class="sub">' + focus.length + " of " + FOCUS_MAX + " — star a task to add it</span></div>" +
+      '<div class="card-body flush">';
+    html += focus.length
+      ? '<div class="rows">' + focus.map(taskRow).join("") + "</div>"
+      : '<p class="empty">Nothing starred. <strong>Pick up to three things</strong> that would make today count — ' +
+        "tap ☆ on any task, or start a new one with <b>!</b>.</p>";
+    html += "</div></div>";
+
+    /* today's list */
+    html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Today</h3>' +
+      '<div class="btn-row">' + (doneToday
+        ? '<button class="btn sm quiet" data-act="clear-done">Clear ' + doneToday + " done</button>" : "") +
+      "</div></div><div class=\"card-body flush\">";
+    html += tt.length
+      ? '<div class="rows">' + tt.map(taskRow).join("") + "</div>"
+      : '<p class="empty">Nothing for today yet.</p>';
+    html += "</div></div>";
+
+    /* upcoming */
+    var later = laterTasks();
+    if (later.length) {
+      html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Coming up</h3>' +
+        '<span class="sub">' + later.length + " scheduled</span></div><div class=\"card-body flush\"><div class=\"rows\">" +
+        later.slice(0, 12).map(taskRow).join("") + "</div></div></div>";
+    }
+
+    /* today's habits, inline so they can be ticked without leaving */
+    if (state.habits.length) {
+      html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Habits today</h3>' +
+        '<button class="btn sm quiet" data-act="go-habits">All habits →</button></div>' +
+        '<div class="card-body"><div class="chips">' + state.habits.map(function (h) {
+          var on = habitDone(h, today());
+          var s = streak(h);
+          return '<button class="chip tap' + (on ? " on" : "") + '" data-act="habit-toggle" data-id="' + h.id +
+            '" data-date="' + today() + '" aria-pressed="' + on + '">' +
+            (on ? "✓" : '<span class="dot" style="background:' + habitColour(h) + '"></span>') +
+            "<b>" + esc(h.name) + "</b>" +
+            (s > 0 ? '<span style="opacity:0.75">' + s + "d</span>" : "") + "</button>";
+        }).join("") + "</div></div></div>";
+    }
+
+    return html;
+  }
+
+  function taskRow(t) {
+    var overdue = !t.done && t.date < today();
+    return '<div class="row' + (t.done ? " done" : "") + '">' +
+      '<input type="checkbox" ' + (t.done ? "checked" : "") + ' data-act="task-toggle" data-id="' + t.id +
+      '" aria-label="Mark ' + esc(t.text) + ' done" />' +
+      '<div class="row-main"><div class="row-title">' + esc(t.text) + "</div>" +
+      (t.time || overdue || t.date > today() || t.notes
+        ? '<div class="row-sub">' +
+          (t.time ? fmtTime(t.time) : "") +
+          (t.time && (overdue || t.date > today()) ? " · " : "") +
+          (overdue ? "from " + esc(niceDate(t.date)) : t.date > today() ? esc(niceDate(t.date)) : "") +
+          (t.notes ? (t.time || overdue || t.date > today() ? " · " : "") + esc(t.notes) : "") +
+          "</div>"
+        : "") +
+      "</div>" +
+      '<div class="row-end">' +
+      (overdue ? '<span class="pill warn">carried over</span>' : "") +
+      '<button class="ibtn" data-act="task-focus" data-id="' + t.id + '" aria-label="Toggle focus" title="' +
+      (t.focus ? "Remove from focus" : "Add to focus") + '" style="' + (t.focus ? "color:var(--accent)" : "") + '">' +
+      (t.focus ? "★" : "☆") + "</button>" +
+      '<button class="ibtn" data-act="task-edit" data-id="' + t.id + '" aria-label="Edit" title="Edit">✎</button>' +
+      '<button class="ibtn danger" data-act="task-del" data-id="' + t.id + '" aria-label="Delete" title="Delete">✕</button>' +
+      "</div></div>";
+  }
+
+  /* ---------------- Habits ---------------- */
+
+  function renderHabits() {
+    var html = pageHead("Habits", "Tap any square to tick a day — including days you missed. " +
+      "Streaks forgive today until the day is over.",
+      '<button class="btn primary" data-act="habit-add">New habit</button>');
+
+    if (!state.habits.length) {
+      return html + '<div class="card"><div class="card-body"><p class="empty">' +
+        "No habits yet. <strong>Start with one or two</strong> — something small enough to do on a bad day. " +
+        "Coffer-style streaks, a " + histWeeks + "-week history and a weekday breakdown appear here once you do." +
+        '</p><button class="btn primary" data-act="habit-add">New habit</button></div></div>';
+    }
+
+    var totalToday = state.habits.filter(function (h) { return habitDone(h, today()); }).length;
+    html += '<div class="tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">' +
+      tile("Today", totalToday + " / " + state.habits.length,
+        totalToday === state.habits.length ? "all ticked" : "keep going",
+        totalToday === state.habits.length ? "gain" : "") +
+      tile("Habits tracked", String(state.habits.length), "") +
+      tile("Best run now", Math.max.apply(null, state.habits.map(streak).concat([0])) + "d", "current") +
+      tile("Best ever", Math.max.apply(null, state.habits.map(bestStreak).concat([0])) + "d", "all time") +
+      "</div>";
+
+    html += '<div class="stack" style="margin-top:1rem">' + state.habits.map(habitCard).join("") + "</div>";
+    return html;
+  }
+
+  function habitCard(h) {
+    var cur = streak(h), best = bestStreak(h);
+    var last7 = doneInLast(h, 7), last30 = doneInLast(h, 30);
+    var colour = habitColour(h);
+
+    // a histWeeks x 7 grid, oldest week first, columns = weekdays
+    var start = weekStart(addDays(today(), -7 * (histWeeks - 1)));
+    var grid = "";
+    for (var w = 0; w < histWeeks; w++) {
+      for (var d = 0; d < 7; d++) {
+        var date = addDays(start, w * 7 + d);
+        var future = date > today();
+        var on = habitDone(h, date);
+        grid += '<button class="hsq' + (on ? " on" : "") + (date === today() ? " now" : "") + '"' +
+          (future ? " disabled" : ' data-act="habit-toggle" data-id="' + h.id + '" data-date="' + date + '"') +
+          ' style="' + (on ? "background:" + colour + ";border-color:" + colour : "") + '"' +
+          ' title="' + esc(parseISO(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })) +
+          (on ? " — done" : "") + '" aria-label="' + esc(date) + (on ? " done" : " not done") + '"></button>';
+      }
+    }
+
+    var pct = Math.round(last30 / 30 * 100);
+    return '<div class="card"><div class="card-body">' +
+      '<div style="display:flex;align-items:baseline;gap:0.6rem;flex-wrap:wrap">' +
+      '<span class="dot" style="background:' + colour + '"></span>' +
+      '<h3 style="font-size:1.05rem;flex:1">' + esc(h.name) + "</h3>" +
+      (cur > 0 ? '<span class="pill ok">' + cur + "d run</span>" : '<span class="pill mute">no run</span>') +
+      '<button class="btn sm ' + (habitDone(h, today()) ? "" : "primary") + '" data-act="habit-toggle" data-id="' + h.id +
+      '" data-date="' + today() + '">' + (habitDone(h, today()) ? "Undo today" : "Tick today") + "</button>" +
+      '<button class="ibtn" data-act="habit-edit" data-id="' + h.id + '" aria-label="Rename" title="Rename">✎</button>' +
+      '<button class="ibtn danger" data-act="habit-del" data-id="' + h.id + '" aria-label="Delete" title="Delete">✕</button>' +
+      "</div>" +
+      '<div class="hgrid-wrap"><div class="hgrid">' + grid + "</div>" +
+      '<div class="hgrid-legend"><span>' + histWeeks + " weeks ago</span><span>today</span></div></div>" +
+      '<div class="hstats">' +
+      '<div><span class="label">Last 7 days</span><b>' + last7 + " / 7</b></div>" +
+      '<div><span class="label">Last 30 days</span><b>' + last30 + " / 30 · " + pct + "%</b></div>" +
+      '<div><span class="label">Best ever</span><b>' + best + " days</b></div>" +
+      "</div></div></div>";
+  }
+
+  /* ---------------- Review ---------------- */
+
+  function renderReview() {
+    var html = pageHead("Review", "How the last few weeks actually went.");
+
+    if (!state.tasks.length && !state.habits.length) {
+      return html + '<div class="card"><div class="card-body"><p class="empty">' +
+        "Nothing to review yet. Add a task or a habit and come back in a week.</p></div></div>";
+    }
+
+    /* tasks completed per day, last 14 days */
+    var bars = [];
+    for (var i = 13; i >= 0; i--) {
+      var date = addDays(today(), -i);
+      var n = state.tasks.filter(function (t) { return t.done && t.doneAt === date; }).length;
+      bars.push({
+        label: i % 2 === 0 ? dayName(date, "narrow") : "",
+        value: n, color: "var(--c3)",
+        tip: parseISO(date).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }) +
+          "\n" + n + (n === 1 ? " task done" : " tasks done")
+      });
+    }
+    var doneTotal = state.tasks.filter(function (t) { return t.done; }).length;
+    var open = state.tasks.filter(function (t) { return !t.done; }).length;
+
+    html += '<div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))">' +
+      tile("Completed", String(doneTotal), "all time") +
+      tile("Still open", String(open), open ? "waiting on you" : "all clear", open ? "" : "gain") +
+      tile("Done in 14 days", String(bars.reduce(function (s, b) { return s + b.value; }, 0)), "") +
+      "</div>";
+
+    html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Tasks finished</h3>' +
+      '<span class="sub">last 14 days</span></div><div class="card-body">' +
+      barChart(bars, { height: 110, gap: "0.25rem" }) + "</div></div>";
+
+    /* habit consistency by weekday — genuinely useful for spotting the day you slip */
+    if (state.habits.length) {
+      html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Which days you keep it up</h3>' +
+        '<span class="sub">last ' + histWeeks + " weeks</span></div><div class=\"card-body\">";
+      var names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      var start = weekStart(addDays(today(), -7 * (histWeeks - 1)));
+      var rows = names.map(function (nm, di) {
+        var hits = 0, chances = 0;
+        for (var w = 0; w < histWeeks; w++) {
+          var date = addDays(start, w * 7 + di);
+          if (date > today()) continue;
+          chances++;
+          if (state.habits.some(function (h) { return habitDone(h, date); })) hits++;
+        }
+        return { label: nm, value: chances ? Math.round(hits / chances * 100) : 0, chances: chances, hits: hits };
+      });
+      html += barChart(rows.map(function (r) {
+        return {
+          label: r.label, value: r.value, color: "var(--c4)",
+          tip: r.label + "\n" + r.hits + " of " + r.chances + " weeks (" + r.value + "%)"
+        };
+      }), { height: 105, min: 100 });
+      var worst = rows.slice().filter(function (r) { return r.chances > 0; })
+        .sort(function (a, b) { return a.value - b.value; })[0];
+      var bestDay = rows.slice().filter(function (r) { return r.chances > 0; })
+        .sort(function (a, b) { return b.value - a.value; })[0];
+      if (worst && bestDay && worst.label !== bestDay.label) {
+        html += '<p class="hint" style="margin-top:0.7rem"><b style="color:var(--ink)">' + bestDay.label +
+          "</b> is your strongest day at " + bestDay.value + "%, <b style=\"color:var(--ink)\">" + worst.label +
+          "</b> your weakest at " + worst.value + "%.</p>";
+      }
+      html += "</div></div>";
+    }
+
+    /* notes */
+    html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>What stands out</h3></div>' +
+      '<div class="card-body flush">' + notesHtml(buildNotes(), "Not enough history yet.") + "</div></div>";
+
+    /* finished tasks log */
+    var recent = state.tasks.filter(function (t) { return t.done && t.doneAt; })
+      .sort(function (a, b) { return (b.doneAt || "").localeCompare(a.doneAt || ""); }).slice(0, 25);
+    if (recent.length) {
+      html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Recently finished</h3>' +
+        '<button class="btn sm quiet" data-act="purge-done">Clear the log</button></div>' +
+        '<div class="card-body flush"><div class="rows">' + recent.map(function (t) {
+          return '<div class="row"><div class="row-main"><div class="row-title" style="font-size:0.86rem">' +
+            esc(t.text) + "</div></div>" +
+            '<span class="row-sub">' + esc(niceDate(t.doneAt)) + "</span></div>";
+        }).join("") + "</div></div></div>";
+    }
+    return html;
+  }
+
+  function buildNotes() {
+    var n = [];
+    var tt = todayTasks();
+    var doneToday = tt.filter(function (t) { return t.done; }).length;
+
+    if (tt.length && doneToday === tt.length) {
+      n.push({ tone: "ok", mark: "✓", html: "Everything on today's list is done." });
+    }
+    var overdue = state.tasks.filter(function (t) { return !t.done && t.date < today(); });
+    if (overdue.length) {
+      n.push({
+        tone: overdue.length > 4 ? "bad" : "warn", mark: "!",
+        html: "<b>" + overdue.length + (overdue.length === 1 ? " task has" : " tasks have") +
+          "</b> been carried over from earlier days. Worth deleting anything you're not actually going to do."
+      });
+    }
+    state.habits.forEach(function (h) {
+      var s = streak(h), b = bestStreak(h);
+      if (s >= 7) n.push({ tone: "ok", mark: "✓", html: "<b>" + esc(h.name) + "</b> is on a " + s + "-day run." });
+      else if (s === 0 && b >= 3) {
+        var last = Object.keys(h.history).filter(function (k) { return h.history[k]; }).sort().pop();
+        n.push({
+          tone: "warn", mark: "↻",
+          html: "<b>" + esc(h.name) + "</b> has lapsed" + (last ? " since " + esc(niceDate(last)) : "") +
+            " — your best run was " + b + " days."
+        });
+      }
+      var l30 = doneInLast(h, 30);
+      if (l30 >= 25) n.push({ tone: "ok", mark: "◆", html: "<b>" + esc(h.name) + "</b> is at " + l30 + "/30 days — near enough automatic." });
+    });
+    var last7done = state.tasks.filter(function (t) {
+      return t.done && t.doneAt && daysBetween(t.doneAt, today()) < 7;
+    }).length;
+    if (last7done) {
+      n.push({ tone: "info", mark: "→", html: "You finished <b>" + last7done + "</b> task" + (last7done === 1 ? "" : "s") + " in the last 7 days." });
+    }
+    return n;
+  }
+
+  /* ---------------- Settings ---------------- */
+
+  function renderSettings() {
+    var bytes = 0;
+    try { bytes = new Blob([localStorage.getItem(APP.storeKey) || ""]).size; } catch (e) {}
+
+    return pageHead("Settings", "Your data, your device.") +
+      '<div class="card"><div class="card-body"><div style="display:flex;gap:0.8rem;align-items:flex-start">' +
+      '<span style="font-size:1.15rem;line-height:1">🔒</span><div style="font-size:0.855rem;line-height:1.55">' +
+      "<b>Nothing leaves this device.</b> No account, no server, no network requests. Everything lives in this " +
+      "browser's local storage on this device only — so if you open the file somewhere else it starts empty there. " +
+      "<b>Export a backup</b> if the history matters to you.</div></div></div></div>" +
+
+      '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Backup</h3>' +
+      '<span class="sub">' + (bytes / 1024).toFixed(1) + " KB stored</span></div><div class=\"card-body\">" +
+      '<div class="btn-row">' +
+      '<button class="btn primary" data-act="export-json">Back up my data</button>' +
+      '<button class="btn" data-act="export-csv">Export habits (.csv)</button>' +
+      '<button class="btn" data-act="import-json">Restore a backup</button></div>' +
+      '<p class="hint" style="margin-top:0.7rem">Importing replaces everything currently in this browser.</p></div></div>' +
+
+      '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>History shown</h3></div>' +
+      '<div class="card-body"><div class="seg" style="max-width:320px">' +
+      [4, 9, 13, 26].map(function (w) {
+        return '<button data-act="set-weeks" data-w="' + w + '" aria-pressed="' + (histWeeks === w) + '">' + w + "w</button>";
+      }).join("") + "</div>" +
+      '<p class="hint" style="margin-top:0.6rem">How many weeks each habit grid shows.</p></div></div>' +
+
+      '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Erase everything</h3></div>' +
+      '<div class="card-body"><p style="font-size:0.86rem;color:var(--dim);line-height:1.6;margin:0 0 0.9rem;max-width:60ch">' +
+      "Removes every task and habit, including all streak history. There is no undo — export a backup first if " +
+      "there's any doubt.</p><button class=\"btn danger\" data-act=\"wipe\">Erase all local data</button></div></div>";
+  }
+
+  /* ---------------- actions ---------------- */
+
+  APP.actions = {
+    "omni-commit": function () { commitTask(); },
+    "omni-clear": function () { omni = { text: "", touched: {} }; render(); var b = document.getElementById("omniBox"); if (b) b.focus(); },
+    "go-habits": function () { view = "habits"; render(); },
+
+    "task-toggle": function (id) {
+      var t = state.tasks.filter(function (x) { return x.id === id; })[0];
+      if (!t) return;
+      t.done = !t.done;
+      t.doneAt = t.done ? today() : null;
+      if (t.done) t.focus = t.focus; // keep the star so focus history reads correctly
+      save(); render();
+    },
+
+    "task-focus": function (id) {
+      var t = state.tasks.filter(function (x) { return x.id === id; })[0];
+      if (!t) return;
+      if (!t.focus && focusCount() >= FOCUS_MAX) {
+        toast("Three focus items is the limit — unstar one first.");
+        return;
+      }
+      t.focus = !t.focus;
+      save(); render();
+    },
+
+    "task-edit": function (id) {
+      var t = state.tasks.filter(function (x) { return x.id === id; })[0];
+      if (!t) return;
+      openModal({
+        title: "Edit task",
+        fields: [
+          { key: "text", label: "Task", value: t.text, span: true },
+          { key: "date", label: "Day", type: "date", value: t.date },
+          { key: "time", label: "Time", type: "time", value: t.time || "" },
+          { key: "notes", label: "Note", value: t.notes || "", placeholder: "optional", span: true }
+        ],
+        validate: function (v) { if (!v.text.trim()) return "The task needs a name."; },
+        onConfirm: function (v) {
+          t.text = v.text.trim(); t.date = v.date || t.date;
+          t.time = v.time || null; t.notes = v.notes.trim();
+          save(); render(); toast("Task updated.");
+        }
+      });
+    },
+
+    "task-del": function (id) {
+      var idx = -1;
+      for (var i = 0; i < state.tasks.length; i++) if (state.tasks[i].id === id) idx = i;
+      if (idx < 0) return;
+      var t = state.tasks[idx];
+      state.tasks.splice(idx, 1);
+      save(); render();
+      toast("Deleted “" + t.text + "”.", function () { state.tasks.splice(idx, 0, t); });
+    },
+
+    "clear-done": function () {
+      var removed = state.tasks.filter(function (t) { return t.done && t.doneAt === today(); });
+      if (!removed.length) return;
+      var keep = state.tasks.slice();
+      state.tasks = state.tasks.filter(function (t) { return !(t.done && t.doneAt === today()); });
+      save(); render();
+      toast(removed.length + " finished " + (removed.length === 1 ? "task" : "tasks") + " cleared.", function () {
+        state.tasks = keep;
+      });
+    },
+
+    "purge-done": function () {
+      var keep = state.tasks.slice();
+      var n = state.tasks.filter(function (t) { return t.done; }).length;
+      if (!n) { toast("Nothing in the log yet."); return; }
+      confirmAction({
+        title: "Clear the finished log?",
+        message: "Removes <b>" + n + "</b> completed " + (n === 1 ? "task" : "tasks") +
+          ". Habit history is untouched. You can undo this straight afterwards.",
+        confirmLabel: "Clear the log"
+      }, function () {
+        state.tasks = state.tasks.filter(function (t) { return !t.done; });
+        save(); render();
+        toast(n + " cleared.", function () { state.tasks = keep; });
+      });
+    },
+
+    "habit-add": function () {
+      openModal({
+        title: "New habit",
+        message: "Keep it small enough that you could still do it on a bad day.",
+        fields: [{ key: "name", label: "Habit", placeholder: "e.g. Stretch for 5 minutes", span: true }],
+        confirmLabel: "Add habit",
+        validate: function (v) {
+          if (!v.name.trim()) return "Give the habit a name.";
+          if (state.habits.some(function (h) { return h.name.toLowerCase() === v.name.trim().toLowerCase(); }))
+            return "You already track that one.";
+        },
+        onConfirm: function (v) {
+          state.habits.push({ id: uid(), name: v.name.trim(), history: {}, target: 7, colour: null });
+          save(); render(); toast(v.name.trim() + " added.");
+        }
+      });
+    },
+
+    "habit-edit": function (id) {
+      var h = state.habits.filter(function (x) { return x.id === id; })[0];
+      if (!h) return;
+      openModal({
+        title: "Rename habit",
+        fields: [{ key: "name", label: "Habit", value: h.name, span: true }],
+        validate: function (v) { if (!v.name.trim()) return "Give the habit a name."; },
+        onConfirm: function (v) { h.name = v.name.trim(); save(); render(); toast("Renamed."); }
+      });
+    },
+
+    "habit-del": function (id) {
+      var h = state.habits.filter(function (x) { return x.id === id; })[0];
+      if (!h) return;
+      var ticks = Object.keys(h.history).filter(function (k) { return h.history[k]; }).length;
+      confirmAction({
+        title: "Delete " + h.name + "?",
+        message: ticks
+          ? "This also removes <b>" + ticks + " ticked " + (ticks === 1 ? "day" : "days") +
+            "</b> of history. You can undo it straight afterwards."
+          : "Nothing has been ticked for this habit yet.",
+        confirmLabel: "Delete habit"
+      }, function () {
+        var idx = state.habits.indexOf(h);
+        state.habits.splice(idx, 1);
+        save(); render();
+        toast(h.name + " deleted.", function () { state.habits.splice(idx, 0, h); });
+      });
+    },
+
+    "habit-toggle": function (id, el) {
+      var h = state.habits.filter(function (x) { return x.id === id; })[0];
+      if (!h) return;
+      var date = el.getAttribute("data-date");
+      if (!date || date > today()) return;
+      if (h.history[date]) delete h.history[date];
+      else h.history[date] = true;
+      save(); render();
+    },
+
+    "set-weeks": function (id, el) { histWeeks = parseInt(el.getAttribute("data-w"), 10); render(); },
+
+    "export-json": function () {
+      backupDialog("daybook-backup-" + today() + ".json", JSON.stringify(state, null, 2),
+        ((state.tasks || []).length + " tasks and " + (state.habits || []).length + " habits"));
+    },
+
+    "export-csv": function () {
+      var dates = {};
+      state.habits.forEach(function (h) { Object.keys(h.history).forEach(function (d) { if (h.history[d]) dates[d] = 1; }); });
+      var all = Object.keys(dates).sort();
+      if (!all.length) { toast("No habit history to export yet."); return; }
+      var rows = [["Date"].concat(state.habits.map(function (h) { return h.name; }))];
+      all.forEach(function (d) {
+        rows.push([d].concat(state.habits.map(function (h) { return h.history[d] ? "1" : "0"; })));
+      });
+      download("daybook-habits-" + today() + ".csv", csvEscape(rows), "text/csv");
+      toast(all.length + " days exported.");
+    },
+
+    "import-json": function () {
+      restoreDialog(function (p) { if (!p || (!p.tasks && !p.habits)) return null; return (p.tasks||[]).length + " tasks, " + (p.habits||[]).length + " habits"; }, function (parsed) {
+        confirmAction({
+          title: "Replace everything with this backup?",
+          message: "The backup holds <b>" + ((parsed.tasks || []).length + " tasks and " + (parsed.habits || []).length + " habits") + "</b>. Everything currently here " +
+            "will be replaced. This can't be undone.",
+          confirmLabel: "Replace my data"
+        }, function () {
+          state = APP.hydrate(parsed, APP.blank());
+          save(); render();
+          toast("Backup restored — " + ((parsed.tasks || []).length + " tasks and " + (parsed.habits || []).length + " habits") + ".");
+        });
+      });
+    },
+
+    "wipe": function () {
+      confirmAction({
+        title: "Erase everything?",
+        message: "Every task and habit, including all streak history, will be deleted. There is no undo.",
+        confirmLabel: "Erase it all"
+      }, function () {
+        state = APP.blank();
+        save(); view = "today"; render(); toast("All data erased.");
+      });
+    }
+  };
+
+
+/* ============================================================
+   Shared runtime for all of these apps.
+
+   Two rules learned the hard way, because a published page runs inside
+   a sandboxed frame:
+     • native confirm() silently returns false  -> never use it
+     • <form> submit events never fire          -> never rely on them
+   So: every confirmation is an in-page modal, and every action is an
+   explicit button click with Enter wired up by hand.
+   ============================================================ */
+
+var STORE_KEY = APP.storeKey;
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function iso(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+function today() { return iso(new Date()); }
+function parseISO(s) { return new Date(s + "T00:00:00"); }
+function addDays(dateStr, n) { var d = parseISO(dateStr); d.setDate(d.getDate() + n); return iso(d); }
+function daysBetween(a, b) { return Math.round((parseISO(b) - parseISO(a)) / 86400000); }
+function daysUntil(s) { return daysBetween(today(), s); }
+
+function dayName(dateStr, style) {
+  return parseISO(dateStr).toLocaleDateString(undefined, { weekday: style || "short" });
+}
+function niceDate(dateStr) {
+  var d = daysUntil(dateStr);
+  if (d === 0) return "today";
+  if (d === 1) return "tomorrow";
+  if (d === -1) return "yesterday";
+  return parseISO(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+// Monday-start week containing dateStr
+function weekStart(dateStr) {
+  var d = parseISO(dateStr);
+  var shift = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - shift);
+  return iso(d);
+}
+
+/* ---------------- storage ---------------- */
+
+function loadState(shape) {
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return shape();
+    var p = JSON.parse(raw);
+    return APP.hydrate(p, shape());
+  } catch (e) { return shape(); }
+}
+function persist(state) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  catch (e) { toast("Could not save — this browser's storage may be full or blocked."); }
+}
+
+/* ---------------- modal ---------------- */
+
+var overlay, escHandler = null;
+
+function closeModal() {
+  overlay.innerHTML = "";
+  if (escHandler) { document.removeEventListener("keydown", escHandler); escHandler = null; }
+}
+
+// fields: [{key,label,type,value,options,placeholder,step,min,hint,span,rows}]
+function openModal(opts) {
+  closeModal();
+  var fields = opts.fields || [];
+
+  var html = '<div class="scrim" data-scrim="1"><div class="modal"' +
+    (opts.wide ? ' style="max-width:620px"' : "") +
+    ' role="dialog" aria-modal="true" aria-label="' + esc(opts.title) + '">' +
+    '<div class="modal-head"><h3>' + esc(opts.title) + "</h3>" +
+    (opts.message ? "<p>" + opts.message + "</p>" : "") + "</div>";
+
+  if (fields.length) {
+    html += '<div class="modal-body"><div class="fields">' + fields.map(function (f) {
+      var id = "mf_" + f.key, inner;
+      if (f.type === "select") {
+        inner = '<select id="' + id + '">' + (f.options || []).map(function (o) {
+          var v = typeof o === "string" ? o : o.value;
+          var l = typeof o === "string" ? o : o.label;
+          return '<option value="' + esc(v) + '"' + (String(v) === String(f.value) ? " selected" : "") + ">" + esc(l) + "</option>";
+        }).join("") + "</select>";
+      } else if (f.type === "textarea") {
+        inner = '<textarea id="' + id + '" rows="' + (f.rows || 4) + '" spellcheck="false" placeholder="' +
+          esc(f.placeholder || "") + '">' + esc(f.value == null ? "" : f.value) + "</textarea>";
+      } else {
+        inner = '<input id="' + id + '" type="' + (f.type || "text") + '" value="' + esc(f.value == null ? "" : f.value) + '"' +
+          (f.placeholder ? ' placeholder="' + esc(f.placeholder) + '"' : "") +
+          (f.type === "number" ? ' step="' + (f.step || "0.01") + '"' : "") +
+          (f.min != null ? ' min="' + f.min + '"' : "") + ' autocomplete="off" />';
+      }
+      return '<div class="field' + (f.span ? " wide" : "") + '">' +
+        '<label class="label" for="' + id + '">' + esc(f.label) + "</label>" + inner +
+        (f.hint ? '<span class="hint">' + esc(f.hint) + "</span>" : "") + "</div>";
+    }).join("") + "</div>" + (opts.extraBody || "") + "</div>";
+  } else if (opts.extraBody) {
+    html += '<div class="modal-body">' + opts.extraBody + "</div>";
+  }
+
+  html += '<div class="modal-foot">' +
+    '<button class="btn quiet" data-mclose="1">' + esc(opts.cancelLabel || "Cancel") + "</button>" +
+    '<button class="btn ' + (opts.danger ? "danger" : "primary") + '" data-mok="1">' +
+    esc(opts.confirmLabel || "Save") + "</button></div></div></div>";
+
+  overlay.innerHTML = html;
+
+  function collect() {
+    var out = {};
+    fields.forEach(function (f) {
+      var el = document.getElementById("mf_" + f.key);
+      out[f.key] = f.type === "number" ? num(el.value) : el.value;
+    });
+    return out;
+  }
+  function accept() {
+    var v = collect();
+    if (opts.validate) {
+      var bad = opts.validate(v);
+      if (bad) { toast(bad); return; }
+    }
+    closeModal();
+    if (opts.onConfirm) opts.onConfirm(v);
+  }
+
+  overlay.querySelector("[data-mok]").addEventListener("click", accept);
+  overlay.querySelector("[data-mclose]").addEventListener("click", function () {
+    closeModal(); if (opts.onCancel) opts.onCancel();
+  });
+  overlay.querySelector("[data-scrim]").addEventListener("mousedown", function (e) {
+    if (e.target === e.currentTarget) { closeModal(); if (opts.onCancel) opts.onCancel(); }
+  });
+  overlay.querySelectorAll(".modal input").forEach(function (i) {
+    i.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); accept(); } });
+  });
+  escHandler = function (e) { if (e.key === "Escape") { closeModal(); if (opts.onCancel) opts.onCancel(); } };
+  document.addEventListener("keydown", escHandler);
+
+  var first = overlay.querySelector(".modal input, .modal select, .modal textarea");
+  if (first) first.focus(); else overlay.querySelector("[data-mok]").focus();
+  if (opts.afterOpen) opts.afterOpen();
+}
+
+function confirmAction(opts, onYes) {
+  openModal({
+    title: opts.title, message: opts.message,
+    confirmLabel: opts.confirmLabel || "Delete",
+    cancelLabel: opts.cancelLabel || "Keep it",
+    danger: opts.danger !== false,
+    onConfirm: onYes
+  });
+}
+
+/* ---------------- toast + undo ---------------- */
+
+function toast(msg, undo) {
+  var box = document.getElementById("toasts");
+  var el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = "<span>" + esc(msg) + "</span>";
+  function remove() { if (el.parentNode) el.parentNode.removeChild(el); }
+  if (undo) {
+    var b = document.createElement("button");
+    b.textContent = "Undo";
+    b.addEventListener("click", function () { undo(); remove(); save(); render(); });
+    el.appendChild(b);
+  }
+  box.appendChild(el);
+  while (box.children.length > 3) box.removeChild(box.firstChild);
+  setTimeout(remove, undo ? 7000 : 3800);
+}
+
+/* ---------------- download ---------------- */
+
+function download(name, content, mime) {
+  try {
+    var blob = new Blob([content], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  } catch (e) {
+    toast("This browser blocked the download. Open the saved file directly rather than in a preview frame.");
+  }
+}
+/* A file save can be ignored outright by the browser — inside an embedded
+   frame it fails with no error at all — so never claim success. Always offer
+   the text too: that route cannot silently fail. */
+function backupDialog(name, text, summary) {
+  closeModal();
+  overlay.innerHTML = '<div class="scrim" data-scrim="1"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Your backup">' +
+    '<div class="modal-head"><h3>Your backup</h3>' +
+    "<p>Two ways to keep this. <b>Save as file</b> puts it in your downloads — but some browsers block that " +
+    "silently, so if nothing turns up there, use <b>Copy</b> and paste it somewhere safe. Either can be " +
+    "restored later.</p></div>" +
+    '<div class="modal-body">' +
+    '<textarea id="bkText" readonly rows="9" spellcheck="false" ' +
+    'style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.76rem;padding:0.6rem;' +
+    'border-radius:8px;border:1px solid var(--rule-mid);background:var(--raised);color:var(--ink);resize:vertical">' +
+    esc(text) + "</textarea>" +
+    '<p class="hint" style="margin-top:0.5rem">' + (text.length / 1024).toFixed(1) + " KB" +
+    (summary ? " · " + esc(summary) : "") + "</p></div>" +
+    '<div class="modal-foot">' +
+    '<button class="btn quiet" data-mclose="1">Done</button>' +
+    '<button class="btn" id="bkFile">Save as file</button>' +
+    '<button class="btn primary" id="bkCopy">Copy</button>' +
+    "</div></div></div>";
+
+  var ta = document.getElementById("bkText");
+  overlay.querySelector("[data-mclose]").addEventListener("click", closeModal);
+  overlay.querySelector("[data-scrim]").addEventListener("mousedown", function (e) {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  document.getElementById("bkFile").addEventListener("click", function () {
+    download(name, text, "application/json");
+    toast("If nothing appears in your downloads, this browser blocked it — use Copy.");
+  });
+  document.getElementById("bkCopy").addEventListener("click", function () {
+    function fallback() {
+      ta.removeAttribute("readonly");
+      ta.focus();
+      ta.setSelectionRange(0, ta.value.length);
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      ta.setAttribute("readonly", "readonly");
+      toast(ok ? "Backup copied — paste it somewhere safe."
+               : "Couldn't copy automatically. The text is selected — copy it by hand.");
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        toast("Backup copied — paste it somewhere safe.");
+      }, fallback);
+    } else { fallback(); }
+  });
+}
+
+// describe(parsed) -> string summary, or null if it isn't one of ours
+function restoreDialog(describe, onJson) {
+  closeModal();
+  overlay.innerHTML = '<div class="scrim" data-scrim="1"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Restore a backup">' +
+    '<div class="modal-head"><h3>Restore a backup</h3>' +
+    "<p>Paste the backup text below, or pick the .json file if you saved one. Everything currently in this " +
+    "browser will be replaced — you'll get one more chance to confirm.</p></div>" +
+    '<div class="modal-body">' +
+    '<textarea id="rsText" rows="9" spellcheck="false" placeholder=\'{ "version": 1, … }\' ' +
+    'style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.76rem;padding:0.6rem;' +
+    'border-radius:8px;border:1px solid var(--rule-mid);background:var(--surface);color:var(--ink);resize:vertical"></textarea>' +
+    '<div id="rsInfo" class="hint" style="margin-top:0.5rem">Nothing pasted yet.</div></div>' +
+    '<div class="modal-foot">' +
+    '<button class="btn quiet" data-mclose="1">Cancel</button>' +
+    '<label class="btn" style="cursor:pointer">Choose a file' +
+    '<input type="file" id="rsFile" accept="application/json,.json" style="display:none" /></label>' +
+    '<button class="btn primary" id="rsGo">Restore</button>' +
+    "</div></div></div>";
+
+  var ta = document.getElementById("rsText");
+  var info = document.getElementById("rsInfo");
+
+  function peek() {
+    var t = ta.value.trim();
+    if (!t) { info.textContent = "Nothing pasted yet."; info.style.color = ""; return null; }
+    var p;
+    try { p = JSON.parse(t); }
+    catch (e) { info.textContent = "That isn't valid JSON yet — make sure you pasted all of it."; info.style.color = "var(--warn)"; return null; }
+    var sum = describe(p);
+    if (!sum) { info.textContent = "Valid JSON, but it isn't a backup from this app."; info.style.color = "var(--warn)"; return null; }
+    info.textContent = "Looks good — " + sum + ".";
+    info.style.color = "var(--gain)";
+    return p;
+  }
+
+  ta.addEventListener("input", peek);
+  overlay.querySelector("[data-mclose]").addEventListener("click", closeModal);
+  overlay.querySelector("[data-scrim]").addEventListener("mousedown", function (e) {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  document.getElementById("rsFile").addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var r = new FileReader();
+    r.onload = function () { ta.value = r.result; peek(); };
+    r.readAsText(file);
+  });
+  document.getElementById("rsGo").addEventListener("click", function () {
+    var parsed = peek();
+    if (!parsed) { toast("Paste a valid backup first."); return; }
+    closeModal();
+    onJson(parsed);
+  });
+  ta.focus();
+}
+
+function csvEscape(rows) {
+  return rows.map(function (r) {
+    return r.map(function (c) {
+      var s = String(c == null ? "" : c).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? '"' + s + '"' : s;
+    }).join(",");
+  }).join("\n");
+}
+
+/* ---------------- tooltip ---------------- */
+
+var tipEl;
+function showTip(text, x, y) {
+  tipEl.textContent = text;
+  tipEl.style.left = x + "px";
+  tipEl.style.top = y + "px";
+  tipEl.classList.add("on");
+}
+function hideTip() { tipEl.classList.remove("on"); }
+
+function wireHovers(root) {
+  root.querySelectorAll("[data-tip]").forEach(function (el) {
+    el.addEventListener("mousemove", function (e) { showTip(el.getAttribute("data-tip"), e.clientX, e.clientY); });
+    el.addEventListener("mouseleave", hideTip);
+  });
+}
+
+/* ---------------- charts ---------------- */
+
+function areaChart(points, o) {
+  o = o || {};
+  if (!points.length) return "";
+  var W = 100, H = o.height || 40, pad = 2;
+  var vals = points.map(function (p) { return p.value; });
+  var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if (o.baseZero && lo > 0) lo = 0;
+  if (lo === hi) { lo -= 1; hi += 1; }
+  var span = hi - lo;
+  function px(i) { return pad + (points.length === 1 ? (W - 2 * pad) / 2 : i * (W - 2 * pad) / (points.length - 1)); }
+  function py(v) { return H - pad - ((v - lo) / span) * (H - 2 * pad); }
+
+  var line = points.map(function (p, i) { return (i ? "L" : "M") + px(i).toFixed(2) + " " + py(p.value).toFixed(2); }).join(" ");
+  var area = line + " L" + px(points.length - 1).toFixed(2) + " " + (H - pad) + " L" + px(0).toFixed(2) + " " + (H - pad) + " Z";
+  var gid = "g" + Math.random().toString(36).slice(2, 8);
+  var stroke = o.color || "var(--c1)";
+  var zero = (lo < 0 && hi > 0)
+    ? '<line x1="' + pad + '" y1="' + py(0).toFixed(2) + '" x2="' + (W - pad) + '" y2="' + py(0).toFixed(2) +
+      '" stroke="var(--rule-strong)" stroke-width="0.25" vector-effect="non-scaling-stroke" />' : "";
+  var hits = points.map(function (p, i) {
+    var w = (W - 2 * pad) / points.length;
+    return '<rect data-tip="' + esc(p.tip || p.label) + '" x="' + (px(i) - w / 2).toFixed(2) +
+      '" y="0" width="' + w.toFixed(2) + '" height="' + H + '" fill="transparent" />';
+  }).join("");
+
+  return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" style="height:' +
+    (o.cssHeight || 100) + 'px" role="img" aria-label="' + esc(o.aria || "trend") + '">' +
+    '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="' + stroke + '" stop-opacity="0.26" />' +
+    '<stop offset="100%" stop-color="' + stroke + '" stop-opacity="0.02" /></linearGradient></defs>' +
+    zero + '<path d="' + area + '" fill="url(#' + gid + ')" />' +
+    '<path d="' + line + '" fill="none" stroke="' + stroke + '" stroke-width="1.1" stroke-linejoin="round" ' +
+    'stroke-linecap="round" vector-effect="non-scaling-stroke" />' +
+    '<circle cx="' + px(points.length - 1).toFixed(2) + '" cy="' + py(points[points.length - 1].value).toFixed(2) +
+    '" r="1.5" fill="' + stroke + '" stroke="var(--surface)" stroke-width="0.6" />' + hits + "</svg>";
+}
+
+function barChart(rows, o) {
+  o = o || {};
+  var H = o.height || 118;
+  var max = Math.max.apply(null, rows.map(function (r) { return r.value; }).concat([o.min || 1]));
+  return '<div style="display:flex;align-items:flex-end;gap:' + (o.gap || "0.4rem") +
+    ';border-bottom:1px solid var(--rule-strong);padding-top:0.3rem">' +
+    rows.map(function (r) {
+      var h = r.value > 0 ? Math.max(Math.round(r.value / max * H), 2) : 0;
+      return '<div style="flex:1;display:flex;align-items:flex-end;justify-content:center;height:' + H + 'px">' +
+        '<div data-tip="' + esc(r.tip || (r.label + ": " + r.value)) + '" style="width:62%;max-width:26px;height:' + h +
+        "px;background:" + (r.color || o.color || "var(--c1)") + ';border-radius:3px 3px 0 0"></div></div>';
+    }).join("") + "</div>" +
+    '<div style="display:flex;gap:' + (o.gap || "0.4rem") + ';margin-top:0.35rem">' +
+    rows.map(function (r) {
+      return '<span style="flex:1;text-align:center;font-size:0.66rem;color:var(--faint)">' + esc(r.label) + "</span>";
+    }).join("") + "</div>";
+}
+
+function meter(pct, color, pacePct) {
+  return '<div class="meter">' +
+    (pacePct != null && pacePct > 0.02 && pacePct < 0.98
+      ? '<div class="meter-pace" style="left:' + (pacePct * 100).toFixed(1) + '%"></div>' : "") +
+    '<div class="meter-fill" style="width:' + (clamp(pct, 0, 1) * 100).toFixed(1) + "%;background:" + color + '"></div></div>';
+}
+
+/* ---------------- shared bits of markup ---------------- */
+
+function pageHead(title, sub, right) {
+  return '<div class="page-head"><div><h2>' + esc(title) + "</h2>" +
+    (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (right || "") + "</div>";
+}
+function notesHtml(notes, emptyMsg) {
+  if (!notes.length) return '<p class="empty">' + esc(emptyMsg) + "</p>";
+  return '<div class="notes">' + notes.map(function (n) {
+    return '<div class="note"><span class="note-mark ' + n.tone + '">' + n.mark + "</span><div>" + n.html + "</div></div>";
+  }).join("") + "</div>";
+}
+function tile(label, fig, foot, cls) {
+  return '<div class="tile"><span class="label">' + esc(label) + '</span><div class="tile-fig' +
+    (cls ? " " + cls : "") + '"' + (cls === "gain" ? ' style="color:var(--gain)"' : cls === "loss" ? ' style="color:var(--loss)"' : "") +
+    ">" + fig + "</div>" + (foot ? '<div class="tile-foot">' + foot + "</div>" : "") + "</div>";
+}
+
+/* ---------------- boot harness ---------------- */
+
+var state, view, viewEl;
+
+function save() { persist(state); }
+
+function renderNav() {
+  document.getElementById("nav").innerHTML = APP.tabs.map(function (t) {
+    return '<button class="tab" data-tab="' + t.id + '"' + (t.id === view ? ' aria-current="page"' : "") + ">" +
+      '<span class="ico">' + t.ico + "</span><span>" + t.label + "</span></button>";
+  }).join("");
+}
+
+function render() {
+  if (APP.beforeRender) APP.beforeRender();
+  renderNav();
+  viewEl.innerHTML = APP.renderView(view);
+  if (APP.afterRender) APP.afterRender();
+  wireHovers(viewEl);
+}
+
+function boot() {
+  overlay = document.getElementById("overlay");
+  tipEl = document.getElementById("tip");
+  viewEl = document.getElementById("view");
+  state = loadState(APP.blank);
+  view = APP.tabs[0].id;
+
+  document.addEventListener("click", function (e) {
+    var tab = e.target.closest("[data-tab]");
+    if (tab) {
+      view = tab.getAttribute("data-tab");
+      hideTip();
+      if (APP.onTabChange) APP.onTabChange(view);
+      render();
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+    var act = e.target.closest("[data-act]");
+    if (!act) return;
+    var name = act.getAttribute("data-act");
+    if (APP.actions[name]) { hideTip(); APP.actions[name](act.getAttribute("data-id"), act); }
+  });
+
+  render();
+  if (APP.afterBoot) APP.afterBoot();
+}
+
+
+  boot();
+})();
+</script>
+
+<script>
+  // Registers the offline worker. Only meaningful over https (or localhost) —
+  // opening this file straight from disk simply skips it, and the app still
+  // works because everything it needs is already inside the file.
+  if ('serviceWorker' in navigator &&
+      (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+</script>

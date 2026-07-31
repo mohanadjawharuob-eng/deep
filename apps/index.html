@@ -8,7 +8,6 @@
 <meta name="theme-color" content="#111312" media="(prefers-color-scheme: dark)" />
 <link rel="icon" type="image/png" href="./icons/apps-192.png" />
 <link rel="apple-touch-icon" sizes="192x192" href="./icons/apps-192.png" />
-<link rel="manifest" href="./apps.webmanifest" />
 <style>
   :root {
     --page: #f2f2ef;
@@ -61,13 +60,15 @@
   .note b { color: var(--ink); font-weight: 620; }
   .note ol { padding-left: 1.1rem; margin: 0.5rem 0 0; }
   .note li { margin-bottom: 0.3rem; }
-  .install {
-    display: none; width: 100%; margin-top: 1rem; padding: 0.8rem 1rem;
-    font: inherit; font-weight: 620; font-size: 0.95rem;
-    background: var(--ink); color: var(--page);
-    border: 0; border-radius: 12px; cursor: pointer;
+  .warn {
+    margin-top: 1.4rem; padding: 0.9rem 1rem;
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 3px solid #c2703a; border-radius: 10px;
+    font-size: 0.84rem; line-height: 1.6; color: var(--dim);
   }
-  .install:active { opacity: 0.85; }
+  .warn b { color: var(--ink); font-weight: 620; }
+  .warn ol { padding-left: 1.1rem; margin: 0.55rem 0 0; }
+  .warn li { margin-bottom: 0.35rem; }
 </style>
 </head>
 <body>
@@ -77,45 +78,57 @@
   everything you enter stays in your browser's storage on the phone or computer you entered it on.</p>
 
   <div class="grid">
-    <a class="app" href="./daybook.html">
+    <a class="app" href="./daybook/">
       <img src="./icons/daybook-192.png" alt="" />
       <span class="t"><b>Daybook</b><span>Tasks, today's focus and habit streaks</span></span>
       <span class="chev">›</span>
     </a>
-    <a class="app" href="./coffer.html">
+    <a class="app" href="./coffer/">
       <img src="./icons/coffer-192.png" alt="" />
       <span class="t"><b>Coffer</b><span>Budgets, goals, debts and a plain-text ledger</span></span>
       <span class="chev">›</span>
     </a>
-    <a class="app" href="./kitchen.html">
+    <a class="app" href="./kitchen/">
       <img src="./icons/kitchen-192.png" alt="" />
       <span class="t"><b>Kitchen</b><span>Plan the week, get one merged shopping list</span></span>
       <span class="chev">›</span>
     </a>
-    <a class="app" href="./timesheet.html">
+    <a class="app" href="./timesheet/">
       <img src="./icons/timesheet-192.png" alt="" />
       <span class="t"><b>Timesheet</b><span>Track hours per client, then invoice them</span></span>
       <span class="chev">›</span>
     </a>
   </div>
 
-  <button class="install" id="install" type="button">Install this page as one app</button>
+  <div class="warn">
+    <b>Installed before 31 July?</b> Those installs were broken — all four apps shared one address, so the first
+    one you installed claimed the other three and Chrome said “already installed” for the rest. Each app now lives
+    at its own address and installs on its own.
+    <ol>
+      <li>In each app, open <b>Settings → Export backup</b> and keep the text somewhere safe. Do this first.</li>
+      <li>Uninstall the old app (press and hold its icon → <b>Uninstall</b>). Your saved data is not stored in the
+      icon, so it stays — but do step 1 anyway.</li>
+      <li>Come back here and install each app fresh from the links above.</li>
+    </ol>
+  </div>
 
   <div class="note">
-    <b>Install one app to your home screen</b>
+    <b>Install an app to your home screen</b>
     <ol>
       <li>Open the app itself (tap it above) — not this page.</li>
       <li>Chrome menu <b>⋮</b> → <b>Install app</b>. On iPhone: Share → Add to Home Screen.</li>
       <li>It gets its own icon and opens full-screen, without the browser bar.</li>
     </ol>
+    <p style="margin:0.7rem 0 0">Repeat for each one you want. They no longer block each other.</p>
 
     <p style="margin:1rem 0 0"><b>Installed it but can't find the icon?</b> Android puts installed web apps in the
     <b>app drawer</b> (swipe up from the bottom), not always on the home screen. Find it there, press and hold, then
     drag it onto your home screen. That's your shortcut — it opens straight into the app with no browser bar,
     which is the same thing Chrome's <b>Open app</b> button does.</p>
 
-    <p style="margin:0.9rem 0 0"><b>Want one icon instead of four?</b> Install <i>this</i> page. You get a single
-    <b>Apps</b> icon that opens the list above, and you tap through from there.</p>
+    <p style="margin:0.9rem 0 0"><b>This page itself is not installable, on purpose.</b> To cover all four apps it
+    would have to claim the whole folder, which is exactly what was breaking the individual installs. Bookmark it
+    instead if you want a single place to tap through from.</p>
 
     <p style="margin:0.9rem 0 0">Each app stores its data separately per device. Use the <b>Export backup</b> button in
     each app's settings if the data matters to you.</p>
@@ -123,25 +136,10 @@
 </main>
 
 <script>
-  // Chrome hands us the install prompt instead of showing its own banner.
-  // Park it on a button so there is always something to press.
-  (function () {
-    var btn = document.getElementById('install');
-    var deferred = null;
-    window.addEventListener('beforeinstallprompt', function (e) {
-      e.preventDefault();
-      deferred = e;
-      btn.style.display = 'block';
-    });
-    btn.addEventListener('click', function () {
-      if (!deferred) return;
-      deferred.prompt();
-      deferred.userChoice.then(function () { deferred = null; btn.style.display = 'none'; });
-    });
-    // Already running as an installed app — nothing to offer.
-    window.addEventListener('appinstalled', function () { btn.style.display = 'none'; });
-  })();
-
+  // ./sw.js is a tombstone now. Registering it is how the old folder-wide
+  // worker — the one that owned every app and served the broken layout from
+  // cache — gets flushed and unregistered on a device that visited before.
+  // On a device that never did, it installs and removes itself immediately.
   if ('serviceWorker' in navigator &&
       (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
     window.addEventListener('load', function () {

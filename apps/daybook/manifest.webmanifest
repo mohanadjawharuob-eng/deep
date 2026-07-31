@@ -1,28 +1,29 @@
 {
+  "id": "/deep/apps/daybook/",
   "name": "Daybook — Focus, Tasks & Habits",
   "short_name": "Daybook",
   "description": "Daybook — Focus, Tasks & Habits",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "start_url": "./daybook.html",
+  "start_url": "./",
   "scope": "./",
   "background_color": "#eceff5",
   "theme_color": "#2f5da3",
   "icons": [
     {
-      "src": "./icons/daybook-192.png",
+      "src": "../icons/daybook-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/daybook-512.png",
+      "src": "../icons/daybook-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/daybook-512-maskable.png",
+      "src": "../icons/daybook-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

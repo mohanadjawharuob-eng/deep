@@ -1,28 +1,29 @@
 {
+  "id": "/deep/apps/coffer/",
   "name": "Coffer — Personal Finance",
   "short_name": "Coffer",
   "description": "Coffer — Personal Finance",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "start_url": "./coffer.html",
+  "start_url": "./",
   "scope": "./",
   "background_color": "#eff1ed",
   "theme_color": "#1f5b42",
   "icons": [
     {
-      "src": "./icons/coffer-192.png",
+      "src": "../icons/coffer-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/coffer-512.png",
+      "src": "../icons/coffer-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/coffer-512-maskable.png",
+      "src": "../icons/coffer-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
