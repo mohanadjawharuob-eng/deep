@@ -11,6 +11,13 @@ one in ``.env``/the environment with ``_test`` appended to the database name.
 from __future__ import annotations
 
 import os
+
+# Must precede any import of application settings, which are read once and
+# cached. bcrypt at the production work factor costs ~0.3 s per hash, and the
+# suite creates hundreds of users; the minimum factor keeps the tests honest
+# about the hashing path while making them fast enough to run on every save.
+os.environ.setdefault("BCRYPT_ROUNDS", "4")
+
 from collections.abc import Iterator
 
 import pytest

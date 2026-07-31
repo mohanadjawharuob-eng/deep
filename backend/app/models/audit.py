@@ -42,7 +42,14 @@ class ActivityLog(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "activity_logs"
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True, server_default=func.now()
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+        # ``clock_timestamp()`` rather than ``now()``: now() returns the
+        # transaction's start time, so every entry written by one request would
+        # share an instant and their order would be undefined. An append-only
+        # log wants the actual moment of the append.
+        server_default=func.clock_timestamp(),
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True
@@ -64,6 +71,13 @@ class ActivityLog(UUIDPrimaryKeyMixin, Base):
     #: Human-readable identifier of the target at the time of the action, so
     #: the log still reads sensibly after the record is renamed or deleted.
     resource_label: Mapped[str | None] = mapped_column(String(300))
+    #: Which project the action belonged to, denormalised at write time.
+    #: The feed is read per project, and the target record may be several joins
+    #: away — or already deleted, at which point the link is unrecoverable.
+    #: ``SET NULL`` so removing a project keeps its history readable.
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), index=True
+    )
 
     #: ``{"field": {"old": ..., "new": ...}}`` for updates.
     changes: Mapped[dict | None] = mapped_column(JSONB)
@@ -78,6 +92,7 @@ class ActivityLog(UUIDPrimaryKeyMixin, Base):
     __table_args__ = (
         Index("ix_activity_logs_resource", "resource_type", "resource_id", "created_at"),
         Index("ix_activity_logs_user_time", "user_id", "created_at"),
+        Index("ix_activity_logs_project_time", "project_id", "created_at"),
     )
 
 
@@ -92,7 +107,14 @@ class Revision(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "revisions"
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True, server_default=func.now()
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+        # ``clock_timestamp()`` rather than ``now()``: now() returns the
+        # transaction's start time, so every entry written by one request would
+        # share an instant and their order would be undefined. An append-only
+        # log wants the actual moment of the append.
+        server_default=func.clock_timestamp(),
     )
     resource_type: Mapped[ResourceType] = mapped_column(
         Enum(ResourceType, name="resource_type", values_callable=lambda e: [m.value for m in e]),

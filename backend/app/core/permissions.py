@@ -25,7 +25,7 @@ import uuid
 from datetime import UTC
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, false, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.models.enums import (
@@ -295,3 +295,135 @@ def requires_approval(user: User | None) -> bool:
     Students submit for approval; researchers and administrators do not.
     """
     return user is not None and user.role is UserRole.STUDENT
+
+
+# --------------------------------------------------------------------------
+# Query-level filtering
+# --------------------------------------------------------------------------
+# The ``can_*`` helpers above decide access for *one* record already loaded.
+# Listings cannot work that way — fetching every row to filter in Python would
+# neither paginate nor scale — so the same rules are expressed a second time as
+# SQL predicates.
+#
+# Two expressions of one policy is exactly the kind of thing that drifts apart,
+# so ``tests/test_visibility_sql.py`` asserts they agree across a matrix of
+# users, records and review states. Change one and that test says to change the
+# other.
+
+
+def _member_projects(user: User, roles: list[ProjectRole] | None = None) -> Any:
+    """Subquery of the project ids a user belongs to, optionally by role."""
+    statement = select(ProjectMembership.project_id).where(ProjectMembership.user_id == user.id)
+    if roles is not None:
+        statement = statement.where(ProjectMembership.role.in_(roles))
+    return statement
+
+
+def _scope_to_projects(model: Any, project_ids: Any) -> Any:
+    """Relate ``model`` to a set of project ids, whatever its distance.
+
+    Projects match on their own id, sites carry ``project_id`` directly, and
+    artifacts and contexts reach it through their site. Returns ``None`` for a
+    model with no route to a project — which correctly contributes no clause,
+    leaving such records reachable only by ownership or an explicit grant.
+    """
+    from app.models.project import Project
+    from app.models.site import Site
+
+    if model is Project:
+        return model.id.in_(project_ids)
+    if hasattr(model, "project_id"):
+        return model.project_id.in_(project_ids)
+    if hasattr(model, "site_id"):
+        return model.site_id.in_(select(Site.id).where(Site.project_id.in_(project_ids)))
+    return None
+
+
+def _granted_records(
+    user: User, resource_type: ResourceType, levels: list[PermissionLevel] | None = None
+) -> Any:
+    """Subquery of record ids explicitly granted to a user."""
+    statement = select(RecordPermission.resource_id).where(
+        RecordPermission.user_id == user.id,
+        RecordPermission.resource_type == resource_type,
+    )
+    if levels is not None:
+        statement = statement.where(RecordPermission.level.in_(levels))
+    return statement
+
+
+def _review_visibility_filter(user: User | None, model: Any, resource_type: ResourceType) -> Any:
+    """Restrict unapproved records to their author and to potential approvers."""
+    if not hasattr(model, "review_status"):
+        return None
+
+    approved = model.review_status == ReviewStatus.APPROVED
+
+    if user is None or not user.is_active:
+        return approved
+
+    allowed: list[Any] = [approved, model.owner_id == user.id]
+
+    editor_clause = _scope_to_projects(
+        model, _member_projects(user, [ProjectRole.DIRECTOR, ProjectRole.RESEARCHER])
+    )
+    if editor_clause is not None:
+        allowed.append(editor_clause)
+
+    allowed.append(
+        model.id.in_(
+            _granted_records(user, resource_type, [PermissionLevel.EDITOR, PermissionLevel.OWNER])
+        )
+    )
+    return or_(*allowed)
+
+
+def visibility_filter(user: User | None, model: Any, resource_type: ResourceType) -> Any:
+    """SQL predicate selecting the rows ``user`` may read.
+
+    Mirrors :func:`can_view`, including the rule that records awaiting review
+    stay hidden from everyone but their author and those who could act on them.
+    """
+    if user is not None and user.is_active and user.role is UserRole.ADMIN:
+        return true()
+
+    clauses: list[Any] = [model.is_public.is_(True)]
+
+    if user is not None and user.is_active:
+        clauses.append(model.owner_id == user.id)
+
+        membership_clause = _scope_to_projects(model, _member_projects(user))
+        if membership_clause is not None:
+            clauses.append(membership_clause)
+
+        clauses.append(model.id.in_(_granted_records(user, resource_type)))
+
+    access = or_(*clauses)
+    review = _review_visibility_filter(user, model, resource_type)
+    return access if review is None else and_(access, review)
+
+
+def editable_filter(user: User | None, model: Any, resource_type: ResourceType) -> Any:
+    """SQL predicate selecting the rows ``user`` may modify.
+
+    Mirrors :func:`can_edit` for queries that act on many rows at once.
+    """
+    if user is None or not user.is_active or user.role is UserRole.VISITOR:
+        return false()
+    if user.role is UserRole.ADMIN:
+        return true()
+
+    clauses: list[Any] = [model.owner_id == user.id]
+
+    editor_clause = _scope_to_projects(
+        model, _member_projects(user, [ProjectRole.DIRECTOR, ProjectRole.RESEARCHER])
+    )
+    if editor_clause is not None:
+        clauses.append(editor_clause)
+
+    clauses.append(
+        model.id.in_(
+            _granted_records(user, resource_type, [PermissionLevel.EDITOR, PermissionLevel.OWNER])
+        )
+    )
+    return or_(*clauses)

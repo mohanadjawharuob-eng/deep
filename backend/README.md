@@ -23,6 +23,10 @@ backend/
 │   ├── models/               # ORM models — one module per domain area
 │   ├── schemas/              # Pydantic request/response models
 │   ├── services/             # business logic that endpoints call
+│   │   ├── records.py        # geometry sync, review status, audit plumbing
+│   │   ├── revisions.py      # snapshot / history / restore
+│   │   ├── activity.py       # the audit trail
+│   │   └── notifications.py  # inbox entries
 │   └── api/
 │       ├── deps.py           # DI: sessions, current user, role guards
 │       └── v1/               # versioned routes
@@ -75,6 +79,24 @@ pytest tests/test_permissions.py -v
 TEST_DATABASE_URL=postgresql+psycopg://user:pw@host/db_test pytest
 ```
 
+The suite lowers the bcrypt work factor (`BCRYPT_ROUNDS=4`, set in
+`tests/conftest.py` before settings are read). Production cost is ~0.3 s per
+hash and the suite creates hundreds of users; the hashing path is still
+exercised, just not at a factor that would make the tests unrunnable.
+
+Worth knowing what each file is for:
+
+| File | Covers |
+|------|--------|
+| `test_security.py` | password policy, hashing, JWT forgery and expiry |
+| `test_auth_api.py` | registration, login, refresh rotation, sessions |
+| `test_users_api.py` | directory, profiles, administration |
+| `test_permissions.py` | the policy, record by record |
+| `test_visibility_sql.py` | that the SQL filter agrees with the policy |
+| `test_crud_api.py` | the four record types end to end |
+| `test_history_api.py` | versions, restore, review workflow, activity |
+| `test_search_api.py` | search results, filters and permission scoping |
+
 Linting and formatting use ruff:
 
 ```bash
@@ -99,6 +121,8 @@ Two migrations exist so far:
 |----------|---------|
 | `0001_extensions` | `postgis`, `pg_trgm`, `unaccent`, `btree_gin` |
 | `0002_initial_schema` | every table, index and constraint |
+| `0003_activity_project` | denormalised `project_id` on `activity_logs`, so the feed can be read per project |
+| `0004_audit_clock_timestamp` | audit timestamps taken at append time rather than transaction start |
 
 `0001` is separate because PostGIS must exist before any geometry column is
 created. Always read a generated migration before committing it — autogenerate
@@ -170,6 +194,41 @@ approve work in projects they are not members of.
 Every check lives in `app/core/permissions.py`. Endpoints call it; they never
 re-implement it. `tests/test_permissions.py` is the executable specification of
 the table above.
+
+### Two expressions of one policy
+
+`can_view`/`can_edit` decide access for a record already in memory. Listings
+cannot work that way — loading every row to filter it in Python neither
+paginates nor scales — so the same rules also exist as SQL predicates
+(`visibility_filter`, `editable_filter`).
+
+That duplication is a standing drift risk, so `tests/test_visibility_sql.py`
+asserts the two agree across a matrix of users × records × review states.
+Change one without the other and it fails, naming the case.
+
+---
+
+## Version history
+
+`app/services/revisions.py` snapshots a record on creation and again before
+every change, so version 1 is always the record as first entered. Snapshots
+hold the whole row rather than a diff: restore becomes an assignment instead of
+a replay, and an old snapshot stays readable after the schema gains columns.
+
+Three rules are worth knowing:
+
+- **Geometry columns are not versioned.** They are derived from `latitude` and
+  `longitude`, which *are* captured, so nothing is lost — and a restore
+  re-derives the geometry rather than round-tripping WKB through JSON.
+- **Some fields never restore.** `id`, `created_at` and `updated_at` are facts
+  about the row. `review_status` is workflow state owned by the approval
+  endpoints — restoring it would silently un-approve a record and pull it out of
+  public listings. `public_token` backs a QR code printed on a physical label
+  and must keep resolving for the life of the object.
+- **A restore is itself a version.** The state being replaced is snapshotted
+  first, so a restore can be undone, and deleting a record leaves its final
+  state in the history — `revisions` deliberately has no foreign key to the
+  record.
 
 ---
 
