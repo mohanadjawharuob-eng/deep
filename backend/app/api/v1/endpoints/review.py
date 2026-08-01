@@ -24,6 +24,7 @@ from app.models.enums import (
     ResourceType,
     ReviewStatus,
 )
+from app.models.media import Document, Photograph
 from app.models.site import Site
 from app.schemas.common import Message
 from app.services import activity, notifications, records
@@ -36,6 +37,11 @@ REVIEWABLE: dict[str, tuple[type[Any], ResourceType, str]] = {
     "sites": (Site, ResourceType.SITE, "Site"),
     "artifacts": (Artifact, ResourceType.ARTIFACT, "Artifact"),
     "contexts": (ExcavationContext, ResourceType.CONTEXT, "Context"),
+    # A student's photographs and documents queue for approval exactly as their
+    # finds do. 3D models are absent because they carry no review status: a
+    # model is a link or a mesh attached to a record that was itself reviewed.
+    "photographs": (Photograph, ResourceType.PHOTOGRAPH, "Photograph"),
+    "documents": (Document, ResourceType.DOCUMENT, "Document"),
 }
 
 

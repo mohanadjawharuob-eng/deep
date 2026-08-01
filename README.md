@@ -3,10 +3,11 @@
 A centralised database for researchers, universities, museums and excavation
 projects to store, search, visualise and manage archaeological information.
 
-> **Status: milestone 2 of 5 — records, history, activity and search.**
-> The API now manages projects, sites, artifacts and excavation contexts, with
-> version history, an approval workflow, an audit feed and global search. File
-> uploads, GIS endpoints and the frontend land in later milestones. See
+> **Status: milestone 3 of 5 — files, media and printable labels.**
+> The API manages projects, sites, artifacts and excavation contexts, with
+> version history, an approval workflow, an audit feed and global search; it now
+> also takes photograph, document and 3D model uploads, generates thumbnails and
+> QR labels. GIS endpoints and the frontend land in later milestones. See
 > [Roadmap](#roadmap).
 
 ---
@@ -155,6 +156,37 @@ Two decisions worth calling out, because both are easy to get wrong:
   site, in the site endpoints *and* in search, because looting follows
   publication.
 
+### Milestone 3 — files, media and labels
+
+**Photograph uploads** with automatic thumbnails and EXIF extraction. Camera,
+lens, timestamp and GPS fix are read off the file and onto the record, so a
+morning's shooting arrives already located and dated. Thumbnails honour the
+orientation tag, so portrait photographs are not served on their side.
+
+**Document uploads** — reports, permits, spreadsheets, field notes — validated
+against their own leading bytes rather than their extension, with text-based
+formats indexed for search.
+
+**3D models**, either linked to where they already live or uploaded as a
+lightweight mesh for preview. Recognised viewers get an embeddable URL;
+everything else is linked rather than framed.
+
+**Printable QR labels** for artifacts, sites and projects. Scanning one opens
+that record, subject to exactly the permissions the record already has.
+
+Three decisions worth calling out:
+
+- **Uploads are validated by content, never by claim.** An image is an image
+  only if it decodes as one; a `.pdf` must actually begin `%PDF-`. The extension
+  and the declared content type are both attacker-controlled, so neither is
+  believed. SVG, HTML and archives are refused outright.
+- **Thumbnails carry no metadata.** Stripping it is not tidiness — the platform
+  blurs restricted site coordinates, and a thumbnail retaining its GPS tags
+  would hand that position straight back.
+- **Storage is content-addressed.** Files are named after the SHA-256 of their
+  bytes, so a filename can never influence where something is written, and the
+  same photograph uploaded twice costs one copy.
+
 ### Endpoints
 
 | Method | Path | Who |
@@ -178,9 +210,18 @@ Two decisions worth calling out, because both are easy to get wrong:
 | `GET` | `/taxonomy/periods`, `/materials`, `/categories` | anyone |
 | `POST`/`PATCH`/`DELETE` | the same `/taxonomy/…` paths | admin |
 | `GET`/`POST`/`DELETE` | `/notifications…` | signed in, own inbox only |
+| `POST` | `/photographs`, `/documents`, `/models3d/upload` | contributors on the project |
+| `GET` | `/photographs`, `/documents`, `/models3d` | anyone, scoped by permission |
+| `GET` | `/photographs/{id}/file`, `/thumbnail?size=` | anyone who can read it |
+| `GET` | `/documents/{id}/file`, `/models3d/{id}/file` | anyone who can read it |
+| `POST` | `/models3d` | contributors — links a hosted model |
+| `PATCH`/`DELETE` | `/photographs/{id}`, `/documents/{id}`, `/models3d/{id}` | editors / owners |
+| `GET` | `/{artifacts\|sites\|projects}/{id}/qr.png`, `/label` | anyone who can read it |
+| `GET` | `/scan/{kind}/{token}` | anyone, scoped — resolves a scanned label |
 
 Everything is under `/api/v1`. `{kind}` is one of `projects`, `sites`,
-`artifacts` or `contexts`.
+`artifacts` or `contexts` — and for revisions and review, also `photographs`
+and `documents`.
 
 ---
 
@@ -220,6 +261,25 @@ The dump runs in the same image as the server, so `pg_dump` and the server
 version always match — a mismatch is the usual reason a restore fails when it
 is needed most.
 
+**The dump does not include uploaded files.** The database stores the *path* of
+every photograph and document, not its bytes; those live in the `uploads`
+volume. Restoring the database alone gives you a complete catalogue in which
+every image is a broken link. Copy the volume too:
+
+```bash
+# Back up uploaded files alongside the dump
+docker run --rm -v archeo_uploads:/data -v "$PWD":/out alpine \
+  tar czf /out/uploads-$(date +%F).tar.gz -C /data .
+
+# Restore them
+docker run --rm -v archeo_uploads:/data -v "$PWD":/in alpine \
+  tar xzf /in/uploads-<date>.tar.gz -C /data
+```
+
+Because storage is content-addressed, this archive deduplicates well and a
+partial restore is safe: a file either matches its checksum or is absent, never
+silently wrong.
+
 ---
 
 ## Configuration
@@ -235,6 +295,10 @@ full annotated list. The ones that matter:
 | `ENVIRONMENT` | `production` turns on HSTS and rejects default secrets |
 | `CORS_ORIGINS` | Comma-separated origins allowed from a browser |
 | `SEED_SAMPLE_DATA` | Demonstration project; ignored in production |
+| `STORAGE_ROOT` | Where uploads are written; a Docker volume by default |
+| `MAX_UPLOAD_SIZE_MB` | Per-file ceiling, enforced while reading rather than trusting the declared length |
+| `THUMBNAIL_SIZES` | Comma-separated longest edges; one thumbnail per size |
+| `FRONTEND_URL` | The address QR labels encode, so a scan opens a page |
 | `RUN_MIGRATIONS` / `RUN_SEED` | Both default to `true` and are safe to repeat |
 
 ---
@@ -246,7 +310,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-pytest                              # 324 tests
+pytest                              # 454 tests
 pytest --cov=app                    # coverage
 ruff check app tests scripts        # lint
 alembic revision --autogenerate -m "…"   # after editing models
@@ -262,7 +326,7 @@ Tests need a PostgreSQL with PostGIS; they create and drop their own database.
 |-----------|----------|
 | **1 — done** | Backend skeleton, full schema, auth, permissions, Docker, backups |
 | **2 — done** | CRUD for projects, sites, artifacts and contexts; revision history; approval workflow; activity feed; search |
-| 3 | File uploads, thumbnails, EXIF, documents, 3D models, QR code images |
+| **3 — done** | File uploads, thumbnails, EXIF, documents, 3D models, QR code images |
 | 4 | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
 | 5 | React frontend: dashboard, map, forms, dark/light mode, admin panel |
 

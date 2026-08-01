@@ -201,6 +201,33 @@ excavation, "Tell el-Demo Regional Survey and Excavation".
 Also worth a look: `GET /api/v1/sites`, `GET /api/v1/artifacts`, and
 `GET /api/v1/search` with `q` set to `bronze`.
 
+### Looking at pictures and labels
+
+The demonstration project comes with three sample photographs and a document.
+They are deliberately plain grey-brown cards marked "PLACEHOLDER" rather than
+real excavation pictures — the point is to show the machinery working, not to
+put invented archaeology in front of you.
+
+1. **See the photographs.** `GET /api/v1/photographs` → *Try it out* →
+   *Execute*. Copy the `id` of one of them from the response.
+2. **View it.** Open this in a new browser tab, pasting the id in place of
+   `<id>`:
+   `http://localhost:8000/api/v1/photographs/<id>/thumbnail?size=800`
+   A picture should appear. That image did not exist as a file anywhere — it
+   was generated from the original when it was stored.
+3. **Get a QR label.** `GET /api/v1/artifacts` → *Execute* → copy an artifact's
+   `id`, then open:
+   `http://localhost:8000/api/v1/artifacts/<id>/qr.png`
+   Point your phone's camera at it. It will offer to open a `localhost:5173`
+   address — that is the website from milestone 5, which does not exist yet, so
+   the link will not load. The code itself is correct; scanning proves it.
+
+Uploading your own photograph is the same idea in reverse: `POST
+/api/v1/photographs` → *Try it out* → choose a file, put an artifact's `id`
+into the `artifact_id` box, then *Execute*. The response will show the size the
+platform read off your image and, if your camera recorded one, where and when
+it was taken.
+
 ### Sample accounts
 
 The demonstration data includes one account per role, all with the password

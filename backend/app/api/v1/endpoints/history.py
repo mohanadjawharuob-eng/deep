@@ -25,6 +25,7 @@ from app.models.artifact import Artifact
 from app.models.audit import ActivityLog
 from app.models.context import ExcavationContext
 from app.models.enums import ActivityAction, ResourceType, UserRole
+from app.models.media import Document, Model3D, Photograph
 from app.models.project import Project, ProjectMembership
 from app.models.site import Site
 from app.schemas.audit import (
@@ -44,6 +45,12 @@ VERSIONED: dict[str, tuple[type[Any], ResourceType, str]] = {
     "sites": (Site, ResourceType.SITE, "Site"),
     "artifacts": (Artifact, ResourceType.ARTIFACT, "Artifact"),
     "contexts": (ExcavationContext, ResourceType.CONTEXT, "Context"),
+    # Media records version their *descriptions*, not their bytes: retitling a
+    # photograph or correcting its photographer is an edit like any other. The
+    # stored file is immutable, so a restore never resurrects different bytes.
+    "photographs": (Photograph, ResourceType.PHOTOGRAPH, "Photograph"),
+    "documents": (Document, ResourceType.DOCUMENT, "Document"),
+    "models3d": (Model3D, ResourceType.MODEL3D, "3D model"),
 }
 
 

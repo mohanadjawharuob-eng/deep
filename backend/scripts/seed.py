@@ -9,14 +9,21 @@ Two layers are created:
 *Reference data* — the first administrator, the controlled vocabularies and
 the default system settings. Always created.
 
-*Sample data* — a demonstration project with sites, contexts and artifacts, so
-a new deployment has something to look at. Skipped unless ``--with-samples``
-is passed or ``SEED_SAMPLE_DATA=true`` is set.
+*Sample data* — a demonstration project with sites, contexts, artifacts and a
+few media records, so a new deployment has something to look at. Skipped unless
+``--with-samples`` is passed or ``SEED_SAMPLE_DATA=true`` is set.
+
+The sample photographs are *drawn*, not shipped: a placeholder card with a
+scale bar, generated at seed time and pushed through the same storage and
+thumbnail services the upload endpoint uses. That keeps the repository free of
+binary fixtures and means the demonstration exercises the real path rather than
+inserting rows that point at files nobody wrote.
 """
 
 from __future__ import annotations
 
 import argparse
+import io
 import logging
 import os
 import sys
@@ -36,10 +43,13 @@ from app.models import (
     ConservationStatus,
     ContextRelationship,
     ContextType,
+    Document,
+    DocumentType,
     ExcavationContext,
     Material,
     ObjectCategory,
     Period,
+    Photograph,
     Project,
     ProjectMembership,
     ProjectRole,
@@ -52,6 +62,14 @@ from app.models import (
     SystemSetting,
     User,
     UserRole,
+)
+from app.services import documents as document_service
+from app.services import images
+from app.services.storage import (
+    CATEGORY_DOCUMENTS,
+    CATEGORY_PHOTOGRAPHS,
+    CATEGORY_THUMBNAILS,
+    storage,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)-8s %(message)s")
@@ -302,6 +320,207 @@ DEMO_USERS = [
 ]
 
 DEMO_PASSWORD = "DemoPass!2024"
+
+
+def _placeholder_image(caption: str, subtitle: str, width: int = 1400, height: int = 933) -> bytes:
+    """Draw a record shot: a labelled card with a scale bar.
+
+    Deliberately obviously synthetic. A stock photograph would be prettier and
+    would misrepresent the data as real excavation material, which is exactly
+    the confusion an archaeological database should never introduce.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    def font(size: int):
+        # Only the built-in font is guaranteed present; a container has no
+        # system fonts. Sized loading needs Pillow 10.1+, hence the fallback.
+        try:
+            return ImageFont.load_default(size=size)
+        except TypeError:  # pragma: no cover - older Pillow
+            return ImageFont.load_default()
+
+    image = Image.new("RGB", (width, height), (198, 178, 148))
+    draw = ImageDraw.Draw(image)
+
+    # A soft vignette, so the card reads as an image rather than a colour swatch.
+    for step in range(60):
+        shade = 198 - step
+        draw.rectangle(
+            [step * 4, step * 3, width - step * 4, height - step * 3],
+            outline=(shade, shade - 20, shade - 50),
+        )
+
+    # Clean panels behind the text: the vignette lines would otherwise run
+    # straight through the captions and make them hard to read.
+    draw.rectangle([0, 0, width, 190], fill=(206, 188, 160))
+    draw.rectangle([0, height - 175, width, height], fill=(206, 188, 160))
+
+    draw.text((70, 70), caption, fill=(40, 30, 20), font=font(46))
+    draw.text((70, 132), subtitle, fill=(95, 72, 50), font=font(30))
+    # A hyphen, not an em dash: the built-in bitmap font has no glyph for one
+    # and draws a placeholder box over the following word.
+    draw.text(
+        (70, height - 150),
+        "PLACEHOLDER - generated sample, not a real photograph",
+        fill=(140, 45, 35),
+        font=font(26),
+    )
+
+    # A ten-centimetre scale bar in alternating blocks, as on a real record shot.
+    bar_x, bar_y, block = 70, height - 100, 60
+    for index in range(10):
+        colour = (250, 250, 250) if index % 2 == 0 else (30, 30, 30)
+        draw.rectangle(
+            [bar_x + index * block, bar_y, bar_x + (index + 1) * block, bar_y + 30],
+            fill=colour,
+            outline=(20, 20, 20),
+        )
+    draw.text((bar_x + 10 * block + 16, bar_y + 2), "10 cm", fill=(30, 30, 30), font=font(26))
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=88)
+    return buffer.getvalue()
+
+
+def _store_photograph(
+    session: Session,
+    *,
+    title: str,
+    subtitle: str,
+    description: str,
+    shot_type: str,
+    user: User,
+    project: Project,
+    site: Site,
+    artifact: Artifact | None = None,
+    is_cover: bool = False,
+) -> Photograph:
+    """Write a generated image through the real storage and thumbnail path."""
+    data = _placeholder_image(title, subtitle)
+    facts = images.inspect(data)
+    stored = storage.save_bytes(data, category=CATEGORY_PHOTOGRAPHS, extension=facts.extension)
+
+    thumbnails: dict[str, str] = {}
+    for size in images.thumbnail_sizes():
+        thumbnail = images.make_thumbnail(data, size)
+        thumbnails[str(size)] = storage.save_bytes(
+            thumbnail, category=CATEGORY_THUMBNAILS, extension=".jpg"
+        ).path
+
+    photograph = Photograph(
+        title=title,
+        description=description,
+        photographer=user.full_name,
+        photographer_id=user.id,
+        taken_at=datetime(2024, 5, 7, 9, 20, tzinfo=UTC),
+        file_path=stored.path,
+        original_filename=f"{_slug(title)}.jpg",
+        mime_type=facts.mime_type,
+        file_size=stored.size,
+        checksum=stored.checksum,
+        width=facts.width,
+        height=facts.height,
+        thumbnails=thumbnails,
+        shot_type=shot_type,
+        has_scale=True,
+        is_cover=is_cover,
+        project_id=project.id,
+        site_id=site.id,
+        artifact_id=artifact.id if artifact is not None else None,
+        context_id=artifact.context_id if artifact is not None else None,
+        is_public=True,
+        owner_id=user.id,
+    )
+    session.add(photograph)
+    return photograph
+
+
+def seed_sample_media(
+    session: Session,
+    *,
+    project: Project,
+    site: Site,
+    artifact: Artifact,
+    user: User,
+) -> None:
+    """Attach a few photographs and a document to the demonstration project."""
+    _store_photograph(
+        session,
+        title="Tell el-Demo from the south-west",
+        subtitle="Site overview, 2024 season",
+        description=(
+            "General view of the mound at the start of the 2024 season, taken "
+            "from the survey datum on the south-western spur."
+        ),
+        shot_type="overview",
+        user=user,
+        project=project,
+        site=site,
+        is_cover=True,
+    )
+    _store_photograph(
+        session,
+        title="Context 1042 after excavation",
+        subtitle="Pit fill, north-facing section",
+        description="The fill of pit cut 1041 fully excavated, showing the section face.",
+        shot_type="context",
+        user=user,
+        project=project,
+        site=site,
+    )
+    _store_photograph(
+        session,
+        title=f"{artifact.inventory_number} — {artifact.name}",
+        subtitle="Find photograph with scale",
+        description="Record shot taken in the field house before conservation assessment.",
+        shot_type="find",
+        user=user,
+        project=project,
+        site=site,
+        artifact=artifact,
+        is_cover=True,
+    )
+
+    notes = (
+        "Tell el-Demo — 2024 season field notes (sample)\n"
+        "===============================================\n\n"
+        "7 May. Continued excavation of pit 1041 in Trench A. The fill (1042) is "
+        "a mid-brown silty loam with frequent charcoal flecks and occasional "
+        "Early Bronze Age body sherds. Heavy fraction from flotation produced "
+        "carbonised grain, sampled as TED-24-012.\n\n"
+        "8 May. Section drawn and photographed. Pit appears to cut the earlier "
+        "surface 1050, giving a terminus post quem for the sequence above.\n\n"
+        "This file is sample content, generated to demonstrate document upload "
+        "and full-text search. It describes no real excavation.\n"
+    )
+    payload = notes.encode("utf-8")
+    facts = document_service.inspect(payload, "ted-2024-field-notes.txt")
+    stored = storage.save_bytes(payload, category=CATEGORY_DOCUMENTS, extension=facts.extension)
+
+    session.add(
+        Document(
+            title="Field notes, 2024 season",
+            description="Daily excavation notes for Trench A (sample content).",
+            document_type=DocumentType.FIELD_NOTES,
+            author=user.full_name,
+            document_date=date(2024, 5, 8),
+            language="en",
+            file_path=stored.path,
+            original_filename="ted-2024-field-notes.txt",
+            mime_type=facts.mime_type,
+            file_size=stored.size,
+            checksum=stored.checksum,
+            extracted_text=document_service.extract_text(payload, facts.extension),
+            tags=["field notes", "Trench A", "sample"],
+            researcher_id=user.id,
+            project_id=project.id,
+            site_id=site.id,
+            is_public=True,
+            owner_id=user.id,
+        )
+    )
+    session.flush()
+    logger.info("Sample media created: 3 photographs with thumbnails, 1 document")
 
 
 def seed_samples(session: Session, admin: User) -> None:
@@ -606,6 +825,8 @@ def seed_samples(session: Session, admin: User) -> None:
     ]
     session.add_all(artifacts)
     session.flush()
+
+    seed_sample_media(session, project=project, site=site, artifact=artifacts[0], user=researcher)
 
     now = datetime.now(UTC)
     for offset, (label, action) in enumerate(

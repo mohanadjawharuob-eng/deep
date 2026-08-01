@@ -11,12 +11,21 @@ one in ``.env``/the environment with ``_test`` appended to the database name.
 from __future__ import annotations
 
 import os
+import shutil
+import tempfile
+from pathlib import Path
 
 # Must precede any import of application settings, which are read once and
 # cached. bcrypt at the production work factor costs ~0.3 s per hash, and the
 # suite creates hundreds of users; the minimum factor keeps the tests honest
 # about the hashing path while making them fast enough to run on every save.
 os.environ.setdefault("BCRYPT_ROUNDS", "4")
+
+# Likewise: the storage service builds its root from the settings at import
+# time, so uploads have to be redirected before that happens. Without this the
+# suite would write into whatever ``STORAGE_ROOT`` a developer's ``.env`` points
+# at, which is their real uploads directory.
+os.environ.setdefault("STORAGE_ROOT", str(Path(tempfile.gettempdir()) / "archeo-test-uploads"))
 
 from collections.abc import Iterator
 
@@ -41,6 +50,21 @@ def _test_database_url() -> str:
 
 
 TEST_URL = _test_database_url()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def storage_root() -> Iterator[Path]:
+    """Start from an empty uploads tree and leave nothing behind.
+
+    Content-addressed storage means a file left over from a previous run would
+    be silently deduplicated against, so a test asserting that bytes were
+    written could pass without anything having been written.
+    """
+    root = Path(os.environ["STORAGE_ROOT"])
+    shutil.rmtree(root, ignore_errors=True)
+    root.mkdir(parents=True, exist_ok=True)
+    yield root
+    shutil.rmtree(root, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")

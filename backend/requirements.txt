@@ -20,3 +20,5 @@ bcrypt==4.2.1
 
 # --- Media -------------------------------------------------------------------
 Pillow==11.0.0
+# QR codes for artifact, site and project labels. The [pil] extra renders PNG.
+qrcode[pil]==8.0

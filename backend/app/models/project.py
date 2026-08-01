@@ -71,6 +71,12 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, Base):
     #: Escape hatch for institution-specific fields; queryable via JSONB.
     metadata_json: Mapped[dict | None] = mapped_column(JSONB)
 
+    #: Stable public token embedded in the QR code, so a printed label keeps
+    #: working even if the record is renamed or its code changes.
+    public_token: Mapped[str] = mapped_column(
+        String(32), nullable=False, unique=True, index=True, default=lambda: uuid.uuid4().hex
+    )
+
     owner: Mapped[User | None] = relationship(foreign_keys="Project.owner_id")
     principal_investigator_user: Mapped[User | None] = relationship(
         foreign_keys="Project.principal_investigator_id"

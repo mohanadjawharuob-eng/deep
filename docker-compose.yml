@@ -63,8 +63,12 @@ services:
       FIRST_ADMIN_EMAIL: ${FIRST_ADMIN_EMAIL:-admin@example.org}
       FIRST_ADMIN_USERNAME: ${FIRST_ADMIN_USERNAME:-admin}
       FIRST_ADMIN_PASSWORD: ${FIRST_ADMIN_PASSWORD:?FIRST_ADMIN_PASSWORD must be set in .env}
+      # Not configurable from .env: it has to match the volume mount below,
+      # and changing one without the other would write uploads into the
+      # container's own filesystem, where they vanish on the next rebuild.
       STORAGE_ROOT: /data/uploads
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-200}
+      THUMBNAIL_SIZES: ${THUMBNAIL_SIZES:-200,800}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       RUN_SEED: ${RUN_SEED:-true}
       SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}

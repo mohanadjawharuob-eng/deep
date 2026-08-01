@@ -4,3 +4,10 @@ pytest==8.3.4
 pytest-cov==6.0.0
 httpx==0.28.1
 ruff==0.8.4
+
+# Test-only. The QR code tests decode the generated images and check the URL
+# comes back, which is the only assertion that proves a printed label actually
+# scans — "it is a valid PNG" does not. Headless because there is no display,
+# and dev-only because nothing in the running service decodes anything.
+opencv-python-headless==5.0.0.93
+numpy==2.4.6

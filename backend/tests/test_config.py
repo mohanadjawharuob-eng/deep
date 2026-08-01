@@ -33,6 +33,7 @@ COMPOSE_ENVIRONMENT = {
     "FIRST_ADMIN_PASSWORD": "ChangeMeNow!2024",
     "STORAGE_ROOT": "/data/uploads",
     "MAX_UPLOAD_SIZE_MB": "200",
+    "THUMBNAIL_SIZES": "200,800",
     "RUN_MIGRATIONS": "true",
     "RUN_SEED": "true",
     "SEED_SAMPLE_DATA": "false",
@@ -42,7 +43,7 @@ COMPOSE_ENVIRONMENT = {
 @pytest.fixture
 def clean_env(monkeypatch, tmp_path):
     """Isolate from the developer's own .env and exported variables."""
-    for key in list(COMPOSE_ENVIRONMENT) + ["THUMBNAIL_SIZES", "DATABASE_URL"]:
+    for key in list(COMPOSE_ENVIRONMENT) + ["DATABASE_URL"]:
         monkeypatch.delenv(key, raising=False)
     # Settings reads ".env" relative to the working directory; point it at an
     # empty directory so a local file cannot mask the values under test.
@@ -59,6 +60,7 @@ class TestComposeEnvironment:
         settings = Settings()
 
         assert settings.CORS_ORIGINS == ["http://localhost:5173", "http://localhost:3000"]
+        assert settings.THUMBNAIL_SIZES == [200, 800]
         assert settings.POSTGRES_HOST == "db"
         assert settings.sqlalchemy_url.startswith("postgresql+psycopg://")
 

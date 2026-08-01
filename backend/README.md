@@ -26,7 +26,12 @@ backend/
 │   │   ├── records.py        # geometry sync, review status, audit plumbing
 │   │   ├── revisions.py      # snapshot / history / restore
 │   │   ├── activity.py       # the audit trail
-│   │   └── notifications.py  # inbox entries
+│   │   ├── notifications.py  # inbox entries
+│   │   ├── storage.py        # content-addressed file storage
+│   │   ├── images.py         # image validation, EXIF, thumbnails
+│   │   ├── documents.py      # document validation by magic bytes
+│   │   ├── attachments.py    # shared media linking, permissions, serving
+│   │   └── qrcodes.py        # QR images for printed labels
 │   └── api/
 │       ├── deps.py           # DI: sessions, current user, role guards
 │       └── v1/               # versioned routes
@@ -96,6 +101,20 @@ Worth knowing what each file is for:
 | `test_crud_api.py` | the four record types end to end |
 | `test_history_api.py` | versions, restore, review workflow, activity |
 | `test_search_api.py` | search results, filters and permission scoping |
+| `test_media_api.py` | uploads, EXIF, thumbnails, documents, 3D models, QR labels |
+
+`test_media_api.py` generates its images rather than checking binaries in, so
+every property it asserts — dimensions, EXIF, GPS, orientation — is visible in
+the test that depends on it. Its QR tests *decode* the generated images and
+compare the URL, which is the only assertion that shows a printed label would
+actually scan; that needs `opencv-python-headless` from `requirements-dev.txt`,
+and those tests skip rather than fail without it.
+
+Uploads during tests go to a temporary directory (`STORAGE_ROOT`, set in
+`conftest.py` before settings are read) which is emptied at session start.
+Storage is content-addressed, so a file left over from an earlier run would be
+deduplicated against and a test asserting bytes were written could pass without
+writing anything.
 
 Linting and formatting use ruff:
 
@@ -115,7 +134,7 @@ alembic downgrade -1                              # step back
 alembic check                                     # models vs. migrations in sync?
 ```
 
-Two migrations exist so far:
+The migrations so far:
 
 | Revision | Purpose |
 |----------|---------|
@@ -123,11 +142,78 @@ Two migrations exist so far:
 | `0002_initial_schema` | every table, index and constraint |
 | `0003_activity_project` | denormalised `project_id` on `activity_logs`, so the feed can be read per project |
 | `0004_audit_clock_timestamp` | audit timestamps taken at append time rather than transaction start |
+| `0005_public_tokens` | `public_token` on `projects` and `sites`, so both can carry a QR label |
 
 `0001` is separate because PostGIS must exist before any geometry column is
 created. Always read a generated migration before committing it — autogenerate
 does not detect renames, and it will happily emit a drop-and-create that loses
 data.
+
+`0005` is a worked example of why. Autogenerate emitted a single
+`add_column(..., nullable=False)`, which fails on any table that already holds
+rows because the default lives in Python, not the database. The committed
+version adds the column nullable, backfills a distinct token per existing row,
+then applies `NOT NULL` and the unique index.
+
+---
+
+## Files and uploads
+
+Uploaded files never touch the database. `app/services/storage.py` writes them
+beneath `STORAGE_ROOT` and everything above it speaks in *relative* paths, so
+swapping local disk for S3 means implementing one class rather than editing
+every endpoint.
+
+- **Content-addressed.** A stored file is named after the SHA-256 of its bytes.
+  The same photograph uploaded twice costs one copy, and no client-supplied
+  filename ever influences where something lands — which is the usual way file
+  uploads turn into arbitrary writes. The original name is kept on the record
+  for display and download, as metadata rather than as a path.
+- **Images are validated by decoding them.** Neither the extension nor the
+  declared content type is trusted; a file is an image only if Pillow can make
+  one of it. SVG is refused — it is a document that can carry script, not a
+  raster image. Decompression bombs are capped at 120 megapixels.
+- **Documents are validated by their leading bytes**, checked against the
+  extension. Archives and HTML are refused outright, and documents are always
+  served `Content-Disposition: attachment` — an uploaded file rendered inline
+  from this origin would run script as the platform.
+- **Thumbnails are generated on upload**, one per size in `THUMBNAIL_SIZES`.
+  They honour the EXIF orientation tag, flatten transparency onto white rather
+  than producing a black-backed JPEG, and **strip all metadata**, so a thumbnail
+  cannot leak the GPS position of a site whose location is restricted.
+- **EXIF is extracted but never trusted to be well-formed.** Camera, lens,
+  timestamp and GPS fix are pulled onto the record where present; a malformed
+  block costs the metadata, not the upload. Coordinates typed by the uploader
+  take precedence over the camera's.
+- **Deleting a record does not delete the bytes.** Because storage is
+  content-addressed, another record may reference the same file. Unlinking is
+  safe; collecting unreferenced files is a separate sweep.
+
+3D models are usually *linked* rather than uploaded — photogrammetry output
+routinely runs to gigabytes. Recognised viewers (currently Sketchfab) get an
+`embed_url` built from the model id alone; everything else is linked and not
+framed, because an `<iframe>` pointing at an arbitrary address is a phishing
+surface under this platform's name.
+
+---
+
+## Labels and QR codes
+
+Projects, sites and artifacts each carry a `public_token`: 32 hexadecimal
+characters, stable for the life of the record.
+
+`GET /api/v1/{artifacts|sites|projects}/{id}/qr.png` renders a printable code,
+and `/label` returns the same information as JSON for a client laying out its
+own label sheet. The encoded URL points at the **frontend** (`/a/<token>`), not
+at this API — someone scanning a finds bag wants a page, not JSON — and it is
+deliberately short, because fewer characters means a sparser code that survives
+being printed small and photographed in bad light at the trench edge.
+
+The token rather than the id is what gets printed, for two reasons: a label
+keeps working when the record is renumbered or reidentified, and a token is not
+an identifier anyone can iterate over. Scanning enforces the same permissions as
+the record's own endpoint, so a leaked label reveals nothing its holder could
+not already see.
 
 ---
 

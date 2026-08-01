@@ -122,6 +122,12 @@ class Site(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, Base):
     keywords: Mapped[list[str] | None] = mapped_column(ARRAY(String(80)))
     metadata_json: Mapped[dict | None] = mapped_column(JSONB)
 
+    #: Stable public token embedded in the QR code, so a printed label keeps
+    #: working even if the record is renamed or its code changes.
+    public_token: Mapped[str] = mapped_column(
+        String(32), nullable=False, unique=True, index=True, default=lambda: uuid.uuid4().hex
+    )
+
     review_status: Mapped[ReviewStatus] = mapped_column(
         Enum(ReviewStatus, name="review_status", values_callable=lambda e: [m.value for m in e]),
         default=ReviewStatus.APPROVED,
