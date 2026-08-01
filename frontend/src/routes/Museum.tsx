@@ -630,6 +630,28 @@ function ObjectPhoto({ objectId }: { objectId: string }) {
   );
 }
 
+/**
+ * A link to the plan that draws where this object is.
+ *
+ * The plan of the *room* is what has the cabinet on it, not the plan of the
+ * box — so the backend walks up the hierarchy to find it. Rendered only when
+ * one exists; a dead link to a plan nobody has drawn is worse than nothing.
+ */
+function PlanShortcut({ locationId }: { locationId: string }) {
+  const plans = useQuery<{ id: string; name: string }[]>(
+    (signal) => api.get(`/floorplans/for-location/${locationId}`, undefined, signal),
+    [locationId],
+  );
+  const first = plans.data?.[0];
+  if (!first) return null;
+
+  return (
+    <Link className="btn btn-sm" to={`/floorplans/${first.id}`} style={{ marginTop: 6, width: "100%" }}>
+      Show on the floor plan
+    </Link>
+  );
+}
+
 /** Where the object is, spelled out rather than as one long path. */
 function CurrentLocation({ object }: { object: MuseumObject }) {
   const locationId = object.storage_location_id;
@@ -666,6 +688,7 @@ function CurrentLocation({ object }: { object: MuseumObject }) {
             >
               Show in storage tree
             </Link>
+            <PlanShortcut locationId={locationId} />
           </>
         )}
       </div>

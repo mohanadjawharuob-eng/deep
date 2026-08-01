@@ -155,6 +155,33 @@ function TreeNode({
   );
 }
 
+/**
+ * A way through to the plan that draws this place — or to making one.
+ *
+ * The tree answers which shelf; the plan answers where the shelf is. Somebody
+ * who has just found a location in the tree is exactly the person who wants
+ * the second question answered.
+ */
+function PlanLink({ locationId }: { locationId: string }) {
+  const plans = useQuery<{ id: string; name: string }[]>(
+    (signal) => api.get(`/floorplans/for-location/${locationId}`, undefined, signal),
+    [locationId],
+  );
+
+  if (plans.loading || !plans.data) return null;
+  const first = plans.data[0];
+
+  return first ? (
+    <Link className="btn btn-sm" to={`/floorplans/${first.id}`}>
+      Show on the plan
+    </Link>
+  ) : (
+    <Link className="btn btn-sm btn-ghost" to={`/floorplans?location=${locationId}`}>
+      Draw a plan
+    </Link>
+  );
+}
+
 export function Storage() {
   const [params, setParams] = useSearchParams();
   const selected = params.get("location");
@@ -275,7 +302,10 @@ export function Storage() {
                   <div className="small muted" style={{ marginBottom: 4 }}>
                     {node?.display_path ?? ""}
                   </div>
-                  <h2 style={{ fontSize: "var(--text-lg)" }}>{node?.name ?? "Location"}</h2>
+                  <div className="row-between wrap">
+                    <h2 style={{ fontSize: "var(--text-lg)" }}>{node?.name ?? "Location"}</h2>
+                    <PlanLink locationId={selected} />
+                  </div>
                 </div>
                 <div className="card-body">
                   <DetailGrid>

@@ -124,6 +124,23 @@ _MODULE_LEVEL_RANK: dict[ModuleLevel, int] = {
 }
 
 
+class ShapeKind(str, enum.Enum):
+    """What a region on a floor plan is.
+
+    ``RECT`` and ``POLYGON`` describe an area — a cabinet, a case, a room. A
+    ``PIN`` marks a single point, for an object standing on the floor rather
+    than filed in a container. ``WALL`` and ``LABEL`` are scenery: a plan with
+    no walls on it is a plan nobody can orient themselves in.
+    """
+
+    RECT = "rect"
+    POLYGON = "polygon"
+    CIRCLE = "circle"
+    PIN = "pin"
+    WALL = "wall"
+    LABEL = "label"
+
+
 class ImportStatus(str, enum.Enum):
     """Where a spreadsheet import has got to.
 

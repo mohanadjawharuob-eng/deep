@@ -33,12 +33,14 @@ from app.models.enums import (
     ProtectionStatus,
     ResourceType,
     ReviewStatus,
+    ShapeKind,
     SiteType,
     StorageKind,
     StratigraphicRelation,
     TreatmentType,
     UserRole,
 )
+from app.models.floorplan import FloorPlan, FloorPlanShape
 from app.models.gis import GisFeature, GisLayer
 from app.models.imports import ImportBatch
 from app.models.media import Document, Model3D, Photograph
@@ -115,8 +117,11 @@ __all__ = [
     "Site",
     "StorageKind",
     "StorageLocation",
+    "FloorPlan",
+    "FloorPlanShape",
     "ImportBatch",
     "ImportStatus",
+    "ShapeKind",
     "StorageMovement",
     "SiteType",
     "StratigraphicRelation",

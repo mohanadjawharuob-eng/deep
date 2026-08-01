@@ -3,17 +3,20 @@
 A centralised database for researchers, universities, museums and excavation
 projects to store, search, visualise and manage archaeological information.
 
-> **Status: milestone 6 — the museum collection module, and a working web interface.**
+> **Status: the museum module is complete, and the platform has its design.**
 > The archaeology module is complete. The museum module catalogues accessioned
 > objects in **your own accession numbering**, with conservation history,
 > exhibitions, loans and environmental monitoring — and serves its cataloguing
 > form as data, so the interface renders a FileMaker-style layout rather than
 > carrying its own hard-coded copy of it.
 >
-> The web interface now exists and runs. It is deliberately plain: every colour,
-> size and space is a design token, so a visual design applies without touching a
-> component. To try it, see **[Running the platform locally](docs/running-locally.md)**.
-> To commission a design for it, hand over **[the design brief](docs/design-brief.md)**.
+> The web interface runs, and carries the **Stratum** design: earth over neon,
+> drawn from fired clay, bone and oxidised bronze, in a light and a dark theme
+> that are drawn separately rather than inverted. A catalogue can be imported
+> from a spreadsheet with every column verified before a row is written, and the
+> store can be **drawn as a floor plan** whose cases show what they hold.
+>
+> To try it, see **[Running the platform locally](docs/running-locally.md)**.
 
 ---
 
@@ -501,12 +504,14 @@ office & storage inventory — with a digital archive to follow.
 | **3 — done** | File uploads, thumbnails, EXIF, documents, 3D models, QR code images |
 | **4 — done** | **Foundations for the five-module platform**: per-module permissions, the storage-location hierarchy and movement history |
 | **5 — done** | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
-| **6 — in progress** | Museum module: catalogue *(done)*, conservation, exhibitions, loans, environmental monitoring, form layouts *(done)*; spreadsheet import and floor plans *(next)* |
+| **6 — done** | Museum module: catalogue, conservation, exhibitions, loans, environmental monitoring, form layouts, spreadsheet import, floor plans |
 | **6b — done** | React frontend: sign-in, dashboard, archaeology, museum record card, storage tree, map, search, light/dark |
+| **6c — done** | Spreadsheet import with per-column verification; floor plans of the store |
 | 7 | Inventory module and the excavation kit builder |
 | 8 | Management module: budgets, grants, staff, tasks, calendar |
 | 9 | Social media repository; the [data-request system](docs/data-requests.md) and its upload links |
-| 10 | Frontend: the visual design applied, plus the admin panel |
+| **10 — done** | The Stratum design applied; the [design brief](docs/design-brief.md) and its appendix |
+| 11 | Admin panel; the digital archive module |
 
 Milestone 4 is sequenced ahead of everything else deliberately. The permission
 model and the storage hierarchy are load-bearing for every module that follows,

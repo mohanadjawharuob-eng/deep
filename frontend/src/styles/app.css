@@ -965,3 +965,165 @@
   font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
+
+/* --------------------------------------------------------------------------
+ * Floor plans
+ * ----------------------------------------------------------------------- */
+.plan-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  align-items: start;
+}
+
+.plan-card { padding: var(--space-4); }
+
+.plan-surface {
+  position: relative;
+  width: 100%;
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+.plan-surface.editing { cursor: crosshair; }
+
+.plan-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+
+/* A metre grid, for a plan drawn from nothing. It gives the eye something to
+   align to, which a blank rectangle does not. */
+.plan-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.7;
+}
+
+.plan-rect {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 3px 5px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: box-shadow var(--transition);
+}
+.plan-rect:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.plan-rect.active { box-shadow: 0 0 0 3px var(--focus); }
+
+/* Scenery: no fill, thinner line, and it never takes the eye. */
+.plan-rect.wall { background: transparent !important; border-width: 3px; opacity: 0.55; }
+
+/* A drawn place with nothing in it is hollow and dashed — the same vocabulary
+   the rest of the platform uses for anything provisional or absent. */
+.plan-rect.empty { background: transparent !important; border-style: dashed; }
+
+.plan-rect-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border-radius: 3px;
+  padding: 0 3px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.plan-rect-count { color: var(--text-3); font-weight: 400; }
+
+.plan-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.plan-pin-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: currentColor;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+}
+.plan-pin.active .plan-pin-dot { box-shadow: 0 0 0 3px var(--focus); }
+.plan-pin-label {
+  font-size: var(--text-sm);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.plan-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.plan-label.active { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* The rectangle being dragged, before it exists. */
+.plan-preview {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+}
+
+.plan-scale {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.scale-bar {
+  height: 6px;
+  border: var(--border-width) solid var(--text-2);
+  border-top: none;
+  min-width: 12px;
+}
+
+.plan-contents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.plan-contents li { display: flex; gap: var(--space-3); align-items: baseline; min-width: 0; }
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch.active { border-color: var(--text); }
+
+@media (max-width: 900px) {
+  .plan-layout { grid-template-columns: minmax(0, 1fr); }
+}

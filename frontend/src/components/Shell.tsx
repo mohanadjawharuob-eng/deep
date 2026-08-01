@@ -121,6 +121,11 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         label: "Locations",
         icon: icon("M3 7.5 10 4l7 3.5v9L10 20l-7-3.5zM3 7.5 10 11l7-3.5M10 11v9"),
       },
+      {
+        to: "/floorplans",
+        label: "Floor plans",
+        icon: icon("M3 3h14v14H3zM3 8h7m0-5v14m0-5h7"),
+      },
     ],
   },
 ];

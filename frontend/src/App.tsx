@@ -30,6 +30,7 @@ import {
   ObjectDetail,
 } from "./routes/Museum";
 import { ImportBatch, ImportUpload } from "./routes/Import";
+import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
 import { Empty, Loading } from "./components/ui";
 
 function NotFound() {
@@ -77,6 +78,8 @@ export function App() {
         <Route path="museum/collections/:collectionId" element={<CollectionDetail />} />
 
         <Route path="storage" element={<Storage />} />
+        <Route path="floorplans" element={<FloorPlansForLocation />} />
+        <Route path="floorplans/:planId" element={<FloorPlanScreen />} />
 
         <Route path="404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />
