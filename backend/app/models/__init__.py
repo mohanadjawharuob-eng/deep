@@ -20,6 +20,7 @@ from app.models.enums import (
     Model3DFormat,
     Module,
     ModuleLevel,
+    MovementReason,
     NotificationType,
     PermissionLevel,
     ProjectRole,
@@ -28,6 +29,7 @@ from app.models.enums import (
     ResourceType,
     ReviewStatus,
     SiteType,
+    StorageKind,
     StratigraphicRelation,
     UserRole,
 )
@@ -35,6 +37,7 @@ from app.models.gis import GisFeature, GisLayer
 from app.models.media import Document, Model3D, Photograph
 from app.models.project import Project, ProjectMembership
 from app.models.site import Site
+from app.models.storage import StorageLocation, StorageMovement
 from app.models.taxonomy import Material, ObjectCategory, Period, Publication, SystemSetting
 from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess
 
@@ -72,12 +75,16 @@ __all__ = [
     "Publication",
     "Module",
     "ModuleLevel",
+    "MovementReason",
     "RecordPermission",
     "RefreshToken",
     "ResourceType",
     "Revision",
     "ReviewStatus",
     "Site",
+    "StorageKind",
+    "StorageLocation",
+    "StorageMovement",
     "SiteType",
     "StratigraphicRelation",
     "SystemSetting",

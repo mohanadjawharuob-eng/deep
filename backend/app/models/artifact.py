@@ -159,6 +159,16 @@ class Artifact(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, Base):
         index=True,
     )
     conservation_notes: Mapped[str | None] = mapped_column(Text)
+    #: Where the object is now, as a node in the shared storage hierarchy.
+    #: ``SET NULL`` rather than cascade: losing the cabinet record must not
+    #: delete the find, it must leave it visibly unlocated so somebody looks.
+    storage_location_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("storage_locations.id", ondelete="SET NULL"), index=True
+    )
+    #: Free-text location, from before the hierarchy existed. Kept because it
+    #: is the only record of where legacy material was said to be, and it
+    #: cannot be parsed into a tree without guessing. New records use
+    #: ``storage_location_id``; this is migrated by hand, deliberately.
     current_location: Mapped[str | None] = mapped_column(String(300), index=True)
     storage_box: Mapped[str | None] = mapped_column(String(120))
     is_on_display: Mapped[bool] = mapped_column(default=False, nullable=False)

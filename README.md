@@ -3,12 +3,12 @@
 A centralised database for researchers, universities, museums and excavation
 projects to store, search, visualise and manage archaeological information.
 
-> **Status: milestone 4 — laying the foundations for a five-module platform.**
+> **Status: milestone 4 done — foundations for a five-module platform.**
 > The archaeology module is complete through file uploads and printable labels.
-> Permissions are now granted **per module** rather than by a single global
-> role, which is what the museum, inventory, management and social-media modules
-> will hang from. The storage-location hierarchy is next. See
-> [Roadmap](#roadmap).
+> Permissions are granted **per module** rather than by a single global role,
+> and one shared storage hierarchy records where every physical object is and
+> everywhere it has been. Both are what the museum, inventory, management and
+> social-media modules hang from. See [Roadmap](#roadmap).
 
 ---
 
@@ -101,7 +101,7 @@ See [`backend/README.md`](backend/README.md).
 
 ### Milestone 1 — foundations
 
-**Database schema — 26 tables**, covering the archaeology module in full.
+**Database schema — 28 tables**, covering the archaeology module in full.
 Projects, sites, artifacts and excavation contexts; photographs, documents and
 3D models; GIS layers and features; controlled vocabularies for periods,
 materials and object categories; publications; and the cross-cutting tables for
@@ -212,6 +212,34 @@ Two decisions worth calling out:
   every module still cannot create a user account. Modules are about the work;
   accounts and settings are about the institution.
 
+**One storage hierarchy** for every module that holds objects:
+
+```
+Institution → Building → Floor → Room → Cabinet → Shelf → Drawer → Box → object
+```
+
+Every physical object is filed against a node in that tree, and every change of
+place is appended to a register that is never rewritten. The current location
+answers *where is it*; the register answers *where was it, when, who moved it
+and why* — which is the question that matters when something cannot be found.
+
+Levels may be skipped (a crate on a room floor has no cabinet) and repeated
+(finds bags inside a crate), because real stores do both. What is refused is
+inversion — a room inside a shelf.
+
+Three decisions worth calling out:
+
+- **The register freezes the paths as they read that day.** Renaming a room
+  changes where things *are*; it must not change what the register said on 20
+  May. Current location and history are allowed to disagree, and do.
+- **A location holding anything cannot be deleted.** Deleting it would leave
+  material with no recorded place, the exact state the hierarchy prevents. Mark
+  it inactive instead — it keeps its history and stops accepting objects.
+- **The legacy free-text locations were not auto-migrated.** Parsing "Field
+  house, Room 2, Shelf B" into a tree means guessing which word is the room,
+  and a wrong guess writes a wrong location into a heritage register. The old
+  text is kept and reported until somebody who knows the building maps it.
+
 ### Endpoints
 
 | Method | Path | Who |
@@ -237,6 +265,11 @@ Two decisions worth calling out:
 | `GET`/`POST`/`DELETE` | `/notifications…` | signed in, own inbox only |
 | `GET` | `/users/me/access` | signed in — which modules you can reach |
 | `GET`/`PUT`/`DELETE` | `/users/{id}/access[/{module}]` | platform administrator |
+| `GET` | `/storage/tree`, `/storage/locations` | anyone with a module that stores things |
+| `POST`/`PATCH`/`DELETE` | `/storage/locations[/{id}]` | supervisor and above |
+| `GET` | `/storage/locations/{id}/contents` | scoped per object |
+| `POST` | `/storage/{kind}/{id}/move` | anyone who may edit the object |
+| `GET` | `/storage/{kind}/{id}/location`, `/movements` | anyone who can read it |
 | `POST` | `/photographs`, `/documents`, `/models3d/upload` | contributors on the project |
 | `GET` | `/photographs`, `/documents`, `/models3d` | anyone, scoped by permission |
 | `GET` | `/photographs/{id}/file`, `/thumbnail?size=` | anyone who can read it |
@@ -354,7 +387,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-pytest                              # 502 tests
+pytest                              # 550 tests
 pytest --cov=app                    # coverage
 ruff check app tests scripts        # lint
 alembic revision --autogenerate -m "…"   # after editing models
@@ -375,12 +408,12 @@ office & storage inventory — with a digital archive to follow.
 | **1 — done** | Backend skeleton, full schema, auth, permissions, Docker, backups |
 | **2 — done** | CRUD for projects, sites, artifacts and contexts; revision history; approval workflow; activity feed; search |
 | **3 — done** | File uploads, thumbnails, EXIF, documents, 3D models, QR code images |
-| **4 — in progress** | **Foundations for the five-module platform**: per-module permissions *(done)*, the storage-location hierarchy and movement history *(next)* |
+| **4 — done** | **Foundations for the five-module platform**: per-module permissions, the storage-location hierarchy and movement history |
 | 5 | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
 | 6 | Museum collection module: catalogue, loans, exhibitions, conservation records |
 | 7 | Inventory module and the excavation kit builder |
 | 8 | Management module: budgets, grants, staff, tasks, calendar |
-| 9 | Social media repository; the data-request system and its upload links |
+| 9 | Social media repository; the [data-request system](docs/data-requests.md) and its upload links |
 | 10 | React frontend: dashboard, map, forms, dark/light mode, admin panel |
 
 Milestone 4 is sequenced ahead of everything else deliberately. The permission

@@ -154,12 +154,15 @@ def make_user(
     password: str = "TestPassword1",
     is_active: bool = True,
     modules: dict[Module, ModuleLevel] | None = None,
+    grant_defaults: bool = True,
 ) -> User:
     """Create a user with the module access their role implies.
 
     ``modules`` grants beyond that default — pass it to build the cross-module
     users the permission model exists for, e.g. an archaeology editor who is
-    only a viewer in the museum.
+    only a viewer in the museum. Set ``grant_defaults=False`` when the point of
+    the test is somebody with *no* archaeology access, which the role default
+    would otherwise hand them.
     """
     user = User(
         email=email,
@@ -173,7 +176,8 @@ def make_user(
     db.add(user)
     db.flush()
 
-    access.grant_defaults(db, user)
+    if grant_defaults:
+        access.grant_defaults(db, user)
     for module, level in (modules or {}).items():
         access.grant(db, user, module, level)
     return user

@@ -124,6 +124,66 @@ _MODULE_LEVEL_RANK: dict[ModuleLevel, int] = {
 }
 
 
+class StorageKind(str, enum.Enum):
+    """A rung on the storage hierarchy, ordered from outermost to innermost.
+
+    Institution → Building → Floor → Room → Cabinet → Shelf → Drawer → Box.
+
+    The order is enforced only against *inversion*: a child may not sit at a
+    shallower rung than its parent. Skipping rungs is fine — a crate on a room
+    floor has no cabinet — and so is repeating one, because finds bags inside a
+    crate really are boxes inside a box. A hierarchy that refuses to describe
+    the actual building is one people stop using.
+    """
+
+    INSTITUTION = "institution"
+    BUILDING = "building"
+    FLOOR = "floor"
+    ROOM = "room"
+    CABINET = "cabinet"
+    SHELF = "shelf"
+    DRAWER = "drawer"
+    BOX = "box"
+
+    @property
+    def depth(self) -> int:
+        return _STORAGE_KIND_DEPTH[self]
+
+
+_STORAGE_KIND_DEPTH: dict[StorageKind, int] = {
+    StorageKind.INSTITUTION: 0,
+    StorageKind.BUILDING: 1,
+    StorageKind.FLOOR: 2,
+    StorageKind.ROOM: 3,
+    StorageKind.CABINET: 4,
+    StorageKind.SHELF: 5,
+    StorageKind.DRAWER: 6,
+    StorageKind.BOX: 7,
+}
+
+
+class MovementReason(str, enum.Enum):
+    """Why an object left one place for another.
+
+    Kept as a closed list because "where has this been and why" is a question
+    a registrar has to answer from the record years later, and free text does
+    not aggregate.
+    """
+
+    ACCESSION = "accession"
+    REORGANISATION = "reorganisation"
+    CONSERVATION = "conservation"
+    ANALYSIS = "analysis"
+    EXHIBITION = "exhibition"
+    LOAN_OUT = "loan_out"
+    LOAN_RETURN = "loan_return"
+    EXCAVATION = "excavation"
+    REPATRIATION = "repatriation"
+    DISPOSAL = "disposal"
+    CORRECTION = "correction"
+    OTHER = "other"
+
+
 class PermissionLevel(str, enum.Enum):
     """Per-record grant, also ordered."""
 

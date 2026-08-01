@@ -21,6 +21,7 @@ from app.api.v1.endpoints import (
     review,
     search,
     sites,
+    storage,
     taxonomy,
     users,
 )
@@ -37,6 +38,9 @@ api_router.include_router(projects.router)
 api_router.include_router(sites.router)
 api_router.include_router(artifacts.router)
 api_router.include_router(contexts.router)
+
+# Physical storage: one hierarchy shared by every module that holds objects.
+api_router.include_router(storage.router)
 
 # Media
 api_router.include_router(photographs.router)

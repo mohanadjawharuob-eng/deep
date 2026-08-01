@@ -32,7 +32,8 @@ backend/
 │   │   ├── documents.py      # document validation by magic bytes
 │   │   ├── attachments.py    # shared media linking, permissions, serving
 │   │   ├── qrcodes.py        # QR images for printed labels
-│   │   └── access.py         # granting and revoking module access
+│   │   ├── access.py         # granting and revoking module access
+│   │   └── storage_locations.py  # the storage tree and movement register
 │   └── api/
 │       ├── deps.py           # DI: sessions, current user, role guards
 │       └── v1/               # versioned routes
@@ -104,6 +105,7 @@ Worth knowing what each file is for:
 | `test_search_api.py` | search results, filters and permission scoping |
 | `test_media_api.py` | uploads, EXIF, thumbnails, documents, 3D models, QR labels |
 | `test_module_access.py` | per-module permissions, granting, and the module ceiling |
+| `test_storage_api.py` | the storage hierarchy, path maintenance and the movement register |
 
 `test_media_api.py` generates its images rather than checking binaries in, so
 every property it asserts — dimensions, EXIF, GPS, orientation — is visible in
@@ -146,6 +148,7 @@ The migrations so far:
 | `0004_audit_clock_timestamp` | audit timestamps taken at append time rather than transaction start |
 | `0005_public_tokens` | `public_token` on `projects` and `sites`, so both can carry a QR label |
 | `0006_module_access` | `user_module_access`, replacing the global role as the permission ceiling; backfills every existing account |
+| `0007_storage_locations` | the storage hierarchy and the movement register; `artifacts.storage_location_id` |
 
 `0001` is separate because PostGIS must exist before any geometry column is
 created. Always read a generated migration before committing it — autogenerate
@@ -197,6 +200,69 @@ routinely runs to gigabytes. Recognised viewers (currently Sketchfab) get an
 `embed_url` built from the model id alone; everything else is linked and not
 framed, because an `<iframe>` pointing at an arbitrary address is a phishing
 surface under this platform's name.
+
+---
+
+## Physical storage
+
+One hierarchy serves every module that holds objects — archaeology, museum,
+inventory — because an institution has one building. A find, an accessioned
+object and a total station all end up on a shelf, and that shelf should not be
+described three times in three tables.
+
+```
+Institution → Building → Floor → Room → Cabinet → Shelf → Drawer → Box → object
+```
+
+The order is enforced only against **inversion**: a child may not sit at a
+shallower rung than its parent. Skipping rungs is fine — a crate on a room
+floor has no cabinet — and so is repeating one, because finds bags inside a
+crate really are boxes inside a box. A hierarchy that refuses to describe the
+actual building is one people stop using.
+
+**The path is materialised.** Each node stores its full route from the root
+(`/ioa/ms/203/cab-4/b`) plus a readable form, so "everything in Room 203" is an
+indexed prefix scan rather than a recursive query on every page load. That
+denormalisation has to be maintained: renaming or reparenting a node rewrites
+the whole subtree, or a cabinet moved between rooms goes on claiming it is in
+the old one. `tests/test_storage_api.py` exists largely to catch that.
+
+**The register is append-only and frozen at the time of the move.** Each row
+copies in the paths as they read that day, so renaming a room later does not
+rewrite what the register said. Current location and movement history answer
+different questions and must be allowed to disagree: "where is it" follows the
+rename, "where was it on 20 May" does not.
+
+Two endpoints exist because those questions differ:
+`GET /storage/{kind}/{id}/location` for where a thing is now, and
+`GET /storage/{kind}/{id}/movements` for everywhere it has been.
+
+Other decisions worth knowing:
+
+- **Deleting a location is refused if it holds anything** — objects or child
+  locations. Deleting it would leave material with no recorded place, which is
+  the exact state this hierarchy exists to prevent. Mark it inactive instead;
+  an inactive location keeps its history and stops accepting new objects.
+- **Contents are permission-filtered per object.** The store is not a way
+  around record permissions: listing a shelf shows only what the caller could
+  already see.
+- **Environmental targets live on the location**, because a metals cabinet and
+  a textile store want different numbers and a conservator needs the target to
+  judge a reading against.
+- **Moving an object to where it already is records nothing** and reports a
+  conflict, so re-submitting a form cannot manufacture a movement that never
+  happened.
+
+### The legacy free-text location
+
+`artifacts.current_location` and `storage_box` predate this hierarchy and hold
+things like `"Field house, Room 2, Shelf B"`. They are **not** parsed into the
+tree by migration `0007`: deciding which words name a room and which name a
+shelf would be guessing, and guessing wrong writes a wrong location into a
+heritage register. Both columns are kept, and
+`GET /storage/{kind}/{id}/location` reports the free text when nothing
+structured has been recorded — an honest "we only know this much" rather than
+an empty field. Mapping them is a job for somebody who knows the building.
 
 ---
 
@@ -363,7 +429,7 @@ Three rules are worth knowing:
 
 ## Data model
 
-26 tables. The core chain is:
+28 tables. The core chain is:
 
 ```
 Project ──< Site ──< ExcavationContext ──< Artifact

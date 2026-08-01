@@ -47,6 +47,7 @@ from app.models import (
     DocumentType,
     ExcavationContext,
     Material,
+    MovementReason,
     ObjectCategory,
     Period,
     Photograph,
@@ -58,6 +59,7 @@ from app.models import (
     ResourceType,
     Site,
     SiteType,
+    StorageKind,
     StratigraphicRelation,
     SystemSetting,
     User,
@@ -65,6 +67,7 @@ from app.models import (
 )
 from app.services import access, images
 from app.services import documents as document_service
+from app.services import storage_locations as storage_tree
 from app.services.storage import (
     CATEGORY_DOCUMENTS,
     CATEGORY_PHOTOGRAPHS,
@@ -524,6 +527,108 @@ def seed_sample_media(
     logger.info("Sample media created: 3 photographs with thumbnails, 1 document")
 
 
+def seed_sample_storage(session: Session, *, artifacts: list[Artifact], user: User) -> None:
+    """Build a small store and file the sample finds in it.
+
+    The point is to show the hierarchy doing its job: a find sitting in a box,
+    on a shelf, in a cabinet, in a room, in a building — and a movement
+    register that already has something in it.
+    """
+    institution = storage_tree.create(
+        session,
+        kind=StorageKind.INSTITUTION,
+        name="Institute of Archaeology",
+        code="IOA",
+        description="Sample institution for the demonstration data.",
+    )
+    building = storage_tree.create(
+        session,
+        kind=StorageKind.BUILDING,
+        name="Main Store",
+        code="MS",
+        parent_id=institution.id,
+    )
+    finds_room = storage_tree.create(
+        session,
+        kind=StorageKind.ROOM,
+        name="Finds Room 203",
+        code="203",
+        parent_id=building.id,
+        target_temperature_c=18.0,
+        target_humidity_percent=45.0,
+        environment_notes="Stable conditions for mixed ceramic and metal assemblages.",
+    )
+    lab = storage_tree.create(
+        session,
+        kind=StorageKind.ROOM,
+        name="Conservation Lab",
+        code="LAB",
+        parent_id=building.id,
+        target_temperature_c=20.0,
+        target_humidity_percent=50.0,
+    )
+    cabinet = storage_tree.create(
+        session,
+        kind=StorageKind.CABINET,
+        name="Cabinet 4",
+        code="CAB-4",
+        parent_id=finds_room.id,
+        capacity=400,
+    )
+    shelf = storage_tree.create(
+        session,
+        kind=StorageKind.SHELF,
+        name="Shelf B",
+        code="B",
+        parent_id=cabinet.id,
+        capacity=80,
+    )
+    box = storage_tree.create(
+        session,
+        kind=StorageKind.BOX,
+        name="Box 12",
+        code="12",
+        parent_id=shelf.id,
+        capacity=30,
+        description="Early Bronze Age ceramics, Trench A.",
+    )
+
+    accessioned = datetime(2024, 5, 20, 10, 0, tzinfo=UTC)
+    for artifact in artifacts:
+        storage_tree.move_object(
+            session,
+            artifact,
+            ResourceType.ARTIFACT,
+            to_location_id=box.id,
+            reason=MovementReason.ACCESSION,
+            notes="Received from the 2024 season and boxed.",
+            moved_at=accessioned,
+            user=user,
+            label=artifact.inventory_number,
+        )
+
+    # One object has since gone to the lab, so the register shows a journey
+    # rather than a single arrival.
+    storage_tree.move_object(
+        session,
+        artifacts[0],
+        ResourceType.ARTIFACT,
+        to_location_id=lab.id,
+        reason=MovementReason.CONSERVATION,
+        notes="Surface consolidation before study.",
+        moved_at=accessioned + timedelta(days=21),
+        user=user,
+        label=artifacts[0].inventory_number,
+    )
+
+    session.flush()
+    logger.info(
+        "Sample storage created: %s, with %d finds filed",
+        box.display_path,
+        len(artifacts),
+    )
+
+
 def seed_samples(session: Session, admin: User) -> None:
     """Create a small but complete demonstration project."""
     if session.scalar(select(Project).where(Project.code == "DEMO-2024")) is not None:
@@ -829,6 +934,7 @@ def seed_samples(session: Session, admin: User) -> None:
     session.flush()
 
     seed_sample_media(session, project=project, site=site, artifact=artifacts[0], user=researcher)
+    seed_sample_storage(session, artifacts=artifacts, user=researcher)
 
     now = datetime.now(UTC)
     for offset, (label, action) in enumerate(

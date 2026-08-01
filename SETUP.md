@@ -239,6 +239,43 @@ The demonstration data includes one account per level, all with the password
 | `j.okonkwo` | contributor | add records; they wait for approval |
 | `visitor` | viewer | read public records only |
 
+### Where things are stored
+
+The demonstration data includes a small store, so you can see how the platform
+tracks physical objects:
+
+```
+Institute of Archaeology
+└── Main Store
+    ├── Finds Room 203
+    │   └── Cabinet 4 → Shelf B → Box 12
+    └── Conservation Lab
+```
+
+Try it. `GET /api/v1/storage/tree` → *Try it out* → *Execute* shows the whole
+store. Then take an artifact's `id` from `GET /api/v1/artifacts` and call:
+
+- `GET /api/v1/storage/artifacts/{id}/location` — where it is **now**
+- `GET /api/v1/storage/artifacts/{id}/movements` — everywhere it has **been**
+
+One of the sample finds was accessioned into Box 12 in May and sent to the
+Conservation Lab in June, so its history has two steps.
+
+Those are two different questions on purpose. If you rename Finds Room 203
+(`PATCH /api/v1/storage/locations/{id}` with `{"name": "Finds Room 500"}`), the
+*current location* updates — but the movement register still says the object
+was put in Room 203, because that is what happened. A register that rewrote
+itself every time a room was renamed would be useless as a record.
+
+To move something: `POST /api/v1/storage/artifacts/{id}/move` with
+
+```json
+{ "to_location_id": "<a location id>", "reason": "conservation" }
+```
+
+A location holding objects cannot be deleted — you would be left with material
+that has no recorded place. Mark it inactive instead.
+
 ### Who can see which parts of the platform
 
 Access is given **per module** — archaeology, museum, inventory, management,

@@ -450,28 +450,50 @@ class TestAccessEndpoints:
         after = client.get("/api/v1/users/me/access", headers=headers).json()
         assert after["access"]["inventory"] == "contributor"
 
-    def test_an_administrator_can_seed_access_when_creating_an_account(
-        self, client: TestClient, db: Session, admin: User
-    ) -> None:
+    def _create_account(self, client: TestClient, username: str, **extra: object) -> dict:
         response = client.post(
             "/api/v1/users",
             json={
-                "email": "collections@example.org",
-                "username": "collections",
-                "full_name": "Collections Manager",
+                "email": f"{username}@example.org",
+                "username": username,
+                "full_name": username.title(),
                 "password": "StrongPassword1",
                 "role": "student",
-                "module_access": {"museum": "administrator", "inventory": "editor"},
+                **extra,
             },
             headers=auth_headers(client, "admin"),
         )
         assert response.status_code == 201, response.text
-
-        created = client.get(
+        return client.get(
             f"/api/v1/users/{response.json()['id']}/access", headers=auth_headers(client, "admin")
         ).json()
-        assert created["access"] == {
-            "archaeology": "contributor",
-            "museum": "administrator",
-            "inventory": "editor",
-        }
+
+    def test_an_account_created_without_a_map_gets_the_role_default(
+        self, client: TestClient, db: Session, admin: User
+    ) -> None:
+        created = self._create_account(client, "defaulted")
+        assert created["access"] == {"archaeology": "contributor"}
+
+    def test_an_explicit_map_replaces_the_default_rather_than_adding_to_it(
+        self, client: TestClient, db: Session, admin: User
+    ) -> None:
+        """A collections manager with no business in the trenches.
+
+        If the map were additive, every account would carry archaeology access
+        whether or not the person has any use for it, and the spec's "no
+        archaeology" user could not be created at all.
+        """
+        created = self._create_account(
+            client,
+            "collections",
+            module_access={"museum": "administrator", "inventory": "editor"},
+        )
+        assert created["access"] == {"museum": "administrator", "inventory": "editor"}
+        assert "archaeology" not in created["access"]
+
+    def test_an_account_can_be_created_with_no_module_access_at_all(
+        self, client: TestClient, db: Session, admin: User
+    ) -> None:
+        """Somebody whose access is decided later, not on the day they join."""
+        created = self._create_account(client, "pending", module_access={})
+        assert created["access"] == {}

@@ -80,8 +80,10 @@ class UserCreateAdmin(UserCreate):
     module_access: dict[Module, ModuleLevel] | None = Field(
         default=None,
         description=(
-            "Access to grant beyond the default. Omit to give only the "
-            "archaeology access the role implies."
+            "The complete set of modules this account may reach, replacing the "
+            "default the role implies. Omit to give only the archaeology access "
+            "the role implies; pass `{}` to create an account with no module "
+            "access at all."
         ),
         examples=[{"museum": "editor", "inventory": "viewer"}],
     )

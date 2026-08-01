@@ -150,9 +150,15 @@ def create_user(
     )
     session.add(user)
     session.flush()
-    access.grant_defaults(session, user, granted_by=admin)
-    for module, level in (payload.module_access or {}).items():
-        access.grant(session, user, module, level, granted_by=admin)
+    # An explicit map is the *complete* set of access, not an addition to the
+    # role default. Otherwise "communications officer, no archaeology" would be
+    # inexpressible — every account would carry archaeology whether or not the
+    # person has any business in it.
+    if payload.module_access is None:
+        access.grant_defaults(session, user, granted_by=admin)
+    else:
+        for module, level in payload.module_access.items():
+            access.grant(session, user, module, level, granted_by=admin)
 
     activity.log(
         session,
