@@ -629,9 +629,7 @@ def update_object(
         _check_artifact_link(session, changes["artifact_id"], exclude=obj.id)
 
     before = records.apply_changes(obj, changes)
-    records.on_updated(
-        session, obj, RESOURCE, before=before, user=user, request=request
-    )
+    records.on_updated(session, obj, RESOURCE, before=before, user=user, request=request)
     session.flush()
     return _object_detail(session, obj, user)
 

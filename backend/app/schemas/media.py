@@ -191,8 +191,7 @@ class Model3DCreate(AttachmentTargets):
     def _needs_a_source(self) -> Model3DCreate:
         if not self.external_url:
             raise ValueError(
-                "Give an external_url. To upload a mesh file instead, "
-                "use the file upload endpoint."
+                "Give an external_url. To upload a mesh file instead, use the file upload endpoint."
             )
         return self
 

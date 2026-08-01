@@ -124,6 +124,23 @@ _MODULE_LEVEL_RANK: dict[ModuleLevel, int] = {
 }
 
 
+class ImportStatus(str, enum.Enum):
+    """Where a spreadsheet import has got to.
+
+    The states are deliberately separate. ``ANALYSED`` means the file has been
+    read and its columns guessed at; ``MAPPED`` means a person has approved
+    what each column fills; ``PREVIEWED`` means every row has been validated
+    and the result reported. Only ``COMMITTED`` has written anything.
+    """
+
+    ANALYSED = "analysed"
+    MAPPED = "mapped"
+    PREVIEWED = "previewed"
+    COMMITTED = "committed"
+    FAILED = "failed"
+    REVERTED = "reverted"
+
+
 class StorageKind(str, enum.Enum):
     """A rung on the storage hierarchy, ordered from outermost to innermost.
 

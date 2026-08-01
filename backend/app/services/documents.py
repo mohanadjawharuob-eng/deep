@@ -117,7 +117,7 @@ def inspect(data: bytes, filename: str | None) -> DocumentFacts:
 
     if extension not in ALLOWED_TYPES:
         raise DocumentError(
-            f"{extension} files are not accepted. Allowed: " f"{', '.join(sorted(ALLOWED_TYPES))}."
+            f"{extension} files are not accepted. Allowed: {', '.join(sorted(ALLOWED_TYPES))}."
         )
 
     mime_type, description = ALLOWED_TYPES[extension]

@@ -901,8 +901,21 @@ def decode_qr(png: bytes) -> str:
     cv2 = pytest.importorskip("cv2", reason="opencv-python-headless is a dev-only dependency")
     numpy = pytest.importorskip("numpy")
 
-    greyscale = numpy.array(Image.open(io.BytesIO(png)).convert("L"))
-    decoded, *_ = cv2.QRCodeDetector().detectAndDecode(greyscale)
+    image = Image.open(io.BytesIO(png)).convert("L")
+
+    # Upscale before decoding. OpenCV's detector is marginal on a code at the
+    # size a label is printed at, and fails on *some* payloads and not others —
+    # which showed up as a test that passed or failed depending on the random
+    # token in the URL. What is under test is the payload, not OpenCV's
+    # threshold, so give it a generous image. Nearest-neighbour keeps the
+    # modules square rather than blurring their edges.
+    if min(image.size) < 600:
+        factor = -(-600 // min(image.size))
+        image = image.resize(
+            (image.width * factor, image.height * factor), Image.Resampling.NEAREST
+        )
+
+    decoded, *_ = cv2.QRCodeDetector().detectAndDecode(numpy.array(image))
     return decoded
 
 

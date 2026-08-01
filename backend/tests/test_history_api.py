@@ -363,9 +363,9 @@ class TestActivityFeed:
         outsider = make_user(db, email="nosy@x.org", username="nosy")
         feed = client.get("/api/v1/activity", headers=auth_headers(client, "nosy")).json()
         # Their own sign-in is there; the other project's work is not.
-        assert all(
-            item["user_id"] == str(outsider.id) for item in feed["items"]
-        ), "activity in projects you are not on must stay private"
+        assert all(item["user_id"] == str(outsider.id) for item in feed["items"]), (
+            "activity in projects you are not on must stay private"
+        )
 
     def test_members_see_their_projects_activity(
         self, client: TestClient, db: Session, researcher: User, student_member: User, site: dict

@@ -351,8 +351,7 @@ class ConservationCreate(BaseModel):
     materials_used: str | None = Field(
         default=None,
         description=(
-            "What was physically applied. A future conservator must know "
-            "before choosing a solvent."
+            "What was physically applied. A future conservator must know before choosing a solvent."
         ),
     )
     recommendations: str | None = None
@@ -580,7 +579,7 @@ class LoanItemCreate(BaseModel):
     def _identifies_something(self) -> LoanItemCreate:
         if self.museum_object_id is None and not self.external_description:
             raise ValueError(
-                "A loan item needs either one of our objects or a description " "of somebody else's"
+                "A loan item needs either one of our objects or a description of somebody else's"
             )
         return self
 

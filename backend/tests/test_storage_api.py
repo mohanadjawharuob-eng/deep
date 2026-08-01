@@ -226,9 +226,9 @@ class TestHierarchy:
 
         node = roots[0]
         for _ in range(4):
-            assert (
-                len(node["children"]) == 1
-            ), f"{node['name']} has {len(node['children'])} children"
+            assert len(node["children"]) == 1, (
+                f"{node['name']} has {len(node['children'])} children"
+            )
             node = node["children"][0]
         assert node["children"] == []
 

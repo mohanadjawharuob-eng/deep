@@ -877,9 +877,9 @@ class TestFormLayout:
         ).json()
         options = layout["value_list_options"]
 
-        assert any(
-            entry["label"].startswith("ARCH") for entry in options["collection"]
-        ), "the collection just created should be selectable"
+        assert any(entry["label"].startswith("ARCH") for entry in options["collection"]), (
+            "the collection just created should be selectable"
+        )
         assert {entry["value"] for entry in options["acquisition_method"]} >= {
             "excavation",
             "donation",

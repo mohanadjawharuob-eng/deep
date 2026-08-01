@@ -172,7 +172,7 @@ class TestSitesAgree:
         )
 
         assert python_says == sql_says, (
-            f"{user_key} vs {site_key}: can_view={python_says} " f"but visibility_filter={sql_says}"
+            f"{user_key} vs {site_key}: can_view={python_says} but visibility_filter={sql_says}"
         )
 
     @pytest.mark.parametrize(("user_key", "site_key"), itertools.product(USER_KEYS, SITE_KEYS))
@@ -193,7 +193,7 @@ class TestSitesAgree:
         )
 
         assert python_says == sql_says, (
-            f"{user_key} vs {site_key}: can_edit={python_says} " f"but editable_filter={sql_says}"
+            f"{user_key} vs {site_key}: can_edit={python_says} but editable_filter={sql_says}"
         )
 
 

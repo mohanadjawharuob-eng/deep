@@ -186,8 +186,7 @@ class SpatialHit(BaseModel):
     is_approximate: bool = Field(
         default=False,
         description=(
-            "True when the coordinates have been blurred because the site's "
-            "location is restricted."
+            "True when the coordinates have been blurred because the site's location is restricted."
         ),
     )
 

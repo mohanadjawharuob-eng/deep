@@ -30,3 +30,9 @@ qrcode[pil]==8.0
 # an entity-expansion attack unless the parser is hardened.
 pyshp==3.1.6
 defusedxml==0.7.1
+
+# --- Spreadsheets ------------------------------------------------------------
+# Institutions arrive with their catalogue in Excel. openpyxl reads .xlsx
+# without Excel, without a compiler and without pandas — which would be a
+# hundred megabytes of numerical machinery to read a column of strings.
+openpyxl==3.1.5

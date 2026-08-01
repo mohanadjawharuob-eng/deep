@@ -318,5 +318,5 @@ def assign(
     return (
         number,
         True,
-        (f"{result.reason} It has been recorded as given and flagged as a " f"legacy number."),
+        (f"{result.reason} It has been recorded as given and flagged as a legacy number."),
     )

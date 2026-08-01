@@ -50,8 +50,7 @@ def _resolve(kind: str) -> tuple[type[Any], ResourceType, str]:
     if entry is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
-            detail=f"Labels are not available for {kind!r}; expected one of "
-            f"{', '.join(LABELLED)}",
+            detail=f"Labels are not available for {kind!r}; expected one of {', '.join(LABELLED)}",
         )
     return entry
 

@@ -51,7 +51,7 @@ def read_layout(
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
             detail=(
-                f"No layout for {record_type!r}. Available: " f"{', '.join(sorted(forms.LAYOUTS))}."
+                f"No layout for {record_type!r}. Available: {', '.join(sorted(forms.LAYOUTS))}."
             ),
         )
 
