@@ -29,6 +29,7 @@ import {
   NewObject,
   ObjectDetail,
 } from "./routes/Museum";
+import { ImportBatch, ImportUpload } from "./routes/Import";
 import { Empty, Loading } from "./components/ui";
 
 function NotFound() {
@@ -70,6 +71,8 @@ export function App() {
         {/* Before the :objectId route, or "new" is read as an id. */}
         <Route path="museum/objects/new" element={<NewObject />} />
         <Route path="museum/objects/:objectId" element={<ObjectDetail />} />
+        <Route path="museum/import" element={<ImportUpload />} />
+        <Route path="museum/import/:batchId" element={<ImportBatch />} />
         <Route path="museum/collections" element={<Collections />} />
         <Route path="museum/collections/:collectionId" element={<CollectionDetail />} />
 

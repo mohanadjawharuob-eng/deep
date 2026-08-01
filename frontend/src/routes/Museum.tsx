@@ -214,17 +214,25 @@ export function Catalogue() {
               : "No objects catalogued yet"
           }
           action={
-            can("museum", "contributor") &&
             !(debounced || collectionId || status || condition) && (
-              <Link className="btn btn-primary" to="/museum/objects/new">
-                New object
-              </Link>
+              <>
+                {can("museum", "contributor") && (
+                  <Link className="btn btn-primary" to="/museum/objects/new">
+                    New object
+                  </Link>
+                )}
+                {can("museum", "supervisor") && (
+                  <Link className="btn" to="/museum/import">
+                    Import a spreadsheet
+                  </Link>
+                )}
+              </>
             )
           }
         >
           {debounced || collectionId || status || condition
             ? "Widen the search, or clear a filter."
-            : "The catalogue starts empty. Add the first object, or import an existing register."}
+            : "The catalogue starts empty. Add the first object, or import the register you already have."}
         </Empty>
       ) : (
         <>

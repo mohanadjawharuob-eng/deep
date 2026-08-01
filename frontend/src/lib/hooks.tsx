@@ -252,29 +252,45 @@ export function useDebounced<T>(value: T, delay = 300): T {
   return settled;
 }
 
-/** Run an action, tracking whether it is in flight and what it complained about. */
-export function useAction<Args extends unknown[]>(
-  action: (...args: Args) => Promise<unknown>,
+/**
+ * Run an action, tracking whether it is in flight and what it complained about.
+ *
+ * The action is held in a ref, and this is not a detail. `run` has to keep a
+ * stable identity — callers pass it to `onClick` — but memoising it with an
+ * empty dependency list would also freeze the *closure*, so the callback would
+ * for ever read the state as it stood on the first render. A Save button
+ * written the obvious way then posts an empty change set and reports success:
+ * the screen closes, nothing is written, and nobody finds out until they
+ * reopen the record.
+ *
+ * The ref is refreshed on every render, so `run` is stable and what it reads
+ * is current.
+ */
+export function useAction<Args extends unknown[], Result>(
+  action: (...args: Args) => Promise<Result>,
 ) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const run = useCallback(
-    async (...args: Args) => {
-      setRunning(true);
-      setError(null);
-      try {
-        return await action(...args);
-      } catch (cause) {
-        setError(cause instanceof ApiError ? cause.message : "Something went wrong");
-        return undefined;
-      } finally {
-        setRunning(false);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  const actionRef = useRef(action);
+  actionRef.current = action;
+
+  const run = useCallback(async (...args: Args) => {
+    setRunning(true);
+    setError(null);
+    try {
+      return await actionRef.current(...args);
+    } catch (cause) {
+      setError(
+        cause instanceof ApiError || cause instanceof Error
+          ? cause.message
+          : "Something went wrong",
+      );
+      return undefined;
+    } finally {
+      setRunning(false);
+    }
+  }, []);
 
   return { run, running, error, clearError: () => setError(null) };
 }

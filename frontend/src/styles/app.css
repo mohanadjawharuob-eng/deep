@@ -935,3 +935,33 @@
    it say the same thing, so neither is the only carrier. */
 .cell-invalid .input,
 .cell-invalid .tags-input { border-color: var(--danger); }
+
+/* --------------------------------------------------------------------------
+ * Import
+ * ----------------------------------------------------------------------- */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  color: var(--text-3);
+  background: var(--surface);
+  /* Dashed, like everything provisional: nothing here is written yet. */
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition), background var(--transition);
+}
+.dropzone.dragging { border-color: var(--accent); background: var(--accent-weak); }
+.dropzone .btn { cursor: pointer; }
+
+/* A value taken from the file, shown so the reader can see what they are
+   approving. Neutral rather than accent — it is evidence, not a selection. */
+.sample-chip {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: var(--border-width) solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}

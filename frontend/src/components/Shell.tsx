@@ -105,6 +105,12 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         module: "museum",
         icon: icon("M4 6h12M4 10h12M4 14h12"),
       },
+      {
+        to: "/museum/import",
+        label: "Import",
+        module: "museum",
+        icon: icon("M10 12.5V3m0 0L6.5 6.5M10 3l3.5 3.5M3.5 13.5v2A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5v-2"),
+      },
     ],
   },
   {
