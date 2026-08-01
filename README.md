@@ -3,12 +3,17 @@
 A centralised database for researchers, universities, museums and excavation
 projects to store, search, visualise and manage archaeological information.
 
-> **Status: milestone 6 — the museum collection module.**
-> The archaeology module is complete. The museum module now catalogues
-> accessioned objects in **your own accession numbering**, with conservation
-> history, exhibitions, loans and environmental monitoring — and serves its
-> cataloguing form as data, so the interface is a FileMaker-style layout rather
-> than a hard-coded page. See [Roadmap](#roadmap).
+> **Status: milestone 6 — the museum collection module, and a working web interface.**
+> The archaeology module is complete. The museum module catalogues accessioned
+> objects in **your own accession numbering**, with conservation history,
+> exhibitions, loans and environmental monitoring — and serves its cataloguing
+> form as data, so the interface renders a FileMaker-style layout rather than
+> carrying its own hard-coded copy of it.
+>
+> The web interface now exists and runs. It is deliberately plain: every colour,
+> size and space is a design token, so a visual design applies without touching a
+> component. To try it, see **[Running the platform locally](docs/running-locally.md)**.
+> To commission a design for it, hand over **[the design brief](docs/design-brief.md)**.
 
 ---
 
@@ -16,7 +21,7 @@ projects to store, search, visualise and manage archaeological information.
 
 ```
    ┌──────────────────────────────────────┐
-   │  Frontend — React + TypeScript       │   (last milestone)
+   │  Frontend — React + TypeScript       │   (built, unstyled)
    └──────────────────┬───────────────────┘
                       │  HTTPS / JSON
    ┌──────────────────▼───────────────────┐
@@ -41,7 +46,7 @@ what makes the permission model meaningful rather than advisory.
 | Migrations | Alembic |
 | Files | Local disk behind a storage interface, ready for S3/GCS |
 | GIS | PostGIS geometry; GeoJSON, KML and shapefile interchange |
-| Frontend | React + TypeScript, Leaflet + OpenStreetMap *(last milestone)* |
+| Frontend | React + TypeScript, Vite, Leaflet + OpenStreetMap; hand-written CSS over design tokens, no UI library |
 
 ---
 
@@ -497,16 +502,18 @@ office & storage inventory — with a digital archive to follow.
 | **4 — done** | **Foundations for the five-module platform**: per-module permissions, the storage-location hierarchy and movement history |
 | **5 — done** | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
 | **6 — in progress** | Museum module: catalogue *(done)*, conservation, exhibitions, loans, environmental monitoring, form layouts *(done)*; spreadsheet import and floor plans *(next)* |
+| **6b — done** | React frontend: sign-in, dashboard, archaeology, museum record card, storage tree, map, search, light/dark |
 | 7 | Inventory module and the excavation kit builder |
 | 8 | Management module: budgets, grants, staff, tasks, calendar |
 | 9 | Social media repository; the [data-request system](docs/data-requests.md) and its upload links |
-| 10 | React frontend: dashboard, map, forms, dark/light mode, admin panel |
+| 10 | Frontend: the visual design applied, plus the admin panel |
 
 Milestone 4 is sequenced ahead of everything else deliberately. The permission
 model and the storage hierarchy are load-bearing for every module that follows,
 so each one built on the old shape would be rework — and a frontend built on it
-would be the most expensive rework available. GIS and the interface do not
-compound like that, so they wait.
+would be the most expensive rework available. That is why the interface waited
+until milestone 6b, after the permission model and the store were settled: it
+was then cheap to build and is now cheap to restyle.
 
 Later: the digital archive module, AI-assisted classification and image tagging,
 OCR, satellite and drone imagery, LiDAR, marine survey (MBES and side-scan
