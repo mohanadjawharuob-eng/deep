@@ -13,7 +13,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api, type Page, type StorageNode } from "../lib/api";
 import { useQuery } from "../lib/hooks";
 import {
-  Badge,
   Detail,
   DetailGrid,
   Empty,
@@ -81,6 +80,7 @@ function TreeNode({
   expanded,
   toggle,
   filter,
+  depth = 0,
 }: {
   node: StorageNode;
   selected: string | null;
@@ -88,6 +88,7 @@ function TreeNode({
   expanded: Set<string>;
   toggle: (id: string) => void;
   filter: string;
+  depth?: number;
 }) {
   const matches = (candidate: StorageNode): boolean => {
     if (!filter) return true;
@@ -108,23 +109,30 @@ function TreeNode({
 
   return (
     <li>
-      <div className={`tree-row ${selected === node.id ? "selected" : ""}`}>
+      <div
+        className={`tree-row ${selected === node.id ? "selected" : ""}`}
+        // Indentation is inline because it is a function of depth, and CSS
+        // cannot express "one step per ancestor" without a rule per level.
+        style={{ paddingLeft: 8 + depth * 14 }}
+      >
         <button
           type="button"
           className="tree-toggle"
           onClick={() => toggle(node.id)}
           aria-label={open ? "Collapse" : "Expand"}
+          aria-expanded={hasChildren ? open : undefined}
           style={{ visibility: hasChildren ? "visible" : "hidden" }}
         >
           {open ? "▾" : "▸"}
         </button>
         <button type="button" className="tree-label" onClick={() => onSelect(node.id)}>
-          <span className="tree-kind" aria-hidden="true">
+          <span className="tree-kind" aria-hidden="true" title={humanise(node.kind)}>
             {KIND_GLYPH[node.kind] ?? "·"}
           </span>
           <span className="truncate">{node.name}</span>
-          <span className="small muted mono">{node.code}</span>
-          {!node.is_active && <span className="badge">inactive</span>}
+          {!node.is_active && <span className="badge badge-warning">inactive</span>}
+          <span className="spacer" />
+          <span className="tree-count">{node.code}</span>
         </button>
       </div>
       {open && hasChildren && (
@@ -138,6 +146,7 @@ function TreeNode({
               expanded={expanded}
               toggle={toggle}
               filter={filter}
+              depth={depth + 1}
             />
           ))}
         </ul>
@@ -157,9 +166,26 @@ export function Storage() {
     [],
   );
 
-  // Top level open by default: a collapsed tree tells you nothing.
+  // A store is a building, not a filesystem: a hundred-odd nodes, all of
+  // which somebody wants to see at once. So the whole thing opens by default
+  // unless it is genuinely large, where opening everything would bury the
+  // top level under boxes.
   useEffect(() => {
-    if (tree.data) setExpanded((current) => new Set([...current, ...tree.data!.map((n) => n.id)]));
+    if (!tree.data) return;
+    const ids: string[] = [];
+    const walk = (nodes: StorageNode[]) => {
+      for (const node of nodes) {
+        ids.push(node.id);
+        walk(node.children);
+      }
+    };
+    walk(tree.data);
+
+    setExpanded((current) =>
+      ids.length <= 200
+        ? new Set([...current, ...ids])
+        : new Set([...current, ...tree.data!.map((node) => node.id)]),
+    );
   }, [tree.data]);
 
   const contents = useQuery<Page<ContentRow>>(
@@ -245,20 +271,16 @@ export function Storage() {
           ) : (
             <>
               <section className="card">
-                <div className="card-header">
-                  <span className="card-title">{node?.name ?? "Location"}</span>
-                  {node && <Badge value={node.kind} />}
+                <div className="card-header" style={{ display: "block" }}>
+                  <div className="small muted" style={{ marginBottom: 4 }}>
+                    {node?.display_path ?? ""}
+                  </div>
+                  <h2 style={{ fontSize: "var(--text-lg)" }}>{node?.name ?? "Location"}</h2>
                 </div>
                 <div className="card-body">
                   <DetailGrid>
                     <Detail label="Code" value={node && <span className="mono">{node.code}</span>} />
-                    <Detail
-                      label="Path"
-                      value={node && <span className="small">{node.display_path}</span>}
-                      span={2}
-                    />
-                    <Detail label="Depth" value={node?.depth} />
-                    <Detail label="Capacity" value={node?.capacity} />
+                    <Detail label="Kind" value={node && humanise(node.kind)} />
                     <Detail
                       label="Holds"
                       value={
@@ -267,6 +289,7 @@ export function Storage() {
                           : null
                       }
                     />
+                    <Detail label="Capacity" value={node?.capacity} />
                   </DetailGrid>
                 </div>
               </section>

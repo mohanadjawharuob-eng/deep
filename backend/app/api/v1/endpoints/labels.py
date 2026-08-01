@@ -16,9 +16,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserOptional, DbSession
-from app.core.permissions import can_view
+from app.core.permissions import can_view, flat_can_view
 from app.models.artifact import Artifact
-from app.models.enums import ResourceType
+from app.models.enums import Module, ResourceType
+from app.models.museum import MuseumObject
 from app.models.project import Project
 from app.models.site import Site
 from app.services import qrcodes, records
@@ -30,7 +31,20 @@ LABELLED: dict[str, tuple[type[Any], ResourceType, str]] = {
     "artifacts": (Artifact, ResourceType.ARTIFACT, "Artifact"),
     "sites": (Site, ResourceType.SITE, "Site"),
     "projects": (Project, ResourceType.PROJECT, "Project"),
+    "museum-objects": (MuseumObject, ResourceType.MUSEUM_OBJECT, "Object"),
 }
+
+#: Museum records are not project-scoped, so the archaeology policy — which
+#: asks which project team the caller is on — has nothing to say about them.
+#: Reading a label falls back to the module policy for those.
+_FLAT_MODULES: dict[ResourceType, Module] = {ResourceType.MUSEUM_OBJECT: Module.MUSEUM}
+
+
+def _may_see(session: DbSession, user: Any, record: Any, resource_type: ResourceType) -> bool:
+    module = _FLAT_MODULES.get(resource_type)
+    if module is not None:
+        return flat_can_view(user, record, module)
+    return can_view(session, user, record, resource_type)
 
 
 class LabelInfo(BaseModel):
@@ -69,7 +83,7 @@ def read_label(
 ) -> LabelInfo:
     model, resource_type, name = _resolve(kind)
     record = records.get_or_404(session, model, record_id, name)
-    if not can_view(session, user, record, resource_type):
+    if not _may_see(session, user, record, resource_type):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{name} not found")
 
     return LabelInfo(
@@ -106,7 +120,7 @@ def read_qr_code(
 ) -> Response:
     model, resource_type, name = _resolve(kind)
     record = records.get_or_404(session, model, record_id, name)
-    if not can_view(session, user, record, resource_type):
+    if not _may_see(session, user, record, resource_type):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{name} not found")
 
     png = qrcodes.render_for_record(
@@ -139,7 +153,7 @@ def resolve_scan(
     model, resource_type, name = _resolve(kind)
 
     record = session.scalar(select(model).where(model.public_token == token))
-    if record is None or not can_view(session, user, record, resource_type):
+    if record is None or not _may_see(session, user, record, resource_type):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{name} not found")
 
     return {

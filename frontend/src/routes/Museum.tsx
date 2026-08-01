@@ -18,13 +18,21 @@ import {
   type Page,
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
-import { RecordCard, layoutFields, type RecordValues } from "../components/RecordCard";
+import {
+  RecordCard,
+  RecordTabs,
+  firstTab,
+  layoutFields,
+  type RecordValues,
+} from "../components/RecordCard";
 import {
   Badge,
+  ConfirmDelete,
   Detail,
   DetailGrid,
   Empty,
   ErrorNote,
+  LegacyMark,
   Loading,
   Pager,
   PageHeader,
@@ -169,6 +177,29 @@ export function Catalogue() {
             </option>
           ))}
         </select>
+        {(debounced || collectionId || status || condition) && (
+          <button
+            type="button"
+            className="filter-chip"
+            onClick={() => {
+              setTerm("");
+              setParams(new URLSearchParams());
+            }}
+            title="Clear every filter"
+          >
+            {[
+              debounced && `“${debounced}”`,
+              collectionId && collectionName(collectionId),
+              status && humanise(status),
+              condition && humanise(condition),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {objects.loading ? (
@@ -176,10 +207,24 @@ export function Catalogue() {
       ) : objects.error ? (
         <ErrorNote message={objects.error} onRetry={objects.reload} />
       ) : objects.data?.items.length === 0 ? (
-        <Empty title="Nothing found">
+        <Empty
+          title={
+            debounced || collectionId || status || condition
+              ? "Nothing matches these filters"
+              : "No objects catalogued yet"
+          }
+          action={
+            can("museum", "contributor") &&
+            !(debounced || collectionId || status || condition) && (
+              <Link className="btn btn-primary" to="/museum/objects/new">
+                New object
+              </Link>
+            )
+          }
+        >
           {debounced || collectionId || status || condition
-            ? "No object matches these filters."
-            : "The catalogue is empty. Accession an object to start it."}
+            ? "Widen the search, or clear a filter."
+            : "The catalogue starts empty. Add the first object, or import an existing register."}
         </Empty>
       ) : (
         <>
@@ -202,11 +247,7 @@ export function Catalogue() {
                       <Link to={linkTo(object.id)} className="mono strong">
                         {object.accession_number}
                       </Link>
-                      {object.number_is_legacy && (
-                        <span className="badge badge-warning" title="Does not match the collection's pattern">
-                          legacy
-                        </span>
-                      )}
+                      {object.number_is_legacy && <LegacyMark />}
                     </td>
                     <td>
                       <Link to={linkTo(object.id)}>{object.title}</Link>
@@ -257,11 +298,23 @@ export function ObjectDetail() {
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<RecordValues>({});
+  const [confirming, setConfirming] = useState(false);
+  const [tab, setTab] = useState("");
 
   useEffect(() => {
     setEditing(false);
     setDraft({});
+    setConfirming(false);
   }, [objectId]);
+
+  // The tab persists across records — walking a found set with ◀ ▶ while
+  // checking one tab is the whole point of the counter, and resetting to the
+  // first tab on every record would undo it.
+  useEffect(() => {
+    if (layout.data && !layout.data.tabs.some((item) => item.key === tab)) {
+      setTab(firstTab(layout.data));
+    }
+  }, [layout.data, tab]);
 
   // The found set the card walks: the same filters the list used, so ◀ ▶
   // follow the search the user actually made.
@@ -328,6 +381,11 @@ export function ObjectDetail() {
     record.reload();
   });
 
+  const remove = useAction(async () => {
+    await api.delete(`/museum/objects/${objectId}`);
+    navigate(`/museum?${params.toString()}`);
+  });
+
   if (layout.loading || record.loading) return <Loading rows={8} />;
   if (record.error) return <ErrorNote message={record.error} onRetry={record.reload} />;
   if (layout.error) return <ErrorNote message={layout.error} onRetry={layout.reload} />;
@@ -335,54 +393,77 @@ export function ObjectDetail() {
 
   const object = record.data;
 
+  const dirty = Object.keys(draft).length;
+  const activeLayout = editing ? editLayout : layout.data;
+
   return (
     <>
-      <PageHeader
-        breadcrumb={[
-          { label: "Catalogue", to: `/museum?${params.toString()}` },
-          { label: object.accession_number },
-        ]}
-        title={object.title}
-        subtitle={
-          <span className="row-tight wrap">
-            <span className="mono">{object.accession_number}</span>
-            {object.number_is_legacy && <Badge value="legacy number" />}
-            <Badge value={object.status} kind="status" />
-            <Badge value={object.condition} kind="condition" />
-            <Badge value={object.review_status} kind="review" />
-          </span>
-        }
-        actions={
-          <>
+      {/* Sticky, and it carries the tabs. Forty fields down, a cataloguer
+          still knows which record they are in and can still change tab. */}
+      <div className="record-head">
+        <nav className="breadcrumb" aria-label="Breadcrumb">
+          <Link to={`/museum?${params.toString()}`}>Museum catalogue</Link>
+          <span className="breadcrumb-sep">/</span>
+          <span className="mono">{object.accession_number}</span>
+        </nav>
+
+        <div className="page-header-main">
+          <div className="page-header-text">
+            <div className="record-title">
+              <h1>{object.title}</h1>
+              <span className="record-number">{object.accession_number}</span>
+              {object.number_is_legacy && <LegacyMark />}
+              <Badge value={object.status} kind="status" />
+              <Badge value={object.condition} kind="condition" />
+              {object.review_status !== "approved" && (
+                <Badge value={object.review_status} kind="review" />
+              )}
+            </div>
+            {typeof object.object_type === "string" && (
+              <div className="page-subtitle">{object.object_type}</div>
+            )}
+          </div>
+
+          <div className="row-tight wrap">
             {neighbours && (
-              <div className="record-counter" aria-label="Record position">
+              <div className="record-counter" aria-label="Position in the found set">
                 <button
                   type="button"
-                  className="btn btn-sm"
                   disabled={!neighbours.previous}
                   onClick={() =>
                     navigate(`/museum/objects/${neighbours.previous}?${params.toString()}`)
                   }
                   aria-label="Previous record"
+                  title="Previous in found set"
                 >
                   ‹
                 </button>
-                <span className="small mono">
-                  {neighbours.index + 1} / {neighbours.total}
+                <span className="position">
+                  {neighbours.index + 1} <span className="of">of</span> {neighbours.total}
                 </span>
                 <button
                   type="button"
-                  className="btn btn-sm"
                   disabled={!neighbours.next}
                   onClick={() => navigate(`/museum/objects/${neighbours.next}?${params.toString()}`)}
                   aria-label="Next record"
+                  title="Next in found set"
                 >
                   ›
                 </button>
               </div>
             )}
+
             {editing ? (
               <>
+                {dirty > 0 && (
+                  <span
+                    className="small strong"
+                    style={{ color: "var(--warn)" }}
+                    aria-live="polite"
+                  >
+                    {dirty} unsaved
+                  </span>
+                )}
                 <button
                   type="button"
                   className="btn"
@@ -410,26 +491,177 @@ export function ObjectDetail() {
                 </button>
               )
             )}
-          </>
-        }
-      />
-
-      {save.error && <ErrorNote message={save.error} />}
-      {editing && Object.keys(draft).length > 0 && (
-        <div className="alert alert-info">
-          {Object.keys(draft).length} field{Object.keys(draft).length === 1 ? "" : "s"} changed. Nothing
-          is saved until you press Save.
+          </div>
         </div>
-      )}
 
-      <RecordCard
-        layout={editing ? editLayout : layout.data}
-        values={values}
-        editing={editing}
-        recordId={objectId}
-        onChange={(name, value) => setDraft((current) => ({ ...current, [name]: value }))}
-      />
+        {activeLayout && <RecordTabs layout={activeLayout} tab={tab} onTab={setTab} />}
+      </div>
+
+      <div className="record-body">
+        <div className="record-main">
+          {save.error && <ErrorNote message={save.error} />}
+          {editing && dirty > 0 && (
+            <div className="alert alert-warning">
+              <span>
+                <b>{dirty} field{dirty === 1 ? "" : "s"} changed.</b> Nothing is written until you
+                press Save.
+              </span>
+            </div>
+          )}
+          {!editing && object.review_status === "pending" && (
+            <div className="alert alert-warning">
+              <span>
+                <b>Pending</b> — submitted by a contributor and not yet approved. It is excluded
+                from published counts.
+              </span>
+            </div>
+          )}
+
+          {activeLayout && (
+            <RecordCard
+              layout={activeLayout}
+              values={values}
+              editing={editing}
+              recordId={objectId}
+              tab={tab}
+              onChange={(name, value) => setDraft((current) => ({ ...current, [name]: value }))}
+            />
+          )}
+        </div>
+
+        {/* The three things a registrar looks at *while* reading the fields:
+            what it looks like, where it is, and what goes on its label. */}
+        <aside className="record-aside">
+          <ObjectPhoto objectId={objectId} />
+          <CurrentLocation object={object} />
+
+          <div className="card">
+            <div className="card-body">
+              <div className="overline" style={{ marginBottom: 8 }}>
+                Label &amp; QR
+              </div>
+              <div className="row-tight">
+                <img
+                  src={`/api/v1/museum/objects/${objectId}/qr.png?size=6`}
+                  alt=""
+                  width={52}
+                  height={52}
+                  style={{ borderRadius: "var(--radius-sm)", background: "var(--surface-3)" }}
+                  onError={(event) => {
+                    event.currentTarget.style.visibility = "hidden";
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ flex: 1 }}
+                  onClick={() => window.print()}
+                >
+                  Print label
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {can("museum", "supervisor") && (
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              onClick={() => setConfirming(true)}
+            >
+              Delete {object.accession_number}…
+            </button>
+          )}
+        </aside>
+      </div>
+
+      {confirming && (
+        <ConfirmDelete
+          name={object.accession_number}
+          title="Delete this object?"
+          consequences={
+            <>
+              Its conservation history and photographs are deleted with it. Deaccessioning rather
+              than deleting keeps the record.
+            </>
+          }
+          busy={remove.running}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => void remove.run()}
+        />
+      )}
     </>
+  );
+}
+
+/** The primary photograph, or an honest placeholder. */
+function ObjectPhoto({ objectId }: { objectId: string }) {
+  const photos = useQuery<Page<{ id: string; title: string }>>(
+    (signal) => api.get("/photographs", { museum_object_id: objectId, limit: 4 }, signal),
+    [objectId],
+  );
+  const first = photos.data?.items[0];
+
+  return (
+    <div className="card">
+      <div className="record-photo">
+        {first ? (
+          <img src={`/api/v1/photographs/${first.id}/thumbnail?size=600`} alt={first.title} />
+        ) : (
+          "No photograph"
+        )}
+      </div>
+      <div className="card-body" style={{ padding: "8px 12px" }}>
+        <span className="small muted">
+          {photos.data?.total
+            ? `${photos.data.total} photograph${photos.data.total === 1 ? "" : "s"} · primary shown`
+            : "None uploaded"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Where the object is, spelled out rather than as one long path. */
+function CurrentLocation({ object }: { object: MuseumObject }) {
+  const locationId = object.storage_location_id;
+  const location = useQuery<{ display_path: string }>(
+    (signal) => api.get(`/storage/locations/${locationId}`, undefined, signal),
+    [locationId],
+    { enabled: Boolean(locationId) },
+  );
+
+  return (
+    <div className="card">
+      <div className="card-body">
+        <div className="overline" style={{ marginBottom: 7 }}>
+          Current location
+        </div>
+        {!locationId ? (
+          <div className="small muted">Not filed in the store.</div>
+        ) : location.loading ? (
+          <div className="small muted">…</div>
+        ) : (
+          <>
+            <div className="small" style={{ lineHeight: "var(--leading-prose)", color: "var(--text-2)" }}>
+              {(location.data?.display_path ?? "").split("→").map((part, index) => (
+                <span key={index}>
+                  {part.trim()}
+                  <br />
+                </span>
+              ))}
+            </div>
+            <Link
+              className="btn btn-sm"
+              to={`/storage?location=${locationId}`}
+              style={{ marginTop: 9, width: "100%" }}
+            >
+              Show in storage tree
+            </Link>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

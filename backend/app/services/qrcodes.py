@@ -24,6 +24,9 @@ _ROUTES: dict[ResourceType, str] = {
     ResourceType.ARTIFACT: "a",
     ResourceType.SITE: "s",
     ResourceType.PROJECT: "p",
+    #: "o" for object. A museum label is printed small and read in a store
+    #: with the lights half off, so the address stays one character.
+    ResourceType.MUSEUM_OBJECT: "o",
 }
 
 

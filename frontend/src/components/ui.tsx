@@ -1,6 +1,6 @@
 /** Small presentational pieces shared across screens. */
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 /* --------------------------------------------------------------------------
@@ -43,24 +43,100 @@ export function PageHeader({
 /* --------------------------------------------------------------------------
  * States
  * ----------------------------------------------------------------------- */
+/**
+ * A skeleton shaped like the rows it is standing in for.
+ *
+ * Deliberately not a spinner. A spinner says "something is happening"; a
+ * skeleton says "a table of this shape is arriving", which stops the page
+ * jumping when it does.
+ */
 export function Loading({ rows = 5, label }: { rows?: number; label?: string }) {
   return (
-    <div className="col" aria-busy="true" aria-live="polite">
+    <div className="card" aria-busy="true" aria-live="polite">
       <span className="sr-only">{label ?? "Loading"}</span>
-      {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="skeleton" style={{ height: 34, opacity: 1 - index * 0.13 }} />
-      ))}
+      <div style={{ padding: "12px 14px" }}>
+        {Array.from({ length: rows }, (_, index) => (
+          <div
+            key={index}
+            style={{
+              display: "flex",
+              gap: 14,
+              alignItems: "center",
+              padding: "7px 0",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <div
+              className="skeleton"
+              style={{ width: 96, height: 11, animationDelay: `${index * 0.06}s` }}
+            />
+            <div
+              className="skeleton"
+              style={{ flex: 1, height: 11, animationDelay: `${index * 0.06 + 0.1}s` }}
+            />
+            <div
+              className="skeleton"
+              style={{ width: 78, height: 11, animationDelay: `${index * 0.06 + 0.2}s` }}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () => void }) {
+const ALERT_ICON = (
+  <svg
+    viewBox="0 0 24 24"
+    width="17"
+    height="17"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    aria-hidden="true"
+    style={{ marginTop: 1, flexShrink: 0 }}
+  >
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 8v5M12 16h.01" />
+  </svg>
+);
+
+/**
+ * A failure, said plainly.
+ *
+ * Two things the design insists on and this implements: say whether anything
+ * was changed, and show the request that failed. "Something went wrong" tells
+ * a curator nothing they can act on or report.
+ */
+export function ErrorNote({
+  message,
+  onRetry,
+  detail,
+}: {
+  message: string;
+  onRetry?: () => void;
+  /** The request that failed, for a bug report. */
+  detail?: string;
+}) {
   return (
-    <div className="alert alert-danger">
-      <div className="col" style={{ gap: "var(--space-2)" }}>
-        <span>{message}</span>
+    <div className="alert alert-danger" role="alert">
+      <span style={{ color: "var(--danger)" }}>{ALERT_ICON}</span>
+      <div style={{ flex: 1 }}>
+        <div className="strong" style={{ color: "var(--danger)" }}>
+          {message}
+        </div>
+        <div className="small" style={{ marginTop: 2 }}>
+          Nothing was changed.
+          {detail && <span className="mono"> {detail}</span>}
+        </div>
         {onRetry && (
-          <button type="button" className="btn btn-sm" onClick={onRetry}>
+          <button
+            type="button"
+            className="btn btn-sm btn-danger"
+            style={{ marginTop: 9 }}
+            onClick={onRetry}
+          >
             Try again
           </button>
         )}
@@ -69,6 +145,12 @@ export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () 
   );
 }
 
+/**
+ * Nothing here — and what to do about it.
+ *
+ * A new institution's platform is entirely empty states for its first week,
+ * so each one names the next action rather than apologising.
+ */
 export function Empty({
   title,
   children,
@@ -82,7 +164,11 @@ export function Empty({
     <div className="empty">
       <div className="empty-title">{title}</div>
       {children && <p>{children}</p>}
-      {action}
+      {action && (
+        <div className="row-tight wrap" style={{ justifyContent: "center" }}>
+          {action}
+        </div>
+      )}
     </div>
   );
 }
@@ -90,37 +176,49 @@ export function Empty({
 /* --------------------------------------------------------------------------
  * Badges with meaning attached
  * ----------------------------------------------------------------------- */
-const REVIEW_TONE: Record<string, string> = {
-  approved: "badge-success",
-  pending: "badge-warning",
-  rejected: "badge-danger",
-  draft: "",
+/**
+ * A badge's tone and its *mark*.
+ *
+ * The mark is not decoration. Stratum's rule is that meaning is never carried
+ * by colour alone: a red pill and a green pill are the same pill to a
+ * colour-blind reader, to a monochrome printer, and to anyone glancing at a
+ * screen in the sun outside a trench. The glyph and — for anything provisional
+ * — the dashed border carry the same information the hue does.
+ */
+type Tone = { className: string; mark?: string };
+
+const REVIEW_TONE: Record<string, Tone> = {
+  approved: { className: "badge-success", mark: "✓" },
+  pending: { className: "badge-warning", mark: "◔" },
+  rejected: { className: "badge-danger", mark: "!" },
+  draft: { className: "", mark: "·" },
 };
 
-const STATUS_TONE: Record<string, string> = {
-  active: "badge-success",
-  open: "badge-success",
-  accessioned: "badge-success",
-  on_display: "badge-info",
-  on_loan: "badge-warning",
-  in_conservation: "badge-warning",
-  planned: "",
-  planning: "",
-  suspended: "badge-warning",
-  completed: "badge-info",
-  archived: "",
-  deaccessioned: "badge-danger",
-  missing: "badge-danger",
-  destroyed: "badge-danger",
+const STATUS_TONE: Record<string, Tone> = {
+  active: { className: "badge-success", mark: "✓" },
+  open: { className: "badge-success", mark: "✓" },
+  accessioned: { className: "badge-success", mark: "✓" },
+  on_display: { className: "badge-info" },
+  on_loan: { className: "badge-warning", mark: "◔" },
+  in_conservation: { className: "badge-warning", mark: "◔" },
+  temporary: { className: "badge-warning", mark: "◔" },
+  planned: { className: "" },
+  planning: { className: "" },
+  suspended: { className: "badge-warning", mark: "◔" },
+  completed: { className: "badge-info" },
+  archived: { className: "" },
+  deaccessioned: { className: "badge-danger", mark: "!" },
+  missing: { className: "badge-danger", mark: "!" },
+  destroyed: { className: "badge-danger", mark: "!" },
 };
 
-const CONDITION_TONE: Record<string, string> = {
-  excellent: "badge-success",
-  good: "badge-success",
-  fair: "badge-warning",
-  poor: "badge-danger",
-  fragmentary: "badge-danger",
-  unknown: "",
+const CONDITION_TONE: Record<string, Tone> = {
+  excellent: { className: "badge-success", mark: "✓" },
+  good: { className: "badge-success", mark: "✓" },
+  fair: { className: "badge-info" },
+  poor: { className: "badge-warning", mark: "◔" },
+  fragmentary: { className: "badge-danger", mark: "!" },
+  unknown: { className: "" },
 };
 
 export function humanise(value: string) {
@@ -130,22 +228,54 @@ export function humanise(value: string) {
 export function Badge({
   value,
   kind = "plain",
+  label,
 }: {
   value?: string | null;
   kind?: "plain" | "review" | "status" | "condition" | "accent";
+  /** Override the displayed text; the tone still comes from `value`. */
+  label?: string;
 }) {
   if (!value) return null;
-  const tone =
+
+  const tone: Tone =
     kind === "review"
-      ? REVIEW_TONE[value]
+      ? (REVIEW_TONE[value] ?? { className: "" })
       : kind === "status"
-        ? STATUS_TONE[value]
+        ? (STATUS_TONE[value] ?? { className: "" })
         : kind === "condition"
-          ? CONDITION_TONE[value]
+          ? (CONDITION_TONE[value] ?? { className: "" })
           : kind === "accent"
-            ? "badge-accent"
-            : "";
-  return <span className={`badge ${tone ?? ""}`}>{humanise(value)}</span>;
+            ? { className: "badge-accent" }
+            : { className: "" };
+
+  return (
+    <span className={`badge ${tone.className}`}>
+      {tone.mark && (
+        <span className="badge-mark" aria-hidden="true">
+          {tone.mark}
+        </span>
+      )}
+      {label ?? humanise(value)}
+    </span>
+  );
+}
+
+/**
+ * A number that does not match its collection's pattern.
+ *
+ * Dashed, like everything provisional in this platform. It is a note, not an
+ * error: the institution's own number is the object's identity, and a
+ * platform that hid or refused it would be a platform they stayed out of.
+ */
+export function LegacyMark() {
+  return (
+    <span
+      className="badge badge-warning"
+      title="Does not match this collection's numbering pattern"
+    >
+      legacy
+    </span>
+  );
 }
 
 /* --------------------------------------------------------------------------
@@ -324,6 +454,78 @@ export function SearchInput({
         autoFocus={autoFocus}
         onChange={(event) => onChange(event.target.value)}
       />
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------------------
+ * Confirming something irreversible
+ * ----------------------------------------------------------------------- */
+
+/**
+ * A confirmation that names the thing and lists what goes with it.
+ *
+ * "Are you sure?" is not a question anybody answers carefully. Naming the
+ * object — and saying that its conservation history and four photographs are
+ * deleted with it — is what makes the second thought possible. The confirming
+ * button repeats the identifier, so a mis-click on a stale dialogue is a
+ * mis-click on a visibly wrong name.
+ */
+export function ConfirmDelete({
+  name,
+  title = "Delete this record?",
+  consequences,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  /** The identifier, shown in monospace and repeated on the button. */
+  name: string;
+  title?: string;
+  consequences?: ReactNode;
+  busy?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  // Escape cancels. A modal that traps you is a modal people learn to dread.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="modal-scrim"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <div className="modal">
+        <div className="modal-title">{title}</div>
+        <p className="small" style={{ margin: "6px 0 14px", color: "var(--text-2)" }}>
+          You are about to delete <span className="mono">{name}</span>.{" "}
+          {consequences ?? "This cannot be undone."}
+        </p>
+        <div className="row-tight" style={{ justifyContent: "flex-end" }}>
+          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+            Keep it
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger-solid"
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy ? "Deleting…" : `Delete ${name}`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

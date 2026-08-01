@@ -36,12 +36,26 @@ const ROUTE: Record<string, (hit: Hit) => string> = {
   project: (hit) => `/projects/${hit.id}`,
 };
 
-const COLOUR: Record<string, string> = {
-  site: "#c2622f",
-  artifact: "#3f7d6a",
-  context: "#5b6cb5",
-  gis_layer: "#8a6bb1",
+/**
+ * Marker colours, read from the theme at render time rather than hard-coded.
+ *
+ * Leaflet draws into SVG attributes and cannot take a CSS custom property, so
+ * the values have to be resolved — but resolving them from the stylesheet is
+ * what keeps the map inside the design rather than beside it, and is what makes
+ * the markers change with the theme.
+ */
+const MARKER_TOKENS: Record<string, string> = {
+  site: "--accent",
+  artifact: "--info",
+  context: "--ok",
+  gis_layer: "--text-3",
 };
+
+function tokenValue(name: string, fallback: string) {
+  if (typeof window === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
 
 /** Below this zoom the view spans more than a query is worth. */
 const MIN_ZOOM_TO_QUERY = 6;
@@ -66,7 +80,11 @@ export function MapView() {
   useEffect(() => {
     if (!container.current || map.current) return;
 
-    const instance = L.map(container.current, { zoomControl: true }).setView([31.95, 35.93], 8);
+    // Zoom sits top-right: the layer panel and the legend own the left, and
+    // Leaflet's default put the +/− buttons directly on top of the first
+    // checkbox.
+    const instance = L.map(container.current, { zoomControl: false }).setView([31.95, 35.93], 6);
+    L.control.zoom({ position: "topright" }).addTo(instance);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
       maxZoom: 19,
@@ -75,7 +93,15 @@ export function MapView() {
     layer.current = L.layerGroup().addTo(instance);
     map.current = instance;
 
+    // Set when the effect tears down. Both the initial framing and every
+    // refresh are async, and a map that has been removed throws
+    // `_leaflet_pos of undefined` if anything touches it afterwards —
+    // which is exactly what happens when the user navigates away while the
+    // first request is still in flight.
+    let disposed = false;
+
     const refresh = async () => {
+      if (disposed) return;
       const zoom = instance.getZoom();
       if (zoom < MIN_ZOOM_TO_QUERY) {
         setTooBroad(true);
@@ -101,6 +127,7 @@ export function MapView() {
           types: typesRef.current,
           limit: 500,
         });
+        if (disposed) return;
         setError(null);
         setCount(result.total);
         draw(result.items);
@@ -113,17 +140,20 @@ export function MapView() {
       layer.current?.clearLayers();
       for (const hit of hits) {
         if (hit.latitude === null || hit.longitude === null) continue;
-        const colour = COLOUR[hit.resource_type] ?? "#7a7a7a";
+        const colour = tokenValue(MARKER_TOKENS[hit.resource_type] ?? "--text-3", "#7a7060");
 
+        // A hollow dashed ring, twice the size, reads as "somewhere in
+        // here" — which is what a protected location means. It must never be
+        // mistakable for a surveyed point, because a looter reading this map
+        // is the reason the backend blurred the coordinate in the first place.
+        const warn = tokenValue("--warn", "#8a6410");
         const marker = L.circleMarker([hit.latitude, hit.longitude], {
-          radius: hit.is_approximate ? 9 : 6,
-          color: colour,
-          weight: hit.is_approximate ? 1 : 2,
+          radius: hit.is_approximate ? 12 : 6,
+          color: hit.is_approximate ? warn : colour,
+          weight: 2,
           fillColor: colour,
-          fillOpacity: hit.is_approximate ? 0.15 : 0.75,
-          // A dashed ring reads as "somewhere around here", which is what an
-          // approximate coordinate means.
-          dashArray: hit.is_approximate ? "3 3" : undefined,
+          fillOpacity: hit.is_approximate ? 0 : 0.75,
+          dashArray: hit.is_approximate ? "4 3" : undefined,
         });
 
         const to = ROUTE[hit.resource_type]?.(hit);
@@ -151,11 +181,41 @@ export function MapView() {
     };
 
     instance.on("moveend", () => void refresh());
-    void refresh();
+
+    // Open on the records, not on a hard-coded capital. A platform whose map
+    // opens over empty countryside and says "0 records in view" reads as
+    // broken, when in fact the data is four hundred kilometres north.
+    const frame = async () => {
+      try {
+        const sites = await api.get<{ items: { latitude: number | null; longitude: number | null }[] }>(
+          "/sites",
+          { limit: 200 },
+        );
+        if (disposed) return;
+        const points = sites.items
+          .filter((site) => site.latitude !== null && site.longitude !== null)
+          .map((site) => [site.latitude!, site.longitude!] as [number, number]);
+
+        if (points.length === 1) {
+          instance.setView(points[0]!, 12);
+        } else if (points.length > 1) {
+          instance.fitBounds(L.latLngBounds(points), { padding: [60, 60], maxZoom: 13 });
+        } else {
+          await refresh();
+        }
+      } catch {
+        // No sites readable, or the request failed. The default view stands,
+        // and `refresh` will report whatever is in it.
+        await refresh();
+      }
+    };
+    void frame();
 
     return () => {
+      disposed = true;
       instance.remove();
       map.current = null;
+      layer.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -181,49 +241,67 @@ export function MapView() {
               ? "Everything with a coordinate"
               : `${count.toLocaleString()} record${count === 1 ? "" : "s"} in view`
         }
-        actions={
-          <div className="row-tight wrap">
-            {[
-              { value: "site", label: "Sites" },
-              { value: "artifact", label: "Finds" },
-              { value: "context", label: "Contexts" },
-              { value: "gis_layer", label: "GIS" },
-            ].map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`btn btn-sm ${types.includes(option.value) ? "btn-primary" : ""}`}
-                onClick={() => toggle(option.value)}
-              >
-                <span
-                  className="legend-dot"
-                  style={{ background: COLOUR[option.value] }}
-                  aria-hidden="true"
-                />
-                {option.label}
-              </button>
-            ))}
-          </div>
-        }
       />
 
       {error && <ErrorNote message={error} />}
 
-      <div
-        ref={container}
-        className="map-shell"
-        data-theme={resolved}
-        role="application"
-        aria-label="Map of records"
-      />
+      <div className="map-shell">
+        <div
+          ref={container}
+          data-theme={resolved}
+          role="application"
+          aria-label="Map of records"
+          style={{ position: "absolute", inset: 0 }}
+        />
 
-      <p className="small muted" style={{ marginTop: "var(--space-3)" }}>
-        A hollow, dashed marker means the location is restricted and shown only
-        approximately.
-      </p>
+        <div className="map-panel top-left">
+          <div className="overline" style={{ marginBottom: 7 }}>
+            Layers
+          </div>
+          {LAYERS.map((option) => (
+            <label key={option.value} className="checkbox" style={{ padding: "3px 0", width: "100%" }}>
+              <input
+                type="checkbox"
+                checked={types.includes(option.value)}
+                onChange={() => toggle(option.value)}
+              />
+              <span
+                className="legend-dot"
+                style={{ background: `var(${MARKER_TOKENS[option.value]})` }}
+                aria-hidden="true"
+              />
+              <span className="small">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="map-panel bottom-left">
+          <div className="overline" style={{ marginBottom: 7 }}>
+            Legend
+          </div>
+          <div className="legend-row">
+            <span className="legend-dot" style={{ background: "var(--accent)" }} aria-hidden="true" />
+            Surveyed position
+          </div>
+          <div className="legend-row">
+            <span className="legend-dot approximate" aria-hidden="true" />
+            Approximate — location protected
+          </div>
+          <p className="small muted" style={{ marginTop: 6 }}>
+            Restricted sites are shown at reduced precision; the circle is the area, not the point.
+          </p>
+        </div>
+      </div>
     </>
   );
 }
+
+const LAYERS = [
+  { value: "site", label: "Sites" },
+  { value: "artifact", label: "Finds" },
+  { value: "context", label: "Contexts" },
+  { value: "gis_layer", label: "GIS layers" },
+];
 
 function escapeHtml(value: string) {
   return value.replace(

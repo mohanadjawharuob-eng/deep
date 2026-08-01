@@ -40,6 +40,7 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.gis import GisFeature, GisLayer
+from app.models.imports import ImportBatch
 from app.models.media import Document, Model3D, Photograph
 from app.models.museum import (
     Collection,
@@ -53,7 +54,6 @@ from app.models.museum import (
 )
 from app.models.project import Project, ProjectMembership
 from app.models.site import Site
-from app.models.imports import ImportBatch
 from app.models.storage import StorageLocation, StorageMovement
 from app.models.taxonomy import Material, ObjectCategory, Period, Publication, SystemSetting
 from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess

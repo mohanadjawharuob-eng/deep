@@ -335,7 +335,8 @@ export type Activity = {
   id: string;
   action: string;
   user_label?: string | null;
-  resource_type: string;
+  /** Null on an entry whose resource kind was not recorded. */
+  resource_type?: string | null;
   resource_label?: string | null;
   summary?: string | null;
   created_at: string;

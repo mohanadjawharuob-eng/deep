@@ -9,6 +9,7 @@ ones.
 
 from __future__ import annotations
 
+import io
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -1111,3 +1112,81 @@ class TestObjectsInTheStore:
             headers=auth_headers(client, "fielder"),
         )
         assert refused.status_code == 403
+
+
+class TestObjectLabels:
+    """An object's label, which the catalogue card offers to print.
+
+    Museum objects carry a ``public_token`` like every other labelled record,
+    but were not registered as labellable — so the card's "Print label" panel
+    pointed at a route that answered 404 for every object in the collection.
+    """
+
+    def test_an_object_has_a_printable_qr_code(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        obj = catalogue(client, collection["id"]).json()
+
+        response = client.get(
+            f"/api/v1/museum/objects/{obj['id']}/qr.png",
+            headers=auth_headers(client, "curator"),
+        )
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"] == "image/png"
+        assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+    def test_the_code_encodes_the_objects_own_address(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """A label that opens the wrong record is worse than no label."""
+        cv2 = pytest.importorskip("cv2", reason="opencv-python-headless is a dev-only dependency")
+        numpy = pytest.importorskip("numpy")
+        from PIL import Image
+
+        obj = catalogue(client, collection["id"]).json()
+        detail = client.get(
+            f"/api/v1/museum/objects/{obj['id']}", headers=auth_headers(client, "curator")
+        ).json()
+
+        png = client.get(
+            f"/api/v1/museum/objects/{obj['id']}/qr.png?size=12",
+            headers=auth_headers(client, "curator"),
+        ).content
+
+        image = Image.open(io.BytesIO(png)).convert("L")
+        if min(image.size) < 600:
+            factor = -(-600 // min(image.size))
+            image = image.resize(
+                (image.width * factor, image.height * factor), Image.Resampling.NEAREST
+            )
+        decoded, *_ = cv2.QRCodeDetector().detectAndDecode(numpy.array(image))
+
+        assert decoded.endswith(f"/o/{detail['public_token']}")
+
+    def test_a_scanned_label_resolves_to_the_object(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        obj = catalogue(client, collection["id"], title="Oil lamp").json()
+        detail = client.get(
+            f"/api/v1/museum/objects/{obj['id']}", headers=auth_headers(client, "curator")
+        ).json()
+
+        response = client.get(
+            f"/api/v1/scan/museum-objects/{detail['public_token']}",
+            headers=auth_headers(client, "curator"),
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["id"] == obj["id"]
+
+    def test_a_scan_reveals_nothing_the_scanner_could_not_already_see(
+        self, client: TestClient, db: Session, curator: User, collection: dict
+    ) -> None:
+        """Scanning a label found in a corridor must not be a way in."""
+        obj = catalogue(client, collection["id"]).json()
+        detail = client.get(
+            f"/api/v1/museum/objects/{obj['id']}", headers=auth_headers(client, "curator")
+        ).json()
+
+        assert (
+            client.get(f"/api/v1/scan/museum-objects/{detail['public_token']}").status_code == 404
+        )

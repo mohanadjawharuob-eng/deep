@@ -12,6 +12,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import type { ModuleName } from "../lib/api";
 import { useSession, useTheme } from "../lib/hooks";
+import { humanise } from "./ui";
 
 type NavItem = {
   to: string;
@@ -20,6 +21,24 @@ type NavItem = {
   module?: ModuleName;
   end?: boolean;
 };
+
+/** The mark: three strata cut by two section lines. */
+export const BrandMark = ({ size = 20 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 17.5h18M3 12.5h18M3 7.5h18" />
+    <path d="M8 3v18M16 3v18" opacity=".35" />
+  </svg>
+);
 
 const icon = (path: string) => (
   <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true">
@@ -107,7 +126,9 @@ export function Shell() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setNavOpen(false);
@@ -135,7 +156,7 @@ export function Shell() {
           target.isContentEditable);
       if (event.key === "/" && !typing) {
         event.preventDefault();
-        navigate("/search");
+        searchRef.current?.focus();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -157,10 +178,11 @@ export function Shell() {
     <div className={`shell ${navOpen ? "nav-open" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark" aria-hidden="true" />
+          <span className="brand-mark">
+            <BrandMark />
+          </span>
           <span className="brand-text">
-            <strong>Archeo</strong>
-            <span className="small muted">Heritage platform</span>
+            <strong>Stratum</strong>
           </span>
         </div>
 
@@ -184,11 +206,37 @@ export function Shell() {
         </nav>
 
         <div className="sidebar-foot">
-          {access?.is_platform_admin && (
-            <div className="small muted" style={{ padding: "0 var(--space-3)" }}>
-              Platform administrator
-            </div>
-          )}
+          <span className="avatar">{initials}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="user-name truncate" style={{ display: "block" }}>
+              {user?.full_name}
+            </span>
+            <span className="user-role">
+              {access?.is_platform_admin ? "Platform administrator" : (user?.position ?? user?.role)}
+            </span>
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            title="Sign out"
+            aria-label="Sign out"
+            onClick={() => void signOut()}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="m16 17 5-5-5-5M21 12H9" />
+            </svg>
+          </button>
         </div>
       </aside>
 
@@ -203,20 +251,46 @@ export function Shell() {
             {icon("M3 6h14M3 10h14M3 14h14")}
           </button>
 
+          {/* Search lives in the header rather than behind an icon: on a
+              platform whose records are found by accession number, the box a
+              number is typed into should always be visible. */}
+          <form
+            className="search"
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              navigate(`/search?q=${encodeURIComponent(query)}`);
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <path d="m20 20-3.6-3.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <input
+              ref={searchRef}
+              className="input"
+              type="search"
+              value={query}
+              placeholder="Search records, sites, accession numbers…"
+              aria-label="Search"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </form>
+
           <div className="spacer" />
 
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-sm"
             onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
             title={`Theme: ${theme}. Click to change.`}
-            aria-label={`Theme: ${theme}`}
           >
             {theme === "dark"
               ? icon("M15.5 11.5A6 6 0 0 1 8.5 4.5a6 6 0 1 0 7 7Z")
               : theme === "light"
                 ? icon("M10 13.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM10 2v1.5M10 16.5V18M18 10h-1.5M3.5 10H2m12.2-4.2-1 1m-6.4 6.4-1 1m8.4 0-1-1M5.8 5.8l1 1")
                 : icon("M10 3v14M10 3a7 7 0 0 0 0 14")}
+            <span className="small">{theme === "system" ? "Auto" : humanise(theme)}</span>
           </button>
 
           <div className="user-menu" ref={menuRef}>
@@ -226,9 +300,9 @@ export function Shell() {
               onClick={() => setMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
+              aria-label="Account and module access"
             >
               <span className="avatar">{initials}</span>
-              <span className="user-name truncate">{user?.full_name}</span>
             </button>
 
             {menuOpen && (

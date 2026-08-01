@@ -15,7 +15,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import Numeric, cast, func, or_, select
 
 from app.api.deps import CurrentUser, CurrentUserOptional, DbSession, require_module
@@ -75,7 +75,7 @@ from app.schemas.museum import (
     ReadingCreate,
     ReadingRead,
 )
-from app.services import accession, activity, records
+from app.services import accession, activity, qrcodes, records
 from app.services import storage_locations as tree
 
 router = APIRouter(prefix="/museum", tags=["Museum"])
@@ -1332,3 +1332,41 @@ def _as_float(value: Any, *, places: int | None = None) -> float | None:
         return None
     number = float(value)
     return round(number, places) if places is not None else number
+
+
+# --------------------------------------------------------------------------
+# Labels
+# --------------------------------------------------------------------------
+@router.get(
+    "/objects/{object_id}/qr.png",
+    summary="QR code image for an object label",
+    description=(
+        "A PNG for the label that goes in the box with the object. Scanning it "
+        "opens the object's record, subject to the same permissions as the "
+        "record itself — a label reveals nothing the scanner could not already "
+        "see.\n\n"
+        "`size` is the pixel size of each module; larger prints more crisply."
+    ),
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}, "description": "The QR code"}},
+)
+def read_object_qr(
+    object_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUserOptional,
+    size: Annotated[int, Query(ge=2, le=40, description="Pixels per module")] = 10,
+    for_label: Annotated[bool, Query(description="Higher error correction, for print")] = True,
+) -> Response:
+    obj = records.get_or_404(session, MuseumObject, object_id, "Object")
+    _require_readable(session, user, obj, "Object")
+
+    png = qrcodes.render_for_record(RESOURCE, obj.public_token, box_size=size, for_label=for_label)
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            # The token never changes, so the image never changes.
+            "Cache-Control": "public, max-age=86400",
+            "Content-Disposition": f'inline; filename="object-{object_id}.png"',
+        },
+    )

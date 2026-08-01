@@ -185,7 +185,7 @@ class TestCapabilities:
             email=f"top.{capability.value}@example.org",
             username=f"top.{capability.value}".replace("_", "."),
             role=UserRole.RESEARCHER,
-            modules={module: ModuleLevel.ADMINISTRATOR for module in Module},
+            modules=dict.fromkeys(Module, ModuleLevel.ADMINISTRATOR),
         )
 
         assert has_capability(user, capability, Module.MUSEUM) is False

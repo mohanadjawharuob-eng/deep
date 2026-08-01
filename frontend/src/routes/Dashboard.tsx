@@ -58,7 +58,15 @@ export function Dashboard() {
 
   return (
     <>
-      <PageHeader title={`${greeting}, ${firstName}`} subtitle="What is in the platform today." />
+      <PageHeader
+        title={`${greeting}, ${firstName}`}
+        subtitle={new Date().toLocaleDateString(undefined, {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })}
+      />
 
       {counts.loading ? (
         <Loading rows={1} />
@@ -152,10 +160,12 @@ export function Dashboard() {
             <ul className="feed">
               {feed.data.items.map((entry) => (
                 <li key={entry.id}>
-                  <div className="feed-dot" data-action={entry.action} aria-hidden="true" />
+                  <span className="feed-chip" data-action={entry.action}>
+                    {(entry.resource_type ?? entry.action ?? "—").replace(/_/g, " ")}
+                  </span>
                   <div style={{ minWidth: 0 }}>
                     <div className="feed-text">
-                      {entry.summary ?? `${entry.action} ${entry.resource_type}`}
+                      {entry.summary ?? `${entry.action} ${entry.resource_type ?? "record"}`}
                     </div>
                     <div className="small muted">
                       {entry.user_label ?? "System"} · {timeAgo(entry.created_at)}

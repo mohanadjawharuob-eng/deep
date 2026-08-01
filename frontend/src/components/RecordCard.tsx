@@ -46,6 +46,16 @@ const REFERENCES: Record<string, { endpoint: string; label: string; to: (id: str
   site: { endpoint: "/sites", label: "name", to: (id) => `/sites/${id}` },
 };
 
+/** Fields whose value is an identifier rather than prose. */
+const IDENTIFIER_FIELDS = new Set([
+  "accession_number",
+  "former_number",
+  "inventory_number",
+  "code",
+  "catalogue_number",
+  "field_number",
+]);
+
 function optionLabel(layout: FormLayout, field: FormField, value: unknown): string | null {
   if (!field.value_list) return null;
   const options = layout.value_list_options[field.value_list];
@@ -125,7 +135,14 @@ function ReadValue({
       return <span className="prose">{String(value)}</span>;
 
     default:
-      return <>{String(value)}</>;
+      // An identifier is monospace wherever it appears: the whole point of
+      // the number is that it can be compared, character by character,
+      // against the one written on the object.
+      return IDENTIFIER_FIELDS.has(field.name) ? (
+        <span className="mono">{String(value)}</span>
+      ) : (
+        <>{String(value)}</>
+      );
   }
 }
 
@@ -298,7 +315,7 @@ function EditValue({
     default:
       return (
         <input
-          className="input"
+          className={`input ${IDENTIFIER_FIELDS.has(field.name) ? "mono" : ""}`}
           value={text}
           placeholder={field.placeholder ?? ""}
           maxLength={field.max_length ?? undefined}
@@ -443,6 +460,11 @@ function ReferenceInput({
 /* --------------------------------------------------------------------------
  * The card
  * ----------------------------------------------------------------------- */
+function isEmpty(value: unknown) {
+  return value === null || value === undefined || value === "" ||
+    (Array.isArray(value) && value.length === 0);
+}
+
 export function FieldCell({
   layout,
   field,
@@ -464,16 +486,21 @@ export function FieldCell({
         {field.required && editing && <span className="required">*</span>}
       </div>
       {editing ? (
-        <EditValue
-          layout={layout}
-          field={field}
-          value={value}
-          onChange={(next) => onChange(field.name, next)}
-        />
+        <div className={field.required && isEmpty(value) ? "cell-invalid" : undefined}>
+          <EditValue
+            layout={layout}
+            field={field}
+            value={value}
+            onChange={(next) => onChange(field.name, next)}
+          />
+        </div>
       ) : (
         <div className="form-value">
           <ReadValue layout={layout} field={field} value={value} />
         </div>
+      )}
+      {editing && field.required && isEmpty(value) && (
+        <div className="form-required-hint">Required before publication</div>
       )}
       {field.help && editing && <div className="form-help">{field.help}</div>}
     </div>
@@ -537,10 +564,50 @@ function portalCell(column: string, value: unknown): ReactNode {
 }
 
 /**
- * The whole card: tab strip, the fields of the active tab, then the portals.
+ * The tab strip, rendered separately from the card.
  *
- * `editing` is owned by the caller because create and edit are the same card
- * with different destinations.
+ * It lives in the record's sticky header, not above the fields: forty fields
+ * down, a cataloguer still needs to be able to change tab without scrolling
+ * back. That is the whole reason the tab state is the caller's.
+ */
+export function RecordTabs({
+  layout,
+  tab,
+  onTab,
+}: {
+  layout: FormLayout;
+  tab: string;
+  onTab: (key: string) => void;
+}) {
+  return (
+    <div className="tabs" role="tablist">
+      {layout.tabs.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          role="tab"
+          aria-selected={item.key === tab}
+          className={`tab ${item.key === tab ? "active" : ""}`}
+          onClick={() => onTab(item.key)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The first tab of a layout, for a caller initialising its own tab state. */
+export function firstTab(layout: FormLayout | undefined) {
+  return layout?.tabs[0]?.key ?? "";
+}
+
+/**
+ * The card itself: the fields of the active tab, then the portals.
+ *
+ * `editing` and `tab` are both the caller's, because create and edit are the
+ * same card with different destinations, and because the tab strip is drawn
+ * in the sticky header above.
  */
 export function RecordCard({
   layout,
@@ -549,6 +616,7 @@ export function RecordCard({
   onChange,
   recordId,
   hidePortals,
+  tab: controlledTab,
 }: {
   layout: FormLayout;
   values: RecordValues;
@@ -556,12 +624,17 @@ export function RecordCard({
   onChange: (name: string, value: unknown) => void;
   recordId?: string;
   hidePortals?: boolean;
+  /** Omit to let the card own its own tab state. */
+  tab?: string;
 }) {
-  const [tab, setTab] = useState(layout.tabs[0]?.key ?? "");
+  const [ownTab, setOwnTab] = useState(layout.tabs[0]?.key ?? "");
+  const tab = controlledTab ?? ownTab;
 
   useEffect(() => {
-    if (!layout.tabs.some((item) => item.key === tab)) setTab(layout.tabs[0]?.key ?? "");
-  }, [layout, tab]);
+    if (controlledTab === undefined && !layout.tabs.some((item) => item.key === ownTab)) {
+      setOwnTab(layout.tabs[0]?.key ?? "");
+    }
+  }, [layout, ownTab, controlledTab]);
 
   const active = useMemo(
     () => layout.tabs.find((item) => item.key === tab) ?? layout.tabs[0],
@@ -570,29 +643,18 @@ export function RecordCard({
 
   return (
     <>
-      <div className="tabs" role="tablist">
-        {layout.tabs.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            role="tab"
-            aria-selected={item.key === active?.key}
-            className={`tab ${item.key === active?.key ? "active" : ""}`}
-            onClick={() => setTab(item.key)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      {controlledTab === undefined && (
+        <RecordTabs layout={layout} tab={tab} onTab={setOwnTab} />
+      )}
 
-      <div className="col">
+      <div className="record">
         {active?.groups.map((group) => (
           <section key={group.label} className="card">
-            <div className="card-header">
-              <span className="card-title">{group.label}</span>
+            <div className="form-group-head">
+              <div className="form-group-title">{group.label}</div>
+              {group.help && <p className="form-group-help">{group.help}</p>}
             </div>
-            <div className="card-body">
-              {group.help && <p className="group-help">{group.help}</p>}
+            <div style={{ padding: "14px 16px" }}>
               <div className="form-grid">
                 {group.fields.map((field) => (
                   <FieldCell
