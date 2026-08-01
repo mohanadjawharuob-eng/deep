@@ -1,0 +1,149 @@
+/*
+ * Design tokens.
+ *
+ * Everything visual is decided here, so changing the platform's look is a
+ * matter of editing this file rather than hunting through components. That
+ * matters more than usual for this project: the institution using it will want
+ * its own colours, and a curator asking for "less brown" should not require a
+ * developer to touch twenty files.
+ *
+ * The palette is deliberately restrained. This is an instrument people use for
+ * six hours a day, not a page they glance at — so the neutrals do the work and
+ * the one accent is reserved for things that are actually interactive.
+ */
+
+:root {
+  /* --- Type ------------------------------------------------------------ */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* A 1.2 scale, which stays readable at data density. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.55;
+
+  /* --- Space ----------------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius-sm: 4px;
+  --radius: 7px;
+  --radius-lg: 11px;
+
+  --border-width: 1px;
+
+  /* --- Layout ---------------------------------------------------------- */
+  --sidebar-width: 236px;
+  --header-height: 52px;
+  --content-max: 1500px;
+
+  --transition: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- Accent ---------------------------------------------------------- */
+  /* Terracotta: the colour of the material most of this platform describes.
+     Used only for interactive and selected states, never decoration. */
+  --accent-h: 20;
+  --accent-s: 52%;
+}
+
+/* --------------------------------------------------------------------------
+ * Light
+ * ----------------------------------------------------------------------- */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: hsl(40 20% 98%);
+  --bg-raised: hsl(0 0% 100%);
+  --bg-sunken: hsl(40 14% 95%);
+  --bg-hover: hsl(38 16% 94%);
+  --bg-active: hsl(38 18% 91%);
+
+  --border: hsl(38 12% 88%);
+  --border-strong: hsl(36 10% 79%);
+
+  --text: hsl(30 8% 14%);
+  --text-secondary: hsl(30 6% 40%);
+  --text-muted: hsl(30 5% 55%);
+  --text-inverse: hsl(40 20% 98%);
+
+  --accent: hsl(var(--accent-h) var(--accent-s) 44%);
+  --accent-hover: hsl(var(--accent-h) var(--accent-s) 38%);
+  --accent-soft: hsl(var(--accent-h) 60% 96%);
+  --accent-border: hsl(var(--accent-h) 45% 80%);
+  --accent-text: hsl(var(--accent-h) 60% 32%);
+
+  --success: hsl(150 45% 33%);
+  --success-soft: hsl(150 44% 95%);
+  --warning: hsl(35 78% 40%);
+  --warning-soft: hsl(40 80% 95%);
+  --danger: hsl(2 62% 46%);
+  --danger-soft: hsl(2 70% 96%);
+  --info: hsl(214 55% 44%);
+  --info-soft: hsl(214 65% 96%);
+
+  --shadow-sm: 0 1px 2px hsl(30 15% 10% / 0.06);
+  --shadow: 0 1px 3px hsl(30 15% 10% / 0.08), 0 4px 12px hsl(30 15% 10% / 0.05);
+  --shadow-lg: 0 8px 28px hsl(30 15% 10% / 0.13);
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+ * Dark
+ *
+ * Not an inversion. Dark surfaces are warm rather than blue-grey, borders
+ * carry more of the structure because shadows barely read, and the accent is
+ * lightened so it still passes contrast on a dark field.
+ * ----------------------------------------------------------------------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: hsl(30 7% 10%);
+  --bg-raised: hsl(30 7% 13%);
+  --bg-sunken: hsl(30 8% 8%);
+  --bg-hover: hsl(30 7% 17%);
+  --bg-active: hsl(30 7% 21%);
+
+  --border: hsl(30 6% 21%);
+  --border-strong: hsl(30 6% 31%);
+
+  --text: hsl(38 14% 92%);
+  --text-secondary: hsl(35 8% 68%);
+  --text-muted: hsl(35 6% 52%);
+  --text-inverse: hsl(30 10% 10%);
+
+  --accent: hsl(var(--accent-h) 58% 60%);
+  --accent-hover: hsl(var(--accent-h) 58% 68%);
+  --accent-soft: hsl(var(--accent-h) 30% 18%);
+  --accent-border: hsl(var(--accent-h) 35% 34%);
+  --accent-text: hsl(var(--accent-h) 60% 70%);
+
+  --success: hsl(150 42% 55%);
+  --success-soft: hsl(150 25% 15%);
+  --warning: hsl(38 70% 60%);
+  --warning-soft: hsl(38 30% 16%);
+  --danger: hsl(2 66% 64%);
+  --danger-soft: hsl(2 30% 17%);
+  --info: hsl(214 60% 65%);
+  --info-soft: hsl(214 30% 17%);
+
+  --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.3);
+  --shadow: 0 1px 3px hsl(0 0% 0% / 0.4), 0 4px 12px hsl(0 0% 0% / 0.3);
+  --shadow-lg: 0 8px 28px hsl(0 0% 0% / 0.5);
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}

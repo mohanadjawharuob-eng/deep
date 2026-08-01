@@ -505,3 +505,4 @@ class ResourceType(str, enum.Enum):
     GIS_LAYER = "gis_layer"
     USER = "user"
     PUBLICATION = "publication"
+    MUSEUM_OBJECT = "museum_object"

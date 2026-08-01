@@ -69,6 +69,12 @@ def run_migrations_online() -> None:
             compare_server_default=True,
             render_item=alembic_helpers.render_item,
             process_revision_directives=alembic_helpers.writer,
+            # Each migration commits on its own. PostgreSQL refuses to *use* a
+            # value added to an enum in the same transaction that added it, so
+            # a single transaction spanning every revision would make it
+            # impossible to add an enum value in one migration and backfill
+            # with it in the next.
+            transaction_per_migration=True,
         )
         with context.begin_transaction():
             context.run_migrations()

@@ -1,0 +1,371 @@
+/**
+ * The store: the location hierarchy, and what sits in each place.
+ *
+ * A tree is the honest shape for Institution → Building → Floor → Room →
+ * Cabinet → Shelf → Drawer → Box, so it is drawn as one. Selecting a node
+ * shows its contents and how they got there — the movement history is the
+ * part that matters when something is not where the record says it is.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+
+import { api, type Page, type StorageNode } from "../lib/api";
+import { useQuery } from "../lib/hooks";
+import {
+  Badge,
+  Detail,
+  DetailGrid,
+  Empty,
+  ErrorNote,
+  Loading,
+  PageHeader,
+  SearchInput,
+  formatDateTime,
+  humanise,
+} from "../components/ui";
+
+/**
+ * One row of a location's contents. The endpoint answers across every kind of
+ * thing that can be filed — finds and accessioned objects today, equipment
+ * next — so the row is deliberately generic: what kind, what number, what it
+ * is called.
+ */
+type ContentRow = {
+  kind: string;
+  resource_type: string;
+  id: string;
+  number: string;
+  label: string;
+};
+
+/** Where each kind's own screen lives. */
+const KIND_ROUTE: Record<string, (id: string) => string> = {
+  artifacts: (id) => `/artifacts/${id}`,
+  museum_objects: (id) => `/museum/objects/${id}`,
+};
+
+const KIND_LABEL: Record<string, string> = {
+  artifacts: "Find",
+  museum_objects: "Museum object",
+};
+
+type Movement = {
+  id: string;
+  resource_type: string;
+  resource_id: string;
+  from_path?: string | null;
+  to_path?: string | null;
+  reason?: string | null;
+  moved_at: string;
+  moved_by_label?: string | null;
+};
+
+/** How deep a kind sits, used only to pick an icon glyph. */
+const KIND_GLYPH: Record<string, string> = {
+  institution: "◈",
+  building: "▣",
+  floor: "▤",
+  room: "▢",
+  cabinet: "▥",
+  shelf: "▬",
+  drawer: "▭",
+  box: "▪",
+  other: "·",
+};
+
+function TreeNode({
+  node,
+  selected,
+  onSelect,
+  expanded,
+  toggle,
+  filter,
+}: {
+  node: StorageNode;
+  selected: string | null;
+  onSelect: (id: string) => void;
+  expanded: Set<string>;
+  toggle: (id: string) => void;
+  filter: string;
+}) {
+  const matches = (candidate: StorageNode): boolean => {
+    if (!filter) return true;
+    const needle = filter.toLowerCase();
+    if (
+      candidate.name.toLowerCase().includes(needle) ||
+      candidate.code.toLowerCase().includes(needle)
+    ) {
+      return true;
+    }
+    return candidate.children.some(matches);
+  };
+
+  if (!matches(node)) return null;
+
+  const open = expanded.has(node.id) || Boolean(filter);
+  const hasChildren = node.children.length > 0;
+
+  return (
+    <li>
+      <div className={`tree-row ${selected === node.id ? "selected" : ""}`}>
+        <button
+          type="button"
+          className="tree-toggle"
+          onClick={() => toggle(node.id)}
+          aria-label={open ? "Collapse" : "Expand"}
+          style={{ visibility: hasChildren ? "visible" : "hidden" }}
+        >
+          {open ? "▾" : "▸"}
+        </button>
+        <button type="button" className="tree-label" onClick={() => onSelect(node.id)}>
+          <span className="tree-kind" aria-hidden="true">
+            {KIND_GLYPH[node.kind] ?? "·"}
+          </span>
+          <span className="truncate">{node.name}</span>
+          <span className="small muted mono">{node.code}</span>
+          {!node.is_active && <span className="badge">inactive</span>}
+        </button>
+      </div>
+      {open && hasChildren && (
+        <ul className="tree-children">
+          {node.children.map((child) => (
+            <TreeNode
+              key={child.id}
+              node={child}
+              selected={selected}
+              onSelect={onSelect}
+              expanded={expanded}
+              toggle={toggle}
+              filter={filter}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+export function Storage() {
+  const [params, setParams] = useSearchParams();
+  const selected = params.get("location");
+  const [filter, setFilter] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const tree = useQuery<StorageNode[]>(
+    (signal) => api.get("/storage/tree", undefined, signal),
+    [],
+  );
+
+  // Top level open by default: a collapsed tree tells you nothing.
+  useEffect(() => {
+    if (tree.data) setExpanded((current) => new Set([...current, ...tree.data!.map((n) => n.id)]));
+  }, [tree.data]);
+
+  const contents = useQuery<Page<ContentRow>>(
+    (signal) =>
+      api.get(`/storage/locations/${selected}/contents`, { limit: 200 }, signal),
+    [selected],
+    { enabled: Boolean(selected) },
+  );
+
+  const node = useMemo(() => {
+    if (!selected || !tree.data) return null;
+    const find = (nodes: StorageNode[]): StorageNode | null => {
+      for (const candidate of nodes) {
+        if (candidate.id === selected) return candidate;
+        const inner = find(candidate.children);
+        if (inner) return inner;
+      }
+      return null;
+    };
+    return find(tree.data);
+  }, [selected, tree.data]);
+
+  const select = (id: string) => {
+    const next = new URLSearchParams(params);
+    next.set("location", id);
+    setParams(next, { replace: true });
+  };
+
+  const toggle = (id: string) =>
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  return (
+    <>
+      <PageHeader
+        title="Storage"
+        subtitle="Where everything physically is, and how it got there."
+      />
+
+      <div className="split">
+        <aside className="card tree-panel">
+          <div className="card-body" style={{ paddingBottom: 0 }}>
+            <SearchInput value={filter} onChange={setFilter} placeholder="Find a location…" />
+          </div>
+          {tree.loading ? (
+            <div className="card-body">
+              <Loading rows={6} />
+            </div>
+          ) : tree.error ? (
+            <div className="card-body">
+              <ErrorNote message={tree.error} onRetry={tree.reload} />
+            </div>
+          ) : tree.data?.length === 0 ? (
+            <div className="card-body">
+              <Empty title="No locations yet">
+                Describe the store from the building down and objects can be placed in it.
+              </Empty>
+            </div>
+          ) : (
+            <ul className="tree">
+              {tree.data?.map((root) => (
+                <TreeNode
+                  key={root.id}
+                  node={root}
+                  selected={selected}
+                  onSelect={select}
+                  expanded={expanded}
+                  toggle={toggle}
+                  filter={filter}
+                />
+              ))}
+            </ul>
+          )}
+        </aside>
+
+        <div className="col">
+          {!selected ? (
+            <Empty title="Nothing selected">Pick a location to see what is in it.</Empty>
+          ) : (
+            <>
+              <section className="card">
+                <div className="card-header">
+                  <span className="card-title">{node?.name ?? "Location"}</span>
+                  {node && <Badge value={node.kind} />}
+                </div>
+                <div className="card-body">
+                  <DetailGrid>
+                    <Detail label="Code" value={node && <span className="mono">{node.code}</span>} />
+                    <Detail
+                      label="Path"
+                      value={node && <span className="small">{node.display_path}</span>}
+                      span={2}
+                    />
+                    <Detail label="Depth" value={node?.depth} />
+                    <Detail label="Capacity" value={node?.capacity} />
+                    <Detail
+                      label="Holds"
+                      value={
+                        contents.data
+                          ? `${contents.data.total.toLocaleString()} item${contents.data.total === 1 ? "" : "s"}`
+                          : null
+                      }
+                    />
+                  </DetailGrid>
+                </div>
+              </section>
+
+              {contents.loading ? (
+                <Loading rows={4} />
+              ) : contents.error ? (
+                <ErrorNote message={contents.error} onRetry={contents.reload} />
+              ) : contents.data?.items.length ? (
+                <section className="card">
+                  <div className="card-header">
+                    <span className="card-title">Contents</span>
+                    <span className="small muted">
+                      including everything below this location
+                    </span>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="table table-dense">
+                      <thead>
+                        <tr>
+                          <th style={{ width: "18ch" }}>Number</th>
+                          <th>Description</th>
+                          <th style={{ width: "16ch" }}>Kind</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {contents.data.items.map((row) => {
+                          const to = KIND_ROUTE[row.kind]?.(row.id);
+                          return (
+                            <tr key={`${row.kind}-${row.id}`}>
+                              <td>
+                                {to ? (
+                                  <Link className="mono" to={to}>
+                                    {row.number}
+                                  </Link>
+                                ) : (
+                                  <span className="mono">{row.number}</span>
+                                )}
+                              </td>
+                              <td>{row.label}</td>
+                              <td className="muted small">
+                                {KIND_LABEL[row.kind] ?? humanise(row.kind)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : (
+                <div className="card">
+                  <div className="card-body small muted">
+                    Nothing is filed here or anywhere below it.
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** The movement history of one record, reused wherever a thing can move. */
+export function MovementHistory({ kind, recordId }: { kind: string; recordId: string }) {
+  const history = useQuery<Page<Movement> | Movement[]>(
+    (signal) => api.get(`/storage/${kind}/${recordId}/movements`, undefined, signal),
+    [kind, recordId],
+  );
+  const rows = Array.isArray(history.data) ? history.data : (history.data?.items ?? []);
+
+  if (history.loading) return <Loading rows={2} />;
+  if (rows.length === 0) return <div className="small muted">Never moved.</div>;
+
+  return (
+    <ol className="timeline">
+      {rows.map((move) => (
+        <li key={move.id}>
+          <div className="timeline-dot" aria-hidden="true" />
+          <div>
+            <div className="small">
+              {move.from_path ? (
+                <>
+                  <span className="muted">{move.from_path}</span> → <span>{move.to_path}</span>
+                </>
+              ) : (
+                <>Placed in {move.to_path}</>
+              )}
+            </div>
+            <div className="small muted">
+              {formatDateTime(move.moved_at)}
+              {move.moved_by_label ? ` · ${move.moved_by_label}` : ""}
+              {move.reason ? ` · ${humanise(move.reason)}` : ""}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}

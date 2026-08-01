@@ -12,20 +12,26 @@ changes what every label in it claims.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from dataclasses import dataclass
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, literal, or_, select
 
 from app.api.deps import CurrentUser, CurrentUserOptional, DbSession, require_module
 from app.core.permissions import (
     ModuleLevel,
     can_edit,
+    can_view,
+    flat_can_edit,
+    flat_can_view,
+    flat_visibility_filter,
     has_module_access,
     visibility_filter,
 )
 from app.models.artifact import Artifact
 from app.models.enums import ActivityAction, Module, ResourceType, StorageKind
+from app.models.museum import MuseumObject
 from app.models.storage import StorageLocation, StorageMovement
 from app.models.user import User
 from app.schemas.common import Message, Page
@@ -53,12 +59,57 @@ RESOURCE = ResourceType.ARTIFACT
 #: of these is enough.
 STORING_MODULES = (Module.ARCHAEOLOGY, Module.MUSEUM, Module.INVENTORY)
 
-#: Which record types can be filed in a location. Museum objects and inventory
-#: items join this as those modules are built; the movement register already
-#: stores the resource type, so nothing here changes when they do.
-STORABLE: dict[str, tuple[type, ResourceType, str]] = {
-    "artifacts": (Artifact, ResourceType.ARTIFACT, "Artifact"),
+
+@dataclass(frozen=True)
+class Storable:
+    """A record type that can be filed in a location."""
+
+    model: type
+    resource_type: ResourceType
+    #: What to call it in an error message, in the singular.
+    name: str
+    #: Set for records that are not project-scoped. Their access is decided by
+    #: module level and ownership rather than project membership, so the checks
+    #: below must ask the flat policy instead of the project one — asking which
+    #: project team a user is on says nothing about a museum object.
+    flat_module: Module | None = None
+    #: The field a person identifies the record by, shown in listings.
+    number_field: str = "inventory_number"
+    label_field: str = "name"
+
+
+#: Which record types can be filed in a location. Inventory items join this as
+#: that module is built; the movement register already stores the resource
+#: type, so nothing here changes when they do.
+STORABLE: dict[str, Storable] = {
+    "artifacts": Storable(Artifact, ResourceType.ARTIFACT, "Artifact"),
+    "museum_objects": Storable(
+        MuseumObject,
+        ResourceType.MUSEUM_OBJECT,
+        "Object",
+        flat_module=Module.MUSEUM,
+        number_field="accession_number",
+        label_field="title",
+    ),
 }
+
+
+def _storable_can_view(session: DbSession, user: User | None, record: Any, entry: Storable) -> bool:
+    if entry.flat_module is not None:
+        return flat_can_view(user, record, entry.flat_module)
+    return can_view(session, user, record, entry.resource_type)
+
+
+def _storable_can_edit(session: DbSession, user: User | None, record: Any, entry: Storable) -> bool:
+    if entry.flat_module is not None:
+        return flat_can_edit(user, record, entry.flat_module)
+    return can_edit(session, user, record, entry.resource_type)
+
+
+def _storable_filter(user: User | None, entry: Storable) -> Any:
+    if entry.flat_module is not None:
+        return flat_visibility_filter(user, entry.model, entry.flat_module)
+    return visibility_filter(user, entry.model, entry.resource_type)
 
 
 def _may_read_storage(user: User | None) -> bool:
@@ -69,9 +120,7 @@ def require_storage_reader(user: CurrentUser) -> User:
     if not _may_read_storage(user):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Seeing the store needs access to the archaeology, museum or " "inventory module"
-            ),
+            detail=("Seeing the store needs access to the archaeology, museum or inventory module"),
         )
     return user
 
@@ -455,26 +504,45 @@ def read_contents(
     if include_children:
         ids.extend(child.id for child in tree.descendants(session, location))
 
-    statement = (
-        select(Artifact)
-        .where(
-            Artifact.storage_location_id.in_(ids),
-            # The store is not a way around record permissions.
-            visibility_filter(user, Artifact, ResourceType.ARTIFACT),
+    # One box holds finds and accessioned objects alike, so the answer to
+    # "what is in it" has to span both. Each kind is projected onto the same
+    # four columns and the results are unioned, so a single ordering and a
+    # single page cover the lot — rather than two lists the caller has to
+    # interleave and paginate itself.
+    parts = []
+    for kind, entry in STORABLE.items():
+        model = entry.model
+        parts.append(
+            select(
+                model.id.label("id"),
+                literal(kind).label("kind"),
+                literal(entry.resource_type.value).label("resource_type"),
+                getattr(model, entry.number_field).label("number"),
+                getattr(model, entry.label_field).label("label"),
+                model.storage_location_id.label("storage_location_id"),
+            ).where(
+                model.storage_location_id.in_(ids),
+                # The store is not a way around record permissions.
+                _storable_filter(user, entry),
+            )
         )
-        .order_by(Artifact.inventory_number, Artifact.id)
-    )
-    rows, total = records.paginate(session, statement, limit, offset)
+
+    union = parts[0].union_all(*parts[1:]).subquery() if len(parts) > 1 else parts[0].subquery()
+    statement = select(union).order_by(union.c.number, union.c.id)
+
+    total = session.scalar(select(func.count()).select_from(statement.subquery())) or 0
+    rows = session.execute(statement.limit(limit).offset(offset)).mappings().all()
 
     items = [
         {
-            "resource_type": ResourceType.ARTIFACT.value,
-            "id": str(row.id),
-            "inventory_number": row.inventory_number,
-            "name": row.name,
-            "storage_location_id": str(row.storage_location_id)
-            if row.storage_location_id
-            else None,
+            "kind": row["kind"],
+            "resource_type": row["resource_type"],
+            "id": str(row["id"]),
+            "number": row["number"],
+            "label": row["label"],
+            "storage_location_id": (
+                str(row["storage_location_id"]) if row["storage_location_id"] else None
+            ),
         }
         for row in rows
     ]
@@ -484,7 +552,7 @@ def read_contents(
 # --------------------------------------------------------------------------
 # The movement register
 # --------------------------------------------------------------------------
-def _resolve_storable(kind: str) -> tuple[type, ResourceType, str]:
+def _resolve_storable(kind: str) -> Storable:
     entry = STORABLE.get(kind)
     if entry is None:
         raise HTTPException(
@@ -520,14 +588,15 @@ def move_record(
     request: Request,
     user: CurrentUser,
 ) -> MovementRead:
-    model, resource_type, name = _resolve_storable(kind)
-    record = records.get_or_404(session, model, record_id, name)
+    entry = _resolve_storable(kind)
+    resource_type = entry.resource_type
+    record = records.get_or_404(session, entry.model, record_id, entry.name)
 
     # Moving an object is editing it: whoever may correct the record may say
     # where it is, and nobody else.
-    if not can_edit(session, user, record, resource_type):
+    if not _storable_can_edit(session, user, record, entry):
         raise HTTPException(
-            status.HTTP_403_FORBIDDEN, detail=f"You may not move this {name.lower()}"
+            status.HTTP_403_FORBIDDEN, detail=f"You may not move this {entry.name.lower()}"
         )
 
     try:
@@ -583,16 +652,15 @@ def move_record(
 def read_movements(
     kind: str, record_id: uuid.UUID, session: DbSession, user: CurrentUserOptional
 ) -> list[MovementRead]:
-    model, resource_type, name = _resolve_storable(kind)
-    record = records.get_or_404(session, model, record_id, name)
+    entry = _resolve_storable(kind)
+    record = records.get_or_404(session, entry.model, record_id, entry.name)
 
-    from app.core.permissions import can_view
-
-    if not can_view(session, user, record, resource_type):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{name} not found")
+    if not _storable_can_view(session, user, record, entry):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{entry.name} not found")
 
     return [
-        MovementRead.model_validate(row) for row in tree.history(session, resource_type, record_id)
+        MovementRead.model_validate(row)
+        for row in tree.history(session, entry.resource_type, record_id)
     ]
 
 
@@ -610,13 +678,12 @@ def read_movements(
 def read_location_of(
     kind: str, record_id: uuid.UUID, session: DbSession, user: CurrentUserOptional
 ) -> LocationOfRecord:
-    model, resource_type, name = _resolve_storable(kind)
-    record = records.get_or_404(session, model, record_id, name)
+    entry = _resolve_storable(kind)
+    resource_type = entry.resource_type
+    record = records.get_or_404(session, entry.model, record_id, entry.name)
 
-    from app.core.permissions import can_view
-
-    if not can_view(session, user, record, resource_type):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{name} not found")
+    if not _storable_can_view(session, user, record, entry):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{entry.name} not found")
 
     location = (
         session.get(StorageLocation, record.storage_location_id)

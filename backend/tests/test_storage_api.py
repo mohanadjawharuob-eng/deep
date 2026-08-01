@@ -596,7 +596,8 @@ class TestContents:
         contents = client.get(
             f"/api/v1/storage/locations/{store['room']['id']}/contents", headers=headers
         ).json()
-        assert [item["inventory_number"] for item in contents["items"]] == ["ST-2024-001"]
+        assert [item["number"] for item in contents["items"]] == ["ST-2024-001"]
+        assert contents["items"][0]["kind"] == "artifacts"
 
     def test_contents_are_permission_filtered(
         self, client: TestClient, db: Session, keeper: User, store: dict, artifact: dict
@@ -631,7 +632,7 @@ class TestContents:
             headers=auth_headers(client, "outsider"),
         ).json()
 
-        numbers = {item["inventory_number"] for item in seen["items"]}
+        numbers = {item["number"] for item in seen["items"]}
         assert "ST-2024-001" in numbers
         assert "ST-2024-SECRET" not in numbers
 

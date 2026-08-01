@@ -1020,7 +1020,94 @@ def test_an_object_catalogued_into_a_location_starts_its_movement_register(
     from app.models.enums import ResourceType
     from app.services import storage_locations as tree
 
-    history = tree.history(db, ResourceType.ARTIFACT, __import__("uuid").UUID(obj["id"]))
+    history = tree.history(db, ResourceType.MUSEUM_OBJECT, __import__("uuid").UUID(obj["id"]))
     assert len(history) == 1
     assert history[0].reason.value == "accession"
     assert history[0].to_path.endswith("Shelf A")
+
+
+class TestObjectsInTheStore:
+    """A museum object lives in the same store as a find and moves the same way.
+
+    This was silently untrue for a while: the object's own catalogue card
+    advertises a location history, but museum objects were never registered as
+    storable, so every one of those requests answered 404 and no object could
+    be moved at all.
+    """
+
+    @pytest.fixture
+    def shelf(self, client: TestClient, db: Session) -> dict:
+        make_user(db, email="keeper4@example.org", username="keeper4", role=UserRole.RESEARCHER)
+        return client.post(
+            "/api/v1/storage/locations",
+            json={"kind": "shelf", "name": "Shelf C", "code": "C"},
+            headers=auth_headers(client, "keeper4"),
+        ).json()
+
+    def test_an_object_can_be_moved_through_the_register(
+        self, client: TestClient, curator: User, collection: dict, shelf: dict
+    ) -> None:
+        obj = catalogue(client, collection["id"]).json()
+
+        moved = client.post(
+            f"/api/v1/storage/museum_objects/{obj['id']}/move",
+            json={"to_location_id": shelf["id"], "reason": "accession"},
+            headers=auth_headers(client, "curator"),
+        )
+        assert moved.status_code == 201, moved.text
+        assert moved.json()["to_path"].endswith("Shelf C")
+
+        history = client.get(
+            f"/api/v1/storage/museum_objects/{obj['id']}/movements",
+            headers=auth_headers(client, "curator"),
+        )
+        assert history.status_code == 200
+        assert len(history.json()) == 1
+
+    def test_the_location_history_the_catalogue_card_promises_resolves(
+        self, client: TestClient, curator: User, collection: dict, shelf: dict
+    ) -> None:
+        """The form layout names this endpoint; it must be a real one."""
+        layout = client.get("/api/v1/forms/layouts/museum_object").json()
+        portal = next(p for p in layout["portals"] if p["key"] == "movements")
+
+        obj = catalogue(client, collection["id"], storage_location_id=shelf["id"]).json()
+        url = portal["endpoint"].replace("{id}", obj["id"])
+
+        response = client.get(url, headers=auth_headers(client, "curator"))
+        assert response.status_code == 200, response.text
+        assert response.json()[0]["to_path"].endswith("Shelf C")
+
+    def test_a_locations_contents_span_finds_and_objects(
+        self, client: TestClient, curator: User, collection: dict, shelf: dict
+    ) -> None:
+        catalogue(client, collection["id"], storage_location_id=shelf["id"], title="Storage jar")
+
+        contents = client.get(
+            f"/api/v1/storage/locations/{shelf['id']}/contents",
+            headers=auth_headers(client, "curator"),
+        )
+        assert contents.status_code == 200, contents.text
+        items = contents.json()["items"]
+        assert [item["kind"] for item in items] == ["museum_objects"]
+        assert items[0]["label"] == "Storage jar"
+
+    def test_moving_an_object_needs_museum_access_not_archaeology(
+        self, client: TestClient, db: Session, curator: User, collection: dict, shelf: dict
+    ) -> None:
+        """The find policy would ask which project team the user is on, which
+        answers nothing about a museum object."""
+        obj = catalogue(client, collection["id"]).json()
+        make_user(
+            db,
+            email="fielder@example.org",
+            username="fielder",
+            role=UserRole.RESEARCHER,  # senior in archaeology, nothing in the museum
+        )
+
+        refused = client.post(
+            f"/api/v1/storage/museum_objects/{obj['id']}/move",
+            json={"to_location_id": shelf["id"], "reason": "accession"},
+            headers=auth_headers(client, "fielder"),
+        )
+        assert refused.status_code == 403

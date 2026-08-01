@@ -69,6 +69,7 @@ from app.models import (
     Site,
     SiteType,
     StorageKind,
+    StorageLocation,
     StratigraphicRelation,
     SystemSetting,
     TreatmentType,
@@ -458,6 +459,12 @@ def seed_sample_media(
     user: User,
 ) -> None:
     """Attach a few photographs and a document to the demonstration project."""
+    if session.scalar(
+        select(Photograph).where(Photograph.title == "Tell el-Demo from the south-west")
+    ):
+        logger.info("Sample media already present; skipping")
+        return
+
     _store_photograph(
         session,
         title="Tell el-Demo from the south-west",
@@ -544,6 +551,10 @@ def seed_sample_storage(session: Session, *, artifacts: list[Artifact], user: Us
     on a shelf, in a cabinet, in a room, in a building — and a movement
     register that already has something in it.
     """
+    if session.scalar(select(StorageLocation).where(StorageLocation.code == "IOA")):
+        logger.info("Sample store already present; skipping")
+        return
+
     institution = storage_tree.create(
         session,
         kind=StorageKind.INSTITUTION,
@@ -645,6 +656,10 @@ def seed_sample_gis(session: Session, *, project: Project, site: Site, user: Use
     Coordinates are placed around the demonstration site's own position, so
     the layers land where the site does rather than in a different country.
     """
+    if session.scalar(select(GisLayer).where(GisLayer.name == "Trench plan, 2024 season")):
+        logger.info("Sample GIS layers already present; skipping")
+        return
+
     centre_lon = float(site.longitude)
     centre_lat = float(site.latitude)
 
@@ -733,6 +748,10 @@ def seed_sample_museum(session: Session, *, artifacts: list[Artifact], user: Use
     record stays as written in the field, and the museum record carries what
     happened afterwards.
     """
+    if session.scalar(select(Collection).where(Collection.code == "ARCH")):
+        logger.info("Sample collection already present; skipping")
+        return
+
     collection = Collection(
         name="Archaeological Collection",
         code="ARCH",
@@ -828,10 +847,42 @@ def seed_sample_museum(session: Session, *, artifacts: list[Artifact], user: Use
     )
 
 
+def _resume_samples(session: Session, project: Project) -> None:
+    """Run the sample sections a partly-seeded database is missing."""
+    site = session.scalar(select(Site).where(Site.project_id == project.id))
+    artifacts = list(
+        session.scalars(
+            select(Artifact).where(Artifact.site_id == site.id).order_by(Artifact.inventory_number)
+        )
+        if site is not None
+        else []
+    )
+    user = session.scalar(select(User).where(User.email == DEMO_USERS[0][0])) or session.scalar(
+        select(User).where(User.role == UserRole.ADMIN)
+    )
+    if site is None or not artifacts or user is None:
+        logger.warning("Sample project is present but incomplete; leaving it alone")
+        return
+
+    seed_sample_media(session, project=project, site=site, artifact=artifacts[0], user=user)
+    seed_sample_storage(session, artifacts=artifacts, user=user)
+    seed_sample_gis(session, project=project, site=site, user=user)
+    seed_sample_museum(session, artifacts=artifacts, user=user)
+
+
 def seed_samples(session: Session, admin: User) -> None:
-    """Create a small but complete demonstration project."""
-    if session.scalar(select(Project).where(Project.code == "DEMO-2024")) is not None:
-        logger.info("Sample project already present; skipping")
+    """Create a small but complete demonstration project.
+
+    Resumable, not all-or-nothing. A database seeded before the store and the
+    museum existed has the project but none of their sample data, and skipping
+    on the project alone left it that way for good — reporting "already
+    present" about sections that were never written. Each section now guards
+    on its own anchor record, so re-running fills in whatever is missing.
+    """
+    existing = session.scalar(select(Project).where(Project.code == "DEMO-2024"))
+    if existing is not None:
+        logger.info("Sample project already present; filling in any missing sections")
+        _resume_samples(session, existing)
         return
 
     users: dict[str, User] = {}

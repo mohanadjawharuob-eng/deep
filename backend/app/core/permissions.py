@@ -95,9 +95,18 @@ _RESOURCE_MODULE: dict[ResourceType, Module] = {
     ResourceType.MODEL3D: Module.ARCHAEOLOGY,
     ResourceType.GIS_LAYER: Module.ARCHAEOLOGY,
     ResourceType.PUBLICATION: Module.ARCHAEOLOGY,
+    ResourceType.MUSEUM_OBJECT: Module.MUSEUM,
     #: A user account is platform-wide, not the property of any module.
     ResourceType.USER: Module.MANAGEMENT,
 }
+
+#: Modules whose records are not project-scoped. Nothing in a museum store or
+#: an equipment cupboard belongs to an excavation project, so the project
+#: membership half of the policy has nothing to say about them and access is
+#: decided by module level plus ownership alone. See :func:`flat_can_edit`.
+FLAT_MODULES: frozenset[Module] = frozenset(
+    {Module.MUSEUM, Module.INVENTORY, Module.SOCIAL_MEDIA, Module.MANAGEMENT}
+)
 
 #: The level a user gets in the archaeology module from their legacy global
 #: role. Used when creating an account and by the backfill migration, so that
@@ -318,6 +327,41 @@ def can_edit(session: Session, user: User | None, record: Any, resource_type: Re
         return False
     level = effective_level(session, user, record, resource_type)
     return level is not None and level >= PermissionLevel.EDITOR
+
+
+# --------------------------------------------------------------------------
+# Modules with no projects in them
+# --------------------------------------------------------------------------
+# A museum object is not part of an excavation, so asking which project team a
+# user belongs to answers nothing about whether they may catalogue it. For
+# those modules the policy collapses to two of the four sources — module level
+# and ownership — and these three functions are the whole of it. They are here
+# rather than in the museum endpoints so that both halves of the platform ask
+# the same code the same question.
+def flat_can_view(user: User | None, record: Any, module: Module) -> bool:
+    """Anyone with module access reads the module; anyone else reads what is
+    public, which is exactly what an institution's own website would show."""
+    if has_module_access(user, module, ModuleLevel.VIEWER):
+        return True
+    return _record_is_public(record)
+
+
+def flat_can_edit(user: User | None, record: Any, module: Module) -> bool:
+    """An editor changes anything in the module; a contributor changes what
+    they themselves catalogued."""
+    if not has_module_access(user, module, ModuleLevel.CONTRIBUTOR):
+        return False
+    if has_module_access(user, module, ModuleLevel.EDITOR):
+        return True
+    owner_id = _record_owner_id(record)
+    return owner_id is not None and user is not None and owner_id == user.id
+
+
+def flat_visibility_filter(user: User | None, model: Any, module: Module) -> Any:
+    """The SQL mirror of :func:`flat_can_view`."""
+    if has_module_access(user, module, ModuleLevel.VIEWER):
+        return true()
+    return model.is_public.is_(True)
 
 
 def can_delete(

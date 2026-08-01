@@ -20,6 +20,8 @@ from sqlalchemy import Numeric, cast, func, or_, select
 
 from app.api.deps import CurrentUser, CurrentUserOptional, DbSession, require_module
 from app.core.permissions import (
+    flat_can_edit,
+    flat_visibility_filter,
     has_module_access,
 )
 from app.models.enums import (
@@ -79,7 +81,11 @@ from app.services import storage_locations as tree
 router = APIRouter(prefix="/museum", tags=["Museum"])
 
 MODULE = Module.MUSEUM
-RESOURCE = ResourceType.ARTIFACT
+#: An accessioned object is its own kind of record, not a find. They share a
+#: storage hierarchy and a movement register, so the register has to be able to
+#: tell them apart — a museum object filed as an ``artifact`` cannot be looked
+#: up as itself.
+RESOURCE = ResourceType.MUSEUM_OBJECT
 
 #: Reading the collection needs viewer access to the museum module.
 MuseumViewer = Annotated[User, Depends(require_module(MODULE, Level.VIEWER))]
@@ -98,30 +104,16 @@ def _may_edit(session: DbSession, user: User | None, record: Any) -> bool:
     """Whether this caller may change a museum record.
 
     Museum records are not project-scoped, so the archaeology policy's project
-    membership has nothing to say about them. Access is the module level plus
-    ownership: an editor changes anything in the module, a contributor changes
-    what they catalogued.
+    membership has nothing to say about them; the rule is the module level plus
+    ownership. The policy itself lives in ``core.permissions`` so that the
+    storage register, which also moves museum objects, reaches the same answer.
     """
-    if not has_module_access(user, MODULE, Level.CONTRIBUTOR):
-        return False
-    if has_module_access(user, MODULE, Level.EDITOR):
-        return True
-    owner_id = getattr(record, "owner_id", None)
-    return owner_id is not None and user is not None and owner_id == user.id
+    return flat_can_edit(user, record, MODULE)
 
 
 def _visible_filter(user: User | None, model: Any) -> Any:
-    """Rows this caller may read.
-
-    Anyone with museum access sees the module's records; anyone without sees
-    only what has been made public, which is what a museum's own website would
-    show.
-    """
-    from sqlalchemy import true
-
-    if has_module_access(user, MODULE, Level.VIEWER):
-        return true()
-    return model.is_public.is_(True)
+    """Rows this caller may read — the SQL mirror of :func:`_may_edit`'s sibling."""
+    return flat_visibility_filter(user, model, MODULE)
 
 
 def _require_readable(session: DbSession, user: User | None, record: Any, name: str) -> None:
@@ -438,7 +430,7 @@ def create_object(
     if obj.storage_location_id is not None:
         tree.record_movement(
             session,
-            resource_type=ResourceType.ARTIFACT,
+            resource_type=RESOURCE,
             resource_id=obj.id,
             resource_label=obj.accession_number,
             from_location=None,
@@ -451,7 +443,7 @@ def create_object(
         session,
         action=ActivityAction.CREATE,
         user=user,
-        resource_type=ResourceType.ARTIFACT,
+        resource_type=RESOURCE,
         resource_id=obj.id,
         resource_label=obj.accession_number,
         summary=f"Catalogued {obj.accession_number} — {obj.title}",
@@ -638,7 +630,7 @@ def update_object(
 
     before = records.apply_changes(obj, changes)
     records.on_updated(
-        session, obj, ResourceType.ARTIFACT, before=before, user=user, request=request
+        session, obj, RESOURCE, before=before, user=user, request=request
     )
     session.flush()
     return _object_detail(session, obj, user)
@@ -651,7 +643,7 @@ def delete_object(
     obj = records.get_or_404(session, MuseumObject, object_id, "Object")
 
     label = obj.accession_number
-    records.on_deleted(session, obj, ResourceType.ARTIFACT, user=user, request=request, label=label)
+    records.on_deleted(session, obj, RESOURCE, user=user, request=request, label=label)
     session.delete(obj)
     return Message(
         detail=(
@@ -701,7 +693,7 @@ def add_conservation(
         session,
         action=ActivityAction.CREATE,
         user=user,
-        resource_type=ResourceType.ARTIFACT,
+        resource_type=RESOURCE,
         resource_id=obj.id,
         resource_label=obj.accession_number,
         summary=f"{payload.treatment_type.value.capitalize()} recorded for {obj.accession_number}",
@@ -756,8 +748,7 @@ def update_conservation(
     response_model=Page[ConservationRead],
     summary="Treatments due for review",
     description=(
-        "Records whose `next_review_on` has arrived. The list a conservator "
-        "works from on a Monday."
+        "Records whose `next_review_on` has arrived. The list a conservator works from on a Monday."
     ),
 )
 def conservation_due(
