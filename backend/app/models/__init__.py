@@ -10,18 +10,23 @@ from app.models.artifact import Artifact, artifact_materials, artifact_publicati
 from app.models.audit import ActivityLog, Comment, Notification, Revision
 from app.models.context import ContextRelationship, ExcavationContext
 from app.models.enums import (
+    AcquisitionMethod,
     ActivityAction,
     ConditionState,
     ConservationStatus,
     ContextType,
     DocumentType,
+    ExhibitionStatus,
     GeometryKind,
     LayerCategory,
+    LoanDirection,
+    LoanStatus,
     Model3DFormat,
     Module,
     ModuleLevel,
     MovementReason,
     NotificationType,
+    ObjectStatus,
     PermissionLevel,
     ProjectRole,
     ProjectStatus,
@@ -31,10 +36,21 @@ from app.models.enums import (
     SiteType,
     StorageKind,
     StratigraphicRelation,
+    TreatmentType,
     UserRole,
 )
 from app.models.gis import GisFeature, GisLayer
 from app.models.media import Document, Model3D, Photograph
+from app.models.museum import (
+    Collection,
+    ConservationRecord,
+    EnvironmentalReading,
+    Exhibition,
+    ExhibitionItem,
+    Loan,
+    LoanItem,
+    MuseumObject,
+)
 from app.models.project import Project, ProjectMembership
 from app.models.site import Site
 from app.models.storage import StorageLocation, StorageMovement
@@ -42,6 +58,20 @@ from app.models.taxonomy import Material, ObjectCategory, Period, Publication, S
 from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess
 
 __all__ = [
+    "TreatmentType",
+    "ObjectStatus",
+    "MuseumObject",
+    "LoanStatus",
+    "LoanItem",
+    "LoanDirection",
+    "Loan",
+    "ExhibitionStatus",
+    "ExhibitionItem",
+    "Exhibition",
+    "EnvironmentalReading",
+    "ConservationRecord",
+    "Collection",
+    "AcquisitionMethod",
     "ActivityAction",
     "ActivityLog",
     "Artifact",

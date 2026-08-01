@@ -36,10 +36,13 @@ from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models import (
+    AcquisitionMethod,
     ActivityAction,
     ActivityLog,
     Artifact,
+    Collection,
     ConditionState,
+    ConservationRecord,
     ConservationStatus,
     ContextRelationship,
     ContextType,
@@ -52,7 +55,9 @@ from app.models import (
     LayerCategory,
     Material,
     MovementReason,
+    MuseumObject,
     ObjectCategory,
+    ObjectStatus,
     Period,
     Photograph,
     Project,
@@ -66,10 +71,11 @@ from app.models import (
     StorageKind,
     StratigraphicRelation,
     SystemSetting,
+    TreatmentType,
     User,
     UserRole,
 )
-from app.services import access, geo, images
+from app.services import access, accession, geo, images
 from app.services import documents as document_service
 from app.services import storage_locations as storage_tree
 from app.services.storage import (
@@ -720,6 +726,108 @@ def seed_sample_gis(session: Session, *, project: Project, site: Site, user: Use
     logger.info("Sample GIS created: layer %r with %d features", layer.name, len(trenches))
 
 
+def seed_sample_museum(session: Session, *, artifacts: list[Artifact], user: User) -> None:
+    """A small collection, with one find accessioned out of the excavation.
+
+    Shows the link working in the direction it actually runs: the excavation
+    record stays as written in the field, and the museum record carries what
+    happened afterwards.
+    """
+    collection = Collection(
+        name="Archaeological Collection",
+        code="ARCH",
+        description="Sample collection for the demonstration data.",
+        accession_pattern="{prefix}.{year}.{seq:04d}",
+        accession_prefix="IOA",
+        institution="Institute of Archaeology",
+        is_public=True,
+        owner_id=user.id,
+    )
+    session.add(collection)
+    session.flush()
+
+    accessioned = MuseumObject(
+        collection_id=collection.id,
+        accession_number=accession.next_number(session, collection, when=date(2024, 9, 12)),
+        title="Everted-rim cooking pot",
+        description=(
+            "Handmade cooking pot with an everted rim, heavily sooted on the "
+            "exterior. Reassembled from eleven sherds."
+        ),
+        object_type="Cooking pot",
+        culture="Early Bronze Age Levantine",
+        date_from=-3000,
+        date_to=-2700,
+        materials=["Ceramic"],
+        height_mm=182.5,
+        diameter_mm=214.0,
+        weight_g=1340.0,
+        condition=ConditionState.FAIR,
+        conservation_status=ConservationStatus.STABLE,
+        acquisition_method=AcquisitionMethod.EXCAVATION,
+        acquisition_date=date(2024, 9, 12),
+        acquisition_source="Tell el-Demo 2024 season",
+        provenance=(
+            "Excavated 2024, Trench A, context 1042. Transferred to the "
+            "institute store at the close of the season."
+        ),
+        credit_line="Institute of Archaeology, Tell el-Demo excavations",
+        status=ObjectStatus.ACCESSIONED,
+        artifact_id=artifacts[0].id,
+        is_public=True,
+        owner_id=user.id,
+    )
+    session.add(accessioned)
+
+    # A second object with no excavation record — the normal case for most of
+    # a collection, and worth showing so the link does not look mandatory.
+    donated = MuseumObject(
+        collection_id=collection.id,
+        accession_number="1974.1a",
+        number_is_legacy=True,
+        title="Oil lamp",
+        description="Wheel-made lamp with a pinched nozzle.",
+        object_type="Lamp",
+        materials=["Ceramic"],
+        condition=ConditionState.GOOD,
+        acquisition_method=AcquisitionMethod.DONATION,
+        acquisition_date=date(1974, 5, 3),
+        acquisition_source="Bequest of A. Whitfield",
+        provenance="Said to be from the Homs region; no excavation record.",
+        former_number="W.77",
+        status=ObjectStatus.ACCESSIONED,
+        is_public=True,
+        owner_id=user.id,
+    )
+    session.add(donated)
+    session.flush()
+
+    session.add(
+        ConservationRecord(
+            museum_object_id=accessioned.id,
+            treatment_type=TreatmentType.CONSOLIDATION,
+            performed_on=date(2024, 10, 2),
+            conservator="A. Rossi",
+            condition_before=ConditionState.POOR,
+            condition_after=ConditionState.FAIR,
+            description=(
+                "Reassembled from eleven sherds and consolidated. Joins secured "
+                "with Paraloid B72; no fills."
+            ),
+            materials_used="Paraloid B72, 15% in acetone",
+            recommendations="Handle by the base. Re-examine in twelve months.",
+            next_review_on=date(2025, 10, 2),
+            hours_spent=6.5,
+            owner_id=user.id,
+        )
+    )
+
+    logger.info(
+        "Sample museum created: collection %s with 2 objects, 1 linked to an excavation record",
+        collection.code,
+    )
+
+
 def seed_samples(session: Session, admin: User) -> None:
     """Create a small but complete demonstration project."""
     if session.scalar(select(Project).where(Project.code == "DEMO-2024")) is not None:
@@ -1027,6 +1135,7 @@ def seed_samples(session: Session, admin: User) -> None:
     seed_sample_media(session, project=project, site=site, artifact=artifacts[0], user=researcher)
     seed_sample_storage(session, artifacts=artifacts, user=researcher)
     seed_sample_gis(session, project=project, site=site, user=researcher)
+    seed_sample_museum(session, artifacts=artifacts, user=researcher)
 
     now = datetime.now(UTC)
     for offset, (label, action) in enumerate(

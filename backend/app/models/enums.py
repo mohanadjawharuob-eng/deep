@@ -184,6 +184,86 @@ class MovementReason(str, enum.Enum):
     OTHER = "other"
 
 
+class AcquisitionMethod(str, enum.Enum):
+    """How an object entered the collection.
+
+    A closed list because provenance is the first thing anyone asks about, and
+    "how did you get this" is a question with legal weight. Free text does not
+    aggregate and does not audit.
+    """
+
+    EXCAVATION = "excavation"
+    SURVEY = "survey"
+    DONATION = "donation"
+    BEQUEST = "bequest"
+    PURCHASE = "purchase"
+    EXCHANGE = "exchange"
+    TRANSFER = "transfer"
+    FIELD_COLLECTION = "field_collection"
+    SEIZURE = "seizure"
+    REPATRIATION = "repatriation"
+    UNKNOWN = "unknown"
+
+
+class ObjectStatus(str, enum.Enum):
+    """Where an object stands in the collection's own process."""
+
+    #: Arrived but not yet formally accessioned.
+    TEMPORARY = "temporary"
+    ACCESSIONED = "accessioned"
+    ON_DISPLAY = "on_display"
+    IN_CONSERVATION = "in_conservation"
+    ON_LOAN = "on_loan"
+    #: Formally removed from the collection — sold, transferred, destroyed.
+    DEACCESSIONED = "deaccessioned"
+    MISSING = "missing"
+    DESTROYED = "destroyed"
+
+
+class TreatmentType(str, enum.Enum):
+    """What was done to an object, in conservation terms."""
+
+    EXAMINATION = "examination"
+    CLEANING = "cleaning"
+    CONSOLIDATION = "consolidation"
+    STABILISATION = "stabilisation"
+    RECONSTRUCTION = "reconstruction"
+    MOUNTING = "mounting"
+    REHOUSING = "rehousing"
+    ANALYSIS = "analysis"
+    MONITORING = "monitoring"
+    OTHER = "other"
+
+
+class ExhibitionStatus(str, enum.Enum):
+    PLANNED = "planned"
+    IN_PREPARATION = "in_preparation"
+    OPEN = "open"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
+
+
+class LoanDirection(str, enum.Enum):
+    """Whether the object is going out or coming in.
+
+    Both directions exist because they are different paperwork with different
+    obligations, and an institution that only lends today may borrow tomorrow.
+    """
+
+    OUTGOING = "outgoing"
+    INCOMING = "incoming"
+
+
+class LoanStatus(str, enum.Enum):
+    REQUESTED = "requested"
+    APPROVED = "approved"
+    DECLINED = "declined"
+    IN_TRANSIT = "in_transit"
+    ON_LOAN = "on_loan"
+    RETURNED = "returned"
+    CANCELLED = "cancelled"
+
+
 class PermissionLevel(str, enum.Enum):
     """Per-record grant, also ordered."""
 

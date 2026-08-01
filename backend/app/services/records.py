@@ -19,7 +19,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.core.permissions import requires_approval, resolve_project_id
-from app.models.enums import ActivityAction, ResourceType, ReviewStatus
+from app.models.enums import ActivityAction, Module, ResourceType, ReviewStatus
 from app.models.user import User
 from app.services import activity, revisions
 
@@ -66,12 +66,14 @@ def validate_coordinates(latitude: float | None, longitude: float | None) -> Non
 # --------------------------------------------------------------------------
 # Review workflow
 # --------------------------------------------------------------------------
-def initial_review_status(user: User | None) -> ReviewStatus:
+def initial_review_status(user: User | None, module: Module = Module.ARCHAEOLOGY) -> ReviewStatus:
     """What a newly created record's review status should be.
 
-    Students submit for approval; researchers and administrators do not.
+    Contributors submit for approval; editors and above do not. The module
+    matters because seniority is held per module: a museum editor's catalogue
+    entry is trusted even if they are only a contributor in archaeology.
     """
-    return ReviewStatus.PENDING if requires_approval(user) else ReviewStatus.APPROVED
+    return ReviewStatus.PENDING if requires_approval(user, module) else ReviewStatus.APPROVED
 
 
 # --------------------------------------------------------------------------

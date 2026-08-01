@@ -35,7 +35,9 @@ backend/
 │   │   ├── access.py         # granting and revoking module access
 │   │   ├── storage_locations.py  # the storage tree and movement register
 │   │   ├── geo.py           # projections, validation, spatial predicates
-│   │   └── geoformats.py    # GeoJSON / KML / Shapefile readers and writers
+│   │   ├── geoformats.py    # GeoJSON / KML / Shapefile readers and writers
+│   │   ├── accession.py     # the collection's own numbering scheme
+│   │   └── forms.py         # form layouts, served rather than hard-coded
 │   └── api/
 │       ├── deps.py           # DI: sessions, current user, role guards
 │       └── v1/               # versioned routes
@@ -109,6 +111,7 @@ Worth knowing what each file is for:
 | `test_module_access.py` | per-module permissions, granting, and the module ceiling |
 | `test_storage_api.py` | the storage hierarchy, path maintenance and the movement register |
 | `test_gis_api.py` | layers, import/export, reprojection and spatial search |
+| `test_museum_api.py` | collections, accession numbering, conservation, loans, forms |
 
 `test_media_api.py` generates its images rather than checking binaries in, so
 every property it asserts — dimensions, EXIF, GPS, orientation — is visible in
@@ -152,6 +155,7 @@ The migrations so far:
 | `0005_public_tokens` | `public_token` on `projects` and `sites`, so both can carry a QR label |
 | `0006_module_access` | `user_module_access`, replacing the global role as the permission ceiling; backfills every existing account |
 | `0007_storage_locations` | the storage hierarchy and the movement register; `artifacts.storage_location_id` |
+| `0008_museum` | collections, objects, conservation, exhibitions, loans, environmental readings |
 
 `0001` is separate because PostGIS must exist before any geometry column is
 created. Always read a generated migration before committing it — autogenerate
@@ -359,6 +363,102 @@ caller chose undoes the blurring in one subtraction.
 
 ---
 
+## The museum module
+
+An **artifact** is a find as excavated — what came out of the ground, in a
+context, in a trench. A **museum object** is that thing once an institution has
+taken formal responsibility for it: accessioned, numbered, valued, insured,
+conserved, displayed, possibly deaccessioned decades later.
+
+They are separate records, linked, because they answer to different rules. The
+excavation record is fixed by what happened in the field and should never
+change; the museum record accumulates a lifetime of custody afterwards. One
+table would mean either the field record drifts or the custody record cannot be
+written. The link is one-to-one and enforced — two museum records claiming the
+same find would make "what happened to this artifact" unanswerable, which is
+the whole point of having it.
+
+Most of a collection has no link at all. A donation, a purchase or an old
+holding has no excavation record to point at, and that is the normal case.
+
+### Accession numbers
+
+Museums do not adopt a new numbering scheme because software arrived. The
+number is painted on the object, written in ledgers going back a century and
+cited in every publication that mentions it.
+
+So the platform imposes nothing. Each collection declares a **pattern** —
+`{prefix}`, `{code}`, `{year}`, `{yy}`, `{seq}`, with the sequence paddable as
+`{seq:04d}` — and the platform validates against it, offers the next number,
+and reconciles its counter against the numbers actually in use before issuing
+one. Two curators accessioning at once, or an import that set numbers by hand,
+both leave a stored counter behind reality.
+
+The part that decides whether a collection can migrate at all: **a number that
+does not fit the pattern is recorded anyway**, flagged as legacy, and does not
+disturb the sequence. A system that refuses to store `1974.1a-bis` because it
+wants `NM.1974.0001` is a system the collection stays out of. A collection may
+set `enforce_pattern` to refuse exceptions, but it is off by default.
+
+### Form layouts
+
+`app/services/forms.py` describes the cataloguing card as data — tabs, field
+groups, labels, types, help text, and which value list fills each dropdown —
+and `/api/v1/forms/layouts/museum_object` serves it. The frontend renders that
+layout; it does not decide it.
+
+Three reasons the indirection is worth it:
+
+1. **The layout is curatorial.** Which fields matter and what they are called
+   differs between a coin cabinet and a textile store, and is not a frontend
+   decision.
+2. **Value lists live in the database.** Periods, materials and categories are
+   taxonomy tables, so a period added this morning is in the dropdown this
+   afternoon without a deployment.
+3. **The importer needs the same description.** Mapping a spreadsheet column
+   onto a field requires knowing what fields exist and what type each is —
+   exactly what a layout says. One description serves both, so they cannot
+   disagree about what a record holds.
+
+A test asserts every field named on the layout exists as a column on the
+record: a layout naming a field the model lacks is a form that cannot be saved,
+and would offer the importer the same dead column.
+
+### Conservation, exhibitions and loans
+
+Conservation records are append-only in practice: a treatment that happened
+cannot un-happen, and what was applied — with what materials, by whom — is what
+the next conservator needs before choosing a solvent. Recording a treatment
+updates the object's own condition by default, which is almost always what is
+meant.
+
+Exhibition labels are written **per exhibition**, not per object: the same pot
+is described differently in a show about trade than in one about cooking.
+
+Loans are built although the institution using this does not currently lend.
+Loan paperwork becomes urgent with three weeks' notice, and adding the table
+then would mean a migration in the middle of it. Both directions exist —
+lending out and borrowing in are different obligations, and an incoming loan
+describes an object that is not ours to number.
+
+### Valuations
+
+A valuation is withheld from anyone who cannot edit the object, museum viewers
+included. A valuation on a record the public can read is an invitation.
+
+### Environmental monitoring
+
+Storage locations carry *target* conditions; `environmental_readings` holds
+what was actually measured. Both are needed — a target with no readings cannot
+be shown to have been met, and readings with no target cannot be judged.
+
+Readings are rows rather than an aggregate because the question a conservator
+asks is about excursions: "did it go above 60% while the building was closed",
+which a monthly average hides. `GET /museum/locations/{id}/conditions` puts the
+two together and counts how many readings fell outside tolerance.
+
+---
+
 ## Labels and QR codes
 
 Projects, sites and artifacts each carry a `public_token`: 32 hexadecimal
@@ -522,7 +622,7 @@ Three rules are worth knowing:
 
 ## Data model
 
-28 tables. The core chain is:
+36 tables. The core chains are:
 
 ```
 Project ──< Site ──< ExcavationContext ──< Artifact

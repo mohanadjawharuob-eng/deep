@@ -323,6 +323,53 @@ To move something: `POST /api/v1/storage/artifacts/{id}/move` with
 A location holding objects cannot be deleted — you would be left with material
 that has no recorded place. Mark it inactive instead.
 
+### The museum collection
+
+The demonstration data includes a small collection, so you can see how objects
+are catalogued.
+
+`GET /api/v1/museum/collections` → *Try it out* → *Execute*. You will see one
+collection, `ARCH`, with a numbering pattern of `{prefix}.{year}.{seq:04d}` —
+which produces numbers like `IOA.2024.0001`.
+
+**Your own numbers.** That pattern is a setting, not a rule the platform
+imposes. Change it to whatever your institution already uses:
+
+- `{prefix}.{year}.{seq:04d}` → `IOA.2024.0001`
+- `{code}-{yy}/{seq}` → `ARCH-24/7`
+- `{seq:06d}` → `000042`
+
+`GET /api/v1/museum/collections/{id}/next-number` shows what the next number
+would be without issuing it. Add `?candidate=1974.1a` to check a number you
+want to type by hand.
+
+**Old numbers still work.** Catalogue an object with `accession_number` set to
+something that does not fit the pattern — `1974.1a-bis`, say — and the platform
+records it as given, marks it as a legacy number, and carries on its own
+sequence unaffected. Nothing in your existing ledger has to be renumbered to
+get into the system. (If you would rather it refused, set `enforce_pattern` on
+the collection.)
+
+`GET /api/v1/museum/objects` lists what is there: one object accessioned out of
+the excavation — its `artifact_id` points back at the find record — and one
+donation from 1974 with no excavation record at all, which is the normal case
+for most of a collection.
+
+`GET /api/v1/museum/objects/{id}/conservation` shows the care history: what was
+done, when, by whom, and with what materials.
+
+### The cataloguing form
+
+`GET /api/v1/forms/layouts/museum_object` returns the whole cataloguing card as
+data — five tabs, fifty-two fields, with labels, help text and the dropdown
+options for each. This is what the finished interface will draw, and it is why
+the interface will look like the object card a museum cataloguer already knows
+rather than a generic web form.
+
+You can read it now to check the fields are the ones you actually use. If
+something is missing or misnamed, that is a one-line change in one file, not a
+frontend rewrite.
+
 ### Who can see which parts of the platform
 
 Access is given **per module** — archaeology, museum, inventory, management,

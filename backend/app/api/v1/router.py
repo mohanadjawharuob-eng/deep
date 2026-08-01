@@ -11,11 +11,13 @@ from app.api.v1.endpoints import (
     auth,
     contexts,
     documents,
+    formlayouts,
     gis,
     health,
     history,
     labels,
     models3d,
+    museum,
     notifications,
     photographs,
     projects,
@@ -47,6 +49,10 @@ api_router.include_router(storage.router)
 # Spatial: layers and their features, plus search by radius, box and polygon.
 api_router.include_router(gis.router)
 api_router.include_router(spatial.router)
+
+# Museum collections, and the form layouts a cataloguing client renders.
+api_router.include_router(museum.router)
+api_router.include_router(formlayouts.router)
 
 # Media
 api_router.include_router(photographs.router)

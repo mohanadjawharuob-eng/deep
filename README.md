@@ -3,11 +3,12 @@
 A centralised database for researchers, universities, museums and excavation
 projects to store, search, visualise and manage archaeological information.
 
-> **Status: milestone 5 done — GIS, interchange and spatial search.**
-> The archaeology module is complete: records, history, files, labels, per-module
-> permissions, a shared storage hierarchy, and now map layers with GeoJSON, KML
-> and shapefile import/export plus search by radius, viewport and polygon. The
-> museum module is next. See [Roadmap](#roadmap).
+> **Status: milestone 6 — the museum collection module.**
+> The archaeology module is complete. The museum module now catalogues
+> accessioned objects in **your own accession numbering**, with conservation
+> history, exhibitions, loans and environmental monitoring — and serves its
+> cataloguing form as data, so the interface is a FileMaker-style layout rather
+> than a hard-coded page. See [Roadmap](#roadmap).
 
 ---
 
@@ -101,7 +102,8 @@ See [`backend/README.md`](backend/README.md).
 
 ### Milestone 1 — foundations
 
-**Database schema — 28 tables**, covering the archaeology module in full.
+**Database schema — 36 tables**, covering the archaeology and museum modules
+in full.
 Projects, sites, artifacts and excavation contexts; photographs, documents and
 3D models; GIS layers and features; controlled vocabularies for periods,
 materials and object categories; publications; and the cross-cutting tables for
@@ -271,6 +273,43 @@ The decision this milestone turns on:
   rather than rounded — a precise distance from a point the caller chose would
   undo the blurring in one subtraction.
 
+### Milestone 6 — museum collections
+
+**Objects catalogued in your own numbering.** Each collection declares its own
+accession pattern; the platform validates against it and continues the
+sequence. A number that does not fit — `1974.1a-bis` — is **recorded anyway**,
+flagged as legacy, and does not disturb the sequence. That single behaviour
+decides whether an existing collection can be migrated at all.
+
+**The excavation link runs one way and only once.** A museum object may point
+at the artifact it came from; the excavation record stays as it was written in
+the field. Two objects cannot claim the same find. Most of a collection has no
+link, because donations and purchases have no excavation record.
+
+**Conservation history, exhibitions and loans.** Treatments record what was
+applied and with what, because that is what the next conservator needs.
+Exhibition labels are written per exhibition — the same pot reads differently
+in a show about trade than one about cooking. Loans are built though unused:
+the paperwork becomes urgent with three weeks' notice.
+
+**Environmental monitoring.** Storage locations hold target conditions;
+readings hold what was measured. Together they answer "were the conditions
+held", which neither answers alone.
+
+**A cataloguing card served as data.** `/forms/layouts/museum_object` returns
+tabs, field groups, labels, help text and the value lists behind each dropdown.
+The frontend renders that layout rather than carrying its own copy — and the
+spreadsheet importer will map columns onto the same description, so the two
+cannot disagree about what a record holds.
+
+Two decisions worth calling out:
+
+- **Valuations are withheld from anyone who cannot edit the object**, museum
+  viewers included. A valuation on a publicly readable record is an invitation.
+- **The museum is permissioned independently.** A collections manager needs no
+  excavation access; a field director needs no access to the store's
+  valuations. That is what the per-module model was built for.
+
 ### Endpoints
 
 | Method | Path | Who |
@@ -307,6 +346,16 @@ The decision this milestone turns on:
 | `GET` | `/gis/layers/{id}/export`, `/gis/export/sites` | anyone who can read it |
 | `GET` | `/spatial/nearby`, `/spatial/bbox` | anyone, scoped |
 | `POST` | `/spatial/within` | anyone, scoped |
+| `GET`/`POST`/`PATCH` | `/museum/collections[/{id}]` | museum viewers / supervisors |
+| `GET` | `/museum/collections/{id}/next-number` | museum viewers |
+| `GET`/`POST`/`PATCH`/`DELETE` | `/museum/objects[/{id}]` | scoped by museum level |
+| `GET` | `/museum/objects/by-number/{number}` | scoped |
+| `GET`/`POST` | `/museum/objects/{id}/conservation` | readers / contributors |
+| `GET`/`POST` | `/museum/exhibitions[/{id}/items]` | readers / contributors |
+| `GET`/`POST` | `/museum/loans[/{id}/items]` | museum viewers / contributors |
+| `POST` | `/museum/readings` | museum contributors |
+| `GET` | `/museum/locations/{id}/conditions` | museum viewers |
+| `GET` | `/forms/layouts/{record_type}` | anyone signed in |
 | `POST` | `/photographs`, `/documents`, `/models3d/upload` | contributors on the project |
 | `GET` | `/photographs`, `/documents`, `/models3d` | anyone, scoped by permission |
 | `GET` | `/photographs/{id}/file`, `/thumbnail?size=` | anyone who can read it |
@@ -424,7 +473,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-pytest                              # 625 tests
+pytest                              # 685 tests
 pytest --cov=app                    # coverage
 ruff check app tests scripts        # lint
 alembic revision --autogenerate -m "…"   # after editing models
@@ -447,7 +496,7 @@ office & storage inventory — with a digital archive to follow.
 | **3 — done** | File uploads, thumbnails, EXIF, documents, 3D models, QR code images |
 | **4 — done** | **Foundations for the five-module platform**: per-module permissions, the storage-location hierarchy and movement history |
 | **5 — done** | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
-| **6 — next** | Museum collection module: catalogue, loans, exhibitions, conservation records |
+| **6 — in progress** | Museum module: catalogue *(done)*, conservation, exhibitions, loans, environmental monitoring, form layouts *(done)*; spreadsheet import and floor plans *(next)* |
 | 7 | Inventory module and the excavation kit builder |
 | 8 | Management module: budgets, grants, staff, tasks, calendar |
 | 9 | Social media repository; the [data-request system](docs/data-requests.md) and its upload links |
