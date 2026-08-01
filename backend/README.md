@@ -33,7 +33,9 @@ backend/
 │   │   ├── attachments.py    # shared media linking, permissions, serving
 │   │   ├── qrcodes.py        # QR images for printed labels
 │   │   ├── access.py         # granting and revoking module access
-│   │   └── storage_locations.py  # the storage tree and movement register
+│   │   ├── storage_locations.py  # the storage tree and movement register
+│   │   ├── geo.py           # projections, validation, spatial predicates
+│   │   └── geoformats.py    # GeoJSON / KML / Shapefile readers and writers
 │   └── api/
 │       ├── deps.py           # DI: sessions, current user, role guards
 │       └── v1/               # versioned routes
@@ -106,6 +108,7 @@ Worth knowing what each file is for:
 | `test_media_api.py` | uploads, EXIF, thumbnails, documents, 3D models, QR labels |
 | `test_module_access.py` | per-module permissions, granting, and the module ceiling |
 | `test_storage_api.py` | the storage hierarchy, path maintenance and the movement register |
+| `test_gis_api.py` | layers, import/export, reprojection and spatial search |
 
 `test_media_api.py` generates its images rather than checking binaries in, so
 every property it asserts — dimensions, EXIF, GPS, orientation — is visible in
@@ -263,6 +266,96 @@ heritage register. Both columns are kept, and
 `GET /storage/{kind}/{id}/location` reports the free text when nothing
 structured has been recorded — an honest "we only know this much" rather than
 an empty field. Mapping them is a job for somebody who knows the building.
+
+---
+
+## GIS
+
+Everything is stored in **EPSG:4326** — longitude and latitude in degrees,
+which is what Leaflet and every web map speak. A layer's features are real
+PostGIS geometries, so filtering, measuring and bounding-box queries happen in
+the database rather than in the browser.
+
+### Coordinate systems, and why this module refuses to guess
+
+Files rarely arrive in degrees. A site grid is almost always recorded in a
+projected national or UTM system, because you cannot measure a trench in
+degrees. That mismatch is the single most common way archaeological GIS data
+is silently corrupted: eastings and northings in the hundreds of thousands,
+read as if they were degrees.
+
+The failure mode is what makes it dangerous. A permission bug throws a 403. A
+projection bug throws **nothing** — the import succeeds, the map renders, the
+shapes look plausible, and the site is in the wrong country until somebody
+visits. PostGIS will happily store 768000 as a longitude.
+
+So:
+
+- Coordinates that are plausible as degrees are taken at face value.
+- Otherwise a `source_srid` must be supplied, and PostGIS reprojects with
+  `ST_Transform`. The EPSG registry is already in `spatial_ref_sys`, so this
+  needs no Python projection library.
+- A shapefile's `.prj` is matched against that registry when it can be.
+- **A file that contradicts itself is refused.** A `.prj` claiming WGS84 over
+  coordinates that cannot be degrees is the classic reprojected-but-never-
+  restamped shapefile; believing the declaration is how eastings become
+  longitudes.
+
+Every export carries a `.prj` saying EPSG:4326, so a consumer of our output
+never has to make the same guess.
+
+### Formats
+
+| Format | Read | Write | Notes |
+|---|:---:|:---:|---|
+| GeoJSON | ✅ | ✅ | `FeatureCollection`, `Feature` or a bare geometry |
+| KML / KMZ | ✅ | ✅ | Always WGS84 by its own specification |
+| Shapefile (zipped) | ✅ | ✅ | Several shapefiles in one archive read as one layer |
+
+Two format quirks worth knowing, because both fail silently:
+
+- **Polygon winding is opposite between the two.** GeoJSON winds exterior
+  rings counter-clockwise (RFC 7946); the shapefile specification winds them
+  clockwise. Writing GeoJSON order straight out produces a file whose every
+  polygon reads as a hole with no exterior — it loads, draws nothing, and
+  reports no error. Rings are re-wound on the way out.
+- **A DBF must declare at least one field.** A layer of pure geometry with no
+  attributes — a trench outline, a contour set — is ordinary, and is the
+  simplest possible layer, so a fallback column exists rather than an export
+  that fails on exactly that case.
+
+Neither format library is a heavy dependency: `pyshp` and `defusedxml` are
+pure Python, so the wheel-only Docker build stands. GDAL would have brought a
+compiler and a 200 MB dependency tree for a format that is three simple binary
+files.
+
+### Reading files from strangers
+
+Every reader parses bytes somebody else chose:
+
+- **KML is XML**, so it is parsed with `defusedxml` — the billion-laughs
+  entity expansion is a two-line file, and an external entity reads
+  `/etc/passwd`.
+- **A shapefile arrives as a ZIP**, so the declared uncompressed size and
+  member count are checked *before* anything is read, and members are pulled
+  into memory by name rather than extracted — a member called
+  `../../etc/cron.d/x` is then just an odd name, not a path.
+
+### Spatial search
+
+`/spatial/nearby`, `/spatial/bbox` and `/spatial/within` ask the same question
+of sites, artifacts, contexts and GIS features at once, as one indexed
+`UNION ALL`.
+
+Radii are **true metres** on the ellipsoid (`geography` casts), not degrees: a
+degree of longitude is 111 km at the equator and nothing at the pole, so a
+degree-based radius silently changes size as the map moves.
+
+Restricted site coordinates are blurred here exactly as in the site endpoints
+and in search — a spatial query being the most direct way a restricted location
+would otherwise escape. For a restricted site the **distance is withheld
+entirely rather than rounded**, because a precise distance from a point the
+caller chose undoes the blurring in one subtraction.
 
 ---
 

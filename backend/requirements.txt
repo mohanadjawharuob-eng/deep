@@ -22,3 +22,11 @@ bcrypt==4.2.1
 Pillow==11.0.0
 # QR codes for artifact, site and project labels. The [pil] extra renders PNG.
 qrcode[pil]==8.0
+
+# GIS interchange. Both are pure Python, so the wheel-only Docker build stands.
+# pyshp reads and writes shapefiles without GDAL, which would drag in a
+# compiler and a 200 MB dependency tree for a format that is three simple
+# binary files. defusedxml parses KML: KML is XML, and XML from a stranger is
+# an entity-expansion attack unless the parser is hardened.
+pyshp==3.1.6
+defusedxml==0.7.1

@@ -46,6 +46,10 @@ from app.models import (
     Document,
     DocumentType,
     ExcavationContext,
+    GeometryKind,
+    GisFeature,
+    GisLayer,
+    LayerCategory,
     Material,
     MovementReason,
     ObjectCategory,
@@ -65,7 +69,7 @@ from app.models import (
     User,
     UserRole,
 )
-from app.services import access, images
+from app.services import access, geo, images
 from app.services import documents as document_service
 from app.services import storage_locations as storage_tree
 from app.services.storage import (
@@ -629,6 +633,93 @@ def seed_sample_storage(session: Session, *, artifacts: list[Artifact], user: Us
     )
 
 
+def seed_sample_gis(session: Session, *, project: Project, site: Site, user: User) -> None:
+    """A trench plan and a survey boundary, so the map has something on it.
+
+    Coordinates are placed around the demonstration site's own position, so
+    the layers land where the site does rather than in a different country.
+    """
+    centre_lon = float(site.longitude)
+    centre_lat = float(site.latitude)
+
+    def offset(east: float, north: float) -> list[float]:
+        """Metres east/north of the site, as degrees.
+
+        Rough but adequate for demonstration geometry: a degree of latitude is
+        ~111 km everywhere, and a degree of longitude shrinks with the cosine
+        of the latitude.
+        """
+        import math
+
+        return [
+            round(centre_lon + east / (111_320 * math.cos(math.radians(centre_lat))), 7),
+            round(centre_lat + north / 110_540, 7),
+        ]
+
+    layer = GisLayer(
+        name="Trench plan, 2024 season",
+        description="Excavated trenches and the surveyed site boundary (sample data).",
+        category=LayerCategory.TRENCH,
+        geometry_kind=GeometryKind.POLYGON,
+        project_id=project.id,
+        site_id=site.id,
+        style={"color": "#c2703d", "weight": 2, "fillOpacity": 0.25},
+        source_format="geojson",
+        source_crs="EPSG:4326",
+        is_public=True,
+        owner_id=user.id,
+    )
+    session.add(layer)
+    session.flush()
+
+    trenches = [
+        (
+            "Trench A",
+            {"trench": "A", "opened": "2024-04-15", "supervisor": "E. Marchetti"},
+            [offset(-20, -20), offset(0, -20), offset(0, 0), offset(-20, 0), offset(-20, -20)],
+        ),
+        (
+            "Trench B",
+            {"trench": "B", "opened": "2024-05-02", "supervisor": "J. Okonkwo"},
+            [offset(10, -20), offset(30, -20), offset(30, 0), offset(10, 0), offset(10, -20)],
+        ),
+        (
+            "Site boundary",
+            {"survey": "2024 topographic survey"},
+            [
+                offset(-60, -60),
+                offset(60, -60),
+                offset(60, 60),
+                offset(-60, 60),
+                offset(-60, -60),
+            ],
+        ),
+    ]
+
+    for name, properties, ring in trenches:
+        session.add(
+            GisFeature(
+                layer_id=layer.id,
+                name=name,
+                geom=geo.geometry_element(
+                    {"type": "Polygon", "coordinates": [ring]}, geo.STORAGE_SRID
+                ),
+                properties=properties,
+                site_id=site.id,
+            )
+        )
+
+    session.flush()
+
+    layer.feature_count = len(trenches)
+    extent = geo.extent_of(session, layer.id)
+    layer.bbox = extent.as_list() if extent is not None else None
+    session.add(layer)
+    session.flush()
+
+    logger.info("Sample GIS created: layer %r with %d features", layer.name, len(trenches))
+
+
 def seed_samples(session: Session, admin: User) -> None:
     """Create a small but complete demonstration project."""
     if session.scalar(select(Project).where(Project.code == "DEMO-2024")) is not None:
@@ -935,6 +1026,7 @@ def seed_samples(session: Session, admin: User) -> None:
 
     seed_sample_media(session, project=project, site=site, artifact=artifacts[0], user=researcher)
     seed_sample_storage(session, artifacts=artifacts, user=researcher)
+    seed_sample_gis(session, project=project, site=site, user=researcher)
 
     now = datetime.now(UTC)
     for offset, (label, action) in enumerate(

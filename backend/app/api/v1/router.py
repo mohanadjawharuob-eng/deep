@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     auth,
     contexts,
     documents,
+    gis,
     health,
     history,
     labels,
@@ -21,6 +22,7 @@ from app.api.v1.endpoints import (
     review,
     search,
     sites,
+    spatial,
     storage,
     taxonomy,
     users,
@@ -41,6 +43,10 @@ api_router.include_router(contexts.router)
 
 # Physical storage: one hierarchy shared by every module that holds objects.
 api_router.include_router(storage.router)
+
+# Spatial: layers and their features, plus search by radius, box and polygon.
+api_router.include_router(gis.router)
+api_router.include_router(spatial.router)
 
 # Media
 api_router.include_router(photographs.router)

@@ -3,12 +3,11 @@
 A centralised database for researchers, universities, museums and excavation
 projects to store, search, visualise and manage archaeological information.
 
-> **Status: milestone 4 done — foundations for a five-module platform.**
-> The archaeology module is complete through file uploads and printable labels.
-> Permissions are granted **per module** rather than by a single global role,
-> and one shared storage hierarchy records where every physical object is and
-> everywhere it has been. Both are what the museum, inventory, management and
-> social-media modules hang from. See [Roadmap](#roadmap).
+> **Status: milestone 5 done — GIS, interchange and spatial search.**
+> The archaeology module is complete: records, history, files, labels, per-module
+> permissions, a shared storage hierarchy, and now map layers with GeoJSON, KML
+> and shapefile import/export plus search by radius, viewport and polygon. The
+> museum module is next. See [Roadmap](#roadmap).
 
 ---
 
@@ -40,6 +39,7 @@ what makes the permission model meaningful rather than advisory.
 | Auth | JWT (HS256) access + rotating refresh tokens, bcrypt |
 | Migrations | Alembic |
 | Files | Local disk behind a storage interface, ready for S3/GCS |
+| GIS | PostGIS geometry; GeoJSON, KML and shapefile interchange |
 | Frontend | React + TypeScript, Leaflet + OpenStreetMap *(last milestone)* |
 
 ---
@@ -240,6 +240,37 @@ Three decisions worth calling out:
   and a wrong guess writes a wrong location into a heritage register. The old
   text is kept and reported until somebody who knows the building maps it.
 
+### Milestone 5 — GIS, interchange and spatial search
+
+**Map layers** of real PostGIS geometry — trench plans, survey grids,
+geophysics outlines — served as literal GeoJSON `FeatureCollection`s, ready to
+hand to Leaflet.
+
+**Import and export** in GeoJSON, KML/KMZ and zipped shapefile. An archive
+holding several shapefiles reads as one layer, because a shapefile carries one
+geometry type and a survey with trenches, finds and a boundary *is* three files.
+
+**Spatial search** across sites, artifacts, contexts and map features at once:
+by radius (`/spatial/nearby`), by viewport (`/spatial/bbox`) and inside a
+supplied polygon (`/spatial/within`).
+
+The decision this milestone turns on:
+
+- **Coordinate systems are never guessed.** A site grid is almost always in a
+  projected system, and a projection bug does not raise anything — the import
+  succeeds, the map renders, and the site is in the wrong country until
+  somebody visits. So: plausible degrees are accepted, anything else needs an
+  explicit `source_srid` and gets reprojected by PostGIS, and a file that
+  **contradicts itself** — a `.prj` claiming WGS84 over coordinates that cannot
+  be degrees — is refused with a message saying what to send instead.
+- **Radii are true metres, not degrees.** A degree of longitude is 111 km at
+  the equator and nothing at the pole; a degree-based radius silently changes
+  size as the map moves.
+- **Restricted sites stay restricted in spatial results.** Coordinates are
+  blurred as they are everywhere else, and the *distance* is withheld outright
+  rather than rounded — a precise distance from a point the caller chose would
+  undo the blurring in one subtraction.
+
 ### Endpoints
 
 | Method | Path | Who |
@@ -270,6 +301,12 @@ Three decisions worth calling out:
 | `GET` | `/storage/locations/{id}/contents` | scoped per object |
 | `POST` | `/storage/{kind}/{id}/move` | anyone who may edit the object |
 | `GET` | `/storage/{kind}/{id}/location`, `/movements` | anyone who can read it |
+| `GET`/`POST` | `/gis/layers[/{id}]` | scoped by permission / contributors |
+| `GET`/`POST`/`PATCH`/`DELETE` | `/gis/layers/{id}/features[/{fid}]` | readers / layer editors |
+| `POST` | `/gis/import` | contributors — GeoJSON, KML/KMZ or zipped shapefile |
+| `GET` | `/gis/layers/{id}/export`, `/gis/export/sites` | anyone who can read it |
+| `GET` | `/spatial/nearby`, `/spatial/bbox` | anyone, scoped |
+| `POST` | `/spatial/within` | anyone, scoped |
 | `POST` | `/photographs`, `/documents`, `/models3d/upload` | contributors on the project |
 | `GET` | `/photographs`, `/documents`, `/models3d` | anyone, scoped by permission |
 | `GET` | `/photographs/{id}/file`, `/thumbnail?size=` | anyone who can read it |
@@ -387,7 +424,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-pytest                              # 550 tests
+pytest                              # 625 tests
 pytest --cov=app                    # coverage
 ruff check app tests scripts        # lint
 alembic revision --autogenerate -m "…"   # after editing models
@@ -409,8 +446,8 @@ office & storage inventory — with a digital archive to follow.
 | **2 — done** | CRUD for projects, sites, artifacts and contexts; revision history; approval workflow; activity feed; search |
 | **3 — done** | File uploads, thumbnails, EXIF, documents, 3D models, QR code images |
 | **4 — done** | **Foundations for the five-module platform**: per-module permissions, the storage-location hierarchy and movement history |
-| 5 | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
-| 6 | Museum collection module: catalogue, loans, exhibitions, conservation records |
+| **5 — done** | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
+| **6 — next** | Museum collection module: catalogue, loans, exhibitions, conservation records |
 | 7 | Inventory module and the excavation kit builder |
 | 8 | Management module: budgets, grants, staff, tasks, calendar |
 | 9 | Social media repository; the [data-request system](docs/data-requests.md) and its upload links |

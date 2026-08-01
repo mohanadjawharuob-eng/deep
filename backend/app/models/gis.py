@@ -60,9 +60,10 @@ class GisLayer(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, Base):
     #: CRS the file arrived in; everything is reprojected to EPSG:4326 on import.
     source_crs: Mapped[str | None] = mapped_column(String(50))
     feature_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    #: Cached extent as ``[minx, miny, maxx, maxy]`` so the map can zoom to a
-    #: layer without scanning its features.
-    bbox: Mapped[dict | None] = mapped_column(JSONB)
+    #: Cached extent as ``[minLon, minLat, maxLon, maxLat]`` so the map can
+    #: zoom to a layer without scanning its features. Refreshed by every path
+    #: that changes what is in the layer.
+    bbox: Mapped[list | None] = mapped_column(JSONB)
 
     features: Mapped[list[GisFeature]] = relationship(
         back_populates="layer", cascade="all, delete-orphan"

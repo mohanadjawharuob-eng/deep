@@ -239,6 +239,53 @@ The demonstration data includes one account per level, all with the password
 | `j.okonkwo` | contributor | add records; they wait for approval |
 | `visitor` | viewer | read public records only |
 
+### The map data
+
+The demonstration project includes a trench plan: two trenches and a surveyed
+site boundary, drawn around the sample site's real position.
+
+`GET /api/v1/gis/layers` → *Try it out* → *Execute* lists it. Copy the layer's
+`id` and open this in a new tab:
+
+`http://localhost:8000/api/v1/gis/layers/<id>/features`
+
+That is **GeoJSON** — the standard format every mapping tool reads. You can
+paste it straight into <https://geojson.io> to see the trenches drawn on a map,
+which is a fair preview of what milestone 10's interface will show.
+
+You can also download the layer as a file:
+
+- `.../export` — GeoJSON
+- `.../export?format=kml` — KML, which opens in Google Earth
+- `.../export?format=shapefile` — a zipped shapefile for QGIS or ArcGIS
+
+**Uploading your own map data.** `POST /api/v1/gis/import` accepts GeoJSON, KML
+and zipped shapefiles.
+
+One thing to know, because it will look like an error and is not: if your file
+is in a **projected coordinate system** — which a total station survey almost
+always is, with coordinates like `768000, 3604000` rather than `35.8, 32.5` —
+the platform will refuse it and ask for the EPSG code. That refusal is
+deliberate. Accepting those numbers as longitude and latitude would put your
+site in the wrong country, the map would still draw, and nothing would tell you.
+Add `source_srid` (for example `32636` for UTM zone 36N) and it converts them
+properly.
+
+### Searching by place
+
+Three ways to ask "what is here", all of which search sites, finds, contexts
+and map features together:
+
+- `GET /api/v1/spatial/nearby?lat=34.7324&lon=36.7137&radius_m=2000`
+  — everything within 2 km, nearest first.
+- `GET /api/v1/spatial/bbox?bbox=36.70,34.72,36.73,34.74`
+  — everything inside a rectangle, which is what a map asks as you pan.
+- `POST /api/v1/spatial/within` with a polygon — everything inside a shape,
+  such as a survey area or a proposed development boundary.
+
+Sites marked as having a restricted location come back deliberately imprecise,
+and without a distance, no matter which of these you use.
+
 ### Where things are stored
 
 The demonstration data includes a small store, so you can see how the platform
