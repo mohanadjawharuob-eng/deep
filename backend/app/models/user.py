@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import PermissionLevel, ResourceType, UserRole
+from app.models.enums import Module, ModuleLevel, PermissionLevel, ResourceType, UserRole
 
 if TYPE_CHECKING:
     from app.models.project import ProjectMembership
@@ -76,6 +76,14 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         foreign_keys="ProjectMembership.user_id",
     )
+    #: Eagerly loaded because every authorisation decision reads it, including
+    #: the SQL filters, which are built without a session in hand.
+    module_access: Mapped[list[UserModuleAccess]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="UserModuleAccess.user_id",
+        lazy="selectin",
+    )
 
     __table_args__ = (Index("ix_users_full_name", "full_name"),)
 
@@ -83,8 +91,64 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     def is_admin(self) -> bool:
         return self.role is UserRole.ADMIN
 
+    def level_in(self, module: Module) -> ModuleLevel | None:
+        """The level held in one module, or ``None`` for no access at all.
+
+        A platform administrator holds the top level everywhere without needing
+        a row per module — that is what makes them an administrator.
+        """
+        if self.role is UserRole.ADMIN:
+            return ModuleLevel.ADMINISTRATOR
+        for grant in self.module_access:
+            if grant.module is module:
+                return grant.level
+        return None
+
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<User {self.username} ({self.role.value})>"
+
+
+class UserModuleAccess(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """One user's level in one module.
+
+    Access is *additive*: a user holds a row per module they can reach, and the
+    absence of a row means no access to that module at all. There is no
+    inheritance from the global role — the global role decides who administers
+    the platform, not who can see the museum's collection.
+
+    Keeping this as rows rather than a column per module means adding the sixth
+    module is a new enum value, not a schema change plus a code change
+    everywhere a permission is read.
+    """
+
+    __tablename__ = "user_module_access"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    module: Mapped[Module] = mapped_column(
+        Enum(Module, name="module", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
+    level: Mapped[ModuleLevel] = mapped_column(
+        Enum(ModuleLevel, name="module_level", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
+    granted_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    #: Why this access was given — useful when auditing who may see what.
+    note: Mapped[str | None] = mapped_column(String(300))
+
+    user: Mapped[User] = relationship(back_populates="module_access", foreign_keys=[user_id])
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "module", name="uq_user_module_access"),
+        Index("ix_user_module_access_lookup", "user_id", "module"),
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"<UserModuleAccess {self.module.value}={self.level.value}>"
 
 
 class RefreshToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):

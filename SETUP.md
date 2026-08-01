@@ -230,14 +230,45 @@ it was taken.
 
 ### Sample accounts
 
-The demonstration data includes one account per role, all with the password
+The demonstration data includes one account per level, all with the password
 `DemoPass!2024`. Sign out and back in as these to see how permissions differ:
 
-| Username | Role | Can do |
+| Username | Archaeology level | Can do |
 |---|---|---|
-| `e.marchetti` | researcher | create projects, approve student work |
-| `j.okonkwo` | student | add records; they wait for approval |
-| `visitor` | visitor | read public records only |
+| `e.marchetti` | supervisor | create projects, approve other people's work |
+| `j.okonkwo` | contributor | add records; they wait for approval |
+| `visitor` | viewer | read public records only |
+
+### Who can see which parts of the platform
+
+Access is given **per module** — archaeology, museum, inventory, management,
+social media — and the grants stack up independently. Somebody can run the
+museum's collection without ever seeing an excavation record, and a field
+director can dig all season without reaching the institution's budgets.
+
+Try it: sign in as `admin` and call `GET /api/v1/users/me/access`. You will see
+`is_platform_admin: true`, meaning every module. Then look up the student with
+`GET /api/v1/users` and call `GET /api/v1/users/{id}/access` with their id —
+they hold only `archaeology: contributor`.
+
+To give somebody access to another module, use
+`PUT /api/v1/users/{id}/access` with a body like:
+
+```json
+{ "module": "museum", "level": "editor" }
+```
+
+It takes effect immediately — the person does not have to sign in again.
+
+The five levels, from least to most: **viewer** (read), **contributor** (add
+their own work, which waits for approval), **editor** (change anyone's work in
+that module, and their own no longer waits), **supervisor** (approve other
+people's work, start projects), **administrator** (everything in that module,
+including deleting).
+
+Only the *platform* administrator can create user accounts and change system
+settings. Being an administrator of every module does not grant that — running
+a collection is not the same job as running the institution's accounts.
 
 ---
 

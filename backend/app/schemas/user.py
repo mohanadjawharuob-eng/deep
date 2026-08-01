@@ -9,7 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.security import PasswordPolicyError, validate_password
-from app.models.enums import UserRole
+from app.models.enums import Module, ModuleLevel, UserRole
 from app.schemas.common import ORMModel
 
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9._-]{3,64}$")
@@ -77,6 +77,41 @@ class UserCreateAdmin(UserCreate):
     role: UserRole = UserRole.STUDENT
     is_active: bool = True
     is_verified: bool = True
+    module_access: dict[Module, ModuleLevel] | None = Field(
+        default=None,
+        description=(
+            "Access to grant beyond the default. Omit to give only the "
+            "archaeology access the role implies."
+        ),
+        examples=[{"museum": "editor", "inventory": "viewer"}],
+    )
+
+
+class ModuleAccessGrant(BaseModel):
+    """One module and the level to hold in it."""
+
+    module: Module
+    level: ModuleLevel
+    note: str | None = Field(default=None, max_length=300)
+
+
+class ModuleAccessRead(ORMModel):
+    module: Module
+    level: ModuleLevel
+    note: str | None = None
+    granted_by_id: uuid.UUID | None = None
+    created_at: datetime
+
+
+class ModuleAccessSummary(BaseModel):
+    """Everything one user can reach, for an administration screen."""
+
+    user_id: uuid.UUID
+    username: str
+    #: True when the user is a platform administrator, who holds every module
+    #: implicitly and therefore has no rows to show.
+    is_platform_admin: bool = False
+    access: dict[Module, ModuleLevel] = {}
 
 
 class UserUpdate(BaseModel):

@@ -25,10 +25,10 @@ from jwt.exceptions import InvalidTokenError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.permissions import Capability, has_capability
+from app.core.permissions import Capability, has_capability, has_module_access
 from app.core.security import decode_token
 from app.db.session import SessionLocal
-from app.models.enums import UserRole
+from app.models.enums import Module, ModuleLevel, UserRole
 from app.models.user import User
 
 #: Two ways to present the same credential, both reading ``Authorization:
@@ -160,14 +160,35 @@ def require_role(minimum: UserRole):
     return dependency
 
 
-def require_capability(capability: Capability):
-    """Dependency factory enforcing a global capability."""
+def require_capability(capability: Capability, module: Module = Module.ARCHAEOLOGY):
+    """Dependency factory enforcing a capability within one module."""
 
     def dependency(user: CurrentUser) -> User:
-        if not has_capability(user, capability):
+        if not has_capability(user, capability, module):
+            action = capability.value.replace("_", " ")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Your role does not permit: {capability.value.replace('_', ' ')}",
+                detail=(
+                    f"Your access to the {module.value.replace('_', ' ')} module "
+                    f"does not permit: {action}"
+                ),
+            )
+        return user
+
+    return dependency
+
+
+def require_module(module: Module, minimum: ModuleLevel):
+    """Dependency factory enforcing a minimum level in one module."""
+
+    def dependency(user: CurrentUser) -> User:
+        if not has_module_access(user, module, minimum):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"This action needs {minimum.value} access or higher in the "
+                    f"{module.value.replace('_', ' ')} module"
+                ),
             )
         return user
 

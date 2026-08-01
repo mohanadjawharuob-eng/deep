@@ -38,7 +38,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.base import Base
-from app.models import User, UserRole
+from app.models import Module, ModuleLevel, User, UserRole
+from app.services import access
 
 
 def _test_database_url() -> str:
@@ -152,7 +153,14 @@ def make_user(
     role: UserRole = UserRole.STUDENT,
     password: str = "TestPassword1",
     is_active: bool = True,
+    modules: dict[Module, ModuleLevel] | None = None,
 ) -> User:
+    """Create a user with the module access their role implies.
+
+    ``modules`` grants beyond that default — pass it to build the cross-module
+    users the permission model exists for, e.g. an archaeology editor who is
+    only a viewer in the museum.
+    """
     user = User(
         email=email,
         username=username,
@@ -164,6 +172,10 @@ def make_user(
     )
     db.add(user)
     db.flush()
+
+    access.grant_defaults(db, user)
+    for module, level in (modules or {}).items():
+        access.grant(db, user, module, level)
     return user
 
 

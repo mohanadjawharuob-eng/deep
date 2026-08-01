@@ -63,8 +63,8 @@ from app.models import (
     User,
     UserRole,
 )
+from app.services import access, images
 from app.services import documents as document_service
-from app.services import images
 from app.services.storage import (
     CATEGORY_DOCUMENTS,
     CATEGORY_PHOTOGRAPHS,
@@ -219,6 +219,7 @@ def seed_admin(session: Session) -> User:
     )
     session.add(admin)
     session.flush()
+    # No module rows: a platform administrator holds every module implicitly.
     session.add(
         ActivityLog(
             action=ActivityAction.CREATE,
@@ -546,6 +547,7 @@ def seed_samples(session: Session, admin: User) -> None:
             )
             session.add(user)
             session.flush()
+            access.grant_defaults(session, user)
         users[role.value] = user
 
     researcher = users[UserRole.RESEARCHER.value]

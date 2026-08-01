@@ -274,7 +274,8 @@ def check_can_contribute(session: Session, user: User, project_id: uuid.UUID) ->
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
     if not has_capability(user, Capability.CREATE_RECORD):
         raise HTTPException(
-            status.HTTP_403_FORBIDDEN, detail="Your role does not permit creating records"
+            status.HTTP_403_FORBIDDEN,
+            detail="Your access to the archaeology module does not permit creating records",
         )
     if project_level(session, user, project_id) is None and not can_edit(
         session, user, project, ResourceType.PROJECT

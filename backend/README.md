@@ -31,7 +31,8 @@ backend/
 │   │   ├── images.py         # image validation, EXIF, thumbnails
 │   │   ├── documents.py      # document validation by magic bytes
 │   │   ├── attachments.py    # shared media linking, permissions, serving
-│   │   └── qrcodes.py        # QR images for printed labels
+│   │   ├── qrcodes.py        # QR images for printed labels
+│   │   └── access.py         # granting and revoking module access
 │   └── api/
 │       ├── deps.py           # DI: sessions, current user, role guards
 │       └── v1/               # versioned routes
@@ -102,6 +103,7 @@ Worth knowing what each file is for:
 | `test_history_api.py` | versions, restore, review workflow, activity |
 | `test_search_api.py` | search results, filters and permission scoping |
 | `test_media_api.py` | uploads, EXIF, thumbnails, documents, 3D models, QR labels |
+| `test_module_access.py` | per-module permissions, granting, and the module ceiling |
 
 `test_media_api.py` generates its images rather than checking binaries in, so
 every property it asserts — dimensions, EXIF, GPS, orientation — is visible in
@@ -143,6 +145,7 @@ The migrations so far:
 | `0003_activity_project` | denormalised `project_id` on `activity_logs`, so the feed can be read per project |
 | `0004_audit_clock_timestamp` | audit timestamps taken at append time rather than transaction start |
 | `0005_public_tokens` | `public_token` on `projects` and `sites`, so both can carry a QR label |
+| `0006_module_access` | `user_module_access`, replacing the global role as the permission ceiling; backfills every existing account |
 
 `0001` is separate because PostGIS must exist before any geometry column is
 created. Always read a generated migration before committing it — autogenerate
@@ -249,32 +252,72 @@ Other properties worth knowing:
 
 ## Authorisation
 
-Three sources combine, and the **most permissive wins**:
+Four sources combine, and the **most permissive wins**:
 
-1. **Global role** — a ceiling. A visitor writes nothing, ever.
-2. **Project membership** — the normal path: joining a team confers a level on
-   everything in that project.
+1. **Module access** — a ceiling, per functional area. Rows in
+   `user_module_access` say what level a user holds in each module, and the
+   absence of a row means no access to that module at all.
+2. **Project membership** — the normal path inside a module: joining a team
+   confers a level on everything in that project.
 3. **Per-record grants** — `record_permissions` rows, for sharing one record
    outside the team.
+4. **The global role** — reserved for administering the *platform*: creating
+   accounts, editing vocabularies, changing settings. A platform administrator
+   holds every module implicitly; no other role says anything about modules.
 
 Ownership and the public flag sit on top: an owner always holds `OWNER` on
 their own record, and a public record is readable by anyone including anonymous
-visitors.
+visitors — module access does not gate public reading, or anonymous browsing
+could not work.
 
-| | visitor | student | researcher | admin |
+### Modules
+
+Access is **additive** and independent per module, so a collections manager can
+run the museum without seeing a single excavation record:
+
+| | archaeology | museum | inventory | management |
 |---|:---:|:---:|:---:|:---:|
-| Browse public records, search, map | ✅ | ✅ | ✅ | ✅ |
-| Create records in own projects | ❌ | ✅ | ✅ | ✅ |
-| Upload images / documents | ❌ | ✅ | ✅ | ✅ |
-| Edit own records | ❌ | ✅ | ✅ | ✅ |
-| Edit others' records in a project | ❌ | ❌ | ✅ | ✅ |
-| Create projects | ❌ | ❌ | ✅ | ✅ |
-| Approve submissions | ❌ | ❌ | ✅ | ✅ |
-| Delete a project | ❌ | ❌ | director only | ✅ |
-| Manage users, roles, settings | ❌ | ❌ | ❌ | ✅ |
+| Field director | supervisor | viewer | contributor | — |
+| Collections manager | — | administrator | editor | — |
+| Finds assistant | contributor | contributor | — | — |
+| Administrator | *implicit, everywhere* | | | |
 
-Records created by students start as `pending` and are invisible to readers
-until a researcher on the same project approves them. Researchers cannot
+Modules are `archaeology`, `museum`, `social_media`, `management`, `inventory`
+and `archive`. Only archaeology is built; the rest exist as grantable values so
+access can be modelled before the modules land.
+
+### Levels
+
+| Level | May |
+|---|---|
+| `viewer` | read |
+| `contributor` | create and edit their **own** work; it queues for approval |
+| `editor` | edit **anyone's** work in the module; their own needs no approval |
+| `supervisor` | approve submissions, start projects, manage teams |
+| `administrator` | full control of the module, deletion included |
+
+The contributor/editor boundary is the one that matters: it is the difference
+between work that is checked and work that is trusted. `requires_approval()`
+reads exactly that, which is why promoting someone to editor is what stops
+their records queueing — not a change to their job title.
+
+Three capabilities are **platform** capabilities and sit outside this ladder
+entirely: `manage_users`, `manage_taxonomy` and `manage_system`. Being
+administrator of every module does not reach them, because running a museum
+must not confer the ability to create accounts.
+
+### What this replaced
+
+The original single global role (`visitor`/`student`/`researcher`/`admin`) is
+still on the user record, and still decides who administers the platform, but
+it is no longer the permission ceiling. Migration `0006` backfills the module
+access each existing role implied — visitor→viewer, student→contributor,
+researcher→supervisor — so nothing anyone could do before, they cannot do
+after. The whole pre-existing test suite passes unchanged against the new
+model, which is the evidence for that claim.
+
+Records created by contributors start as `pending` and are invisible to readers
+until a supervisor on the same project approves them. Supervisors cannot
 approve work in projects they are not members of.
 
 Every check lives in `app/core/permissions.py`. Endpoints call it; they never
@@ -320,7 +363,7 @@ Three rules are worth knowing:
 
 ## Data model
 
-25 tables. The core chain is:
+26 tables. The core chain is:
 
 ```
 Project ──< Site ──< ExcavationContext ──< Artifact
@@ -344,6 +387,9 @@ Design decisions that are not obvious from the schema:
 - **Media links are denormalised.** A photograph carries `project_id`,
   `site_id`, `artifact_id` and `context_id`, so the gallery at any level is one
   indexed query rather than a recursive join.
+- **Module access is rows, not columns.** One row per user per module they can
+  reach. Adding the sixth module is then a new enum value rather than a schema
+  change plus an edit everywhere a permission is read.
 
 ---
 

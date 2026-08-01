@@ -3,11 +3,11 @@
 A centralised database for researchers, universities, museums and excavation
 projects to store, search, visualise and manage archaeological information.
 
-> **Status: milestone 3 of 5 — files, media and printable labels.**
-> The API manages projects, sites, artifacts and excavation contexts, with
-> version history, an approval workflow, an audit feed and global search; it now
-> also takes photograph, document and 3D model uploads, generates thumbnails and
-> QR labels. GIS endpoints and the frontend land in later milestones. See
+> **Status: milestone 4 — laying the foundations for a five-module platform.**
+> The archaeology module is complete through file uploads and printable labels.
+> Permissions are now granted **per module** rather than by a single global
+> role, which is what the museum, inventory, management and social-media modules
+> will hang from. The storage-location hierarchy is next. See
 > [Roadmap](#roadmap).
 
 ---
@@ -16,7 +16,7 @@ projects to store, search, visualise and manage archaeological information.
 
 ```
    ┌──────────────────────────────────────┐
-   │  Frontend — React + TypeScript       │   (milestone 5)
+   │  Frontend — React + TypeScript       │   (last milestone)
    └──────────────────┬───────────────────┘
                       │  HTTPS / JSON
    ┌──────────────────▼───────────────────┐
@@ -40,7 +40,7 @@ what makes the permission model meaningful rather than advisory.
 | Auth | JWT (HS256) access + rotating refresh tokens, bcrypt |
 | Migrations | Alembic |
 | Files | Local disk behind a storage interface, ready for S3/GCS |
-| Frontend | React + TypeScript, Leaflet + OpenStreetMap *(milestone 5)* |
+| Frontend | React + TypeScript, Leaflet + OpenStreetMap *(last milestone)* |
 
 ---
 
@@ -101,7 +101,7 @@ See [`backend/README.md`](backend/README.md).
 
 ### Milestone 1 — foundations
 
-**Database schema — 25 tables, complete for every module in the specification.**
+**Database schema — 26 tables**, covering the archaeology module in full.
 Projects, sites, artifacts and excavation contexts; photographs, documents and
 3D models; GIS layers and features; controlled vocabularies for periods,
 materials and object categories; publications; and the cross-cutting tables for
@@ -111,8 +111,9 @@ permissions, revisions, activity, notifications and comments.
 tokens, rotating refresh tokens with reuse detection, session listing and
 revocation, password change, administrative reset, and account lockout.
 
-**Authorisation.** One policy module combining global roles, project membership
-and per-record grants, with the student-approval workflow built in.
+**Authorisation.** One policy module combining project membership and
+per-record grants, with the approval workflow built in. Milestone 4 replaced
+the global role at the top of this with per-module access.
 
 **Operations.** Multi-stage Docker build running as a non-root user,
 health-checked Compose stack, automatic migration and seeding on start, and a
@@ -130,9 +131,10 @@ first edit. Any version can be restored, and the restore is itself a new
 version — nothing is ever overwritten irrecoverably. A record's final state
 survives its deletion.
 
-**Approval workflow.** Student submissions enter a pending queue, stay out of
-public listings until approved, and notify the project's researchers. Approving
-requires both the researcher role and rights on that particular project.
+**Approval workflow.** Contributors' submissions enter a pending queue, stay
+out of public listings until approved, and notify the project's supervisors.
+Approving requires both the supervisor level *and* rights on that particular
+project — seniority elsewhere does not reach into someone else's excavation.
 
 **Activity feed.** Every write, sign-in and review decision is logged with the
 fields that changed, scoped so users see their own actions plus activity in
@@ -187,6 +189,29 @@ Three decisions worth calling out:
   bytes, so a filename can never influence where something is written, and the
   same photograph uploaded twice costs one copy.
 
+### Milestone 4 — foundations for five modules
+
+**Per-module permissions.** A user holds an independent level in each module,
+and the grants are additive — the collections manager who runs the museum and
+cannot see a single excavation record is now expressible, which it was not
+before. Levels are viewer, contributor, editor, supervisor and administrator;
+see [Permissions](#permissions).
+
+The global role did not disappear, it narrowed: it now decides who administers
+the *platform* (accounts, vocabularies, settings) and nothing else. Migration
+`0006` backfills the module access every existing account's role implied, so
+nobody can do less after it runs than before.
+
+Two decisions worth calling out:
+
+- **The whole pre-existing suite passes unchanged** against the new model. That
+  was the acceptance test for the retrofit: a permission rewrite that quietly
+  widens or narrows access is worse than no rewrite, and 118 parametrised
+  visibility cases agreeing before and after is the evidence it did neither.
+- **Platform powers sit outside the module ladder.** Being administrator of
+  every module still cannot create a user account. Modules are about the work;
+  accounts and settings are about the institution.
+
 ### Endpoints
 
 | Method | Path | Who |
@@ -210,6 +235,8 @@ Three decisions worth calling out:
 | `GET` | `/taxonomy/periods`, `/materials`, `/categories` | anyone |
 | `POST`/`PATCH`/`DELETE` | the same `/taxonomy/…` paths | admin |
 | `GET`/`POST`/`DELETE` | `/notifications…` | signed in, own inbox only |
+| `GET` | `/users/me/access` | signed in — which modules you can reach |
+| `GET`/`PUT`/`DELETE` | `/users/{id}/access[/{module}]` | platform administrator |
 | `POST` | `/photographs`, `/documents`, `/models3d/upload` | contributors on the project |
 | `GET` | `/photographs`, `/documents`, `/models3d` | anyone, scoped by permission |
 | `GET` | `/photographs/{id}/file`, `/thumbnail?size=` | anyone who can read it |
@@ -225,20 +252,37 @@ and `documents`.
 
 ---
 
-## Roles
+## Permissions
 
-| | visitor | student | researcher | admin |
+Access is granted **per module**, and the grants are additive. Somebody can run
+the museum without seeing a single excavation record, or dig all season without
+reaching the institution's budgets:
+
+| | archaeology | museum | inventory | management |
 |---|:---:|:---:|:---:|:---:|
-| Browse public records, search, map | ✅ | ✅ | ✅ | ✅ |
-| Create records, upload images | ❌ | ✅ | ✅ | ✅ |
-| Edit own records | ❌ | ✅ | ✅ | ✅ |
-| Edit others' records in a project | ❌ | ❌ | ✅ | ✅ |
-| Create projects, approve submissions | ❌ | ❌ | ✅ | ✅ |
-| Delete a project | ❌ | ❌ | director only | ✅ |
-| Manage users, roles, settings | ❌ | ❌ | ❌ | ✅ |
+| Field director | supervisor | viewer | contributor | — |
+| Collections manager | — | administrator | editor | — |
+| Finds assistant | contributor | contributor | — | — |
+| Communications officer | viewer | viewer | — | — |
+| Administrator | *implicit, every module* | | | |
 
-Student submissions start as `pending` and stay invisible to readers until a
-researcher on the same project approves them.
+Within each module there are five levels:
+
+| Level | May |
+|---|---|
+| `viewer` | read |
+| `contributor` | create and edit their **own** work; it queues for approval |
+| `editor` | edit **anyone's** work in the module; their own needs no approval |
+| `supervisor` | approve submissions, start projects, manage teams |
+| `administrator` | full control of the module, deletion included |
+
+The contributor/editor line is the one that matters: it separates work that is
+checked from work that is trusted.
+
+Creating accounts, editing the controlled vocabularies and changing system
+settings are **platform** powers, held only by the global administrator role.
+Being administrator of every module does not reach them — running a collection
+should not confer the ability to create users.
 
 ---
 
@@ -310,7 +354,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-pytest                              # 454 tests
+pytest                              # 502 tests
 pytest --cov=app                    # coverage
 ruff check app tests scripts        # lint
 alembic revision --autogenerate -m "…"   # after editing models
@@ -322,16 +366,33 @@ Tests need a PostgreSQL with PostGIS; they create and drop their own database.
 
 ## Roadmap
 
+The platform is five permissioned modules over one authentication system and
+one database — archaeology, museum collections, social media, management, and
+office & storage inventory — with a digital archive to follow.
+
 | Milestone | Contents |
 |-----------|----------|
 | **1 — done** | Backend skeleton, full schema, auth, permissions, Docker, backups |
 | **2 — done** | CRUD for projects, sites, artifacts and contexts; revision history; approval workflow; activity feed; search |
 | **3 — done** | File uploads, thumbnails, EXIF, documents, 3D models, QR code images |
-| 4 | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
-| 5 | React frontend: dashboard, map, forms, dark/light mode, admin panel |
+| **4 — in progress** | **Foundations for the five-module platform**: per-module permissions *(done)*, the storage-location hierarchy and movement history *(next)* |
+| 5 | GIS endpoints, GeoJSON/Shapefile/KML import and export, spatial search |
+| 6 | Museum collection module: catalogue, loans, exhibitions, conservation records |
+| 7 | Inventory module and the excavation kit builder |
+| 8 | Management module: budgets, grants, staff, tasks, calendar |
+| 9 | Social media repository; the data-request system and its upload links |
+| 10 | React frontend: dashboard, map, forms, dark/light mode, admin panel |
 
-Later: AI-assisted classification and image tagging, OCR, satellite and drone
-imagery, LiDAR, offline field collection.
+Milestone 4 is sequenced ahead of everything else deliberately. The permission
+model and the storage hierarchy are load-bearing for every module that follows,
+so each one built on the old shape would be rework — and a frontend built on it
+would be the most expensive rework available. GIS and the interface do not
+compound like that, so they wait.
+
+Later: the digital archive module, AI-assisted classification and image tagging,
+OCR, satellite and drone imagery, LiDAR, marine survey (MBES and side-scan
+sonar), direct publishing through social media APIs, digital signatures, and
+offline field collection.
 
 ---
 

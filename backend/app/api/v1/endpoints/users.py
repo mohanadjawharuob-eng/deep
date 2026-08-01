@@ -11,10 +11,12 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, DbSession, RequireAdmin
 from app.core.security import hash_password
-from app.models.enums import ActivityAction, ResourceType, UserRole
+from app.models.enums import ActivityAction, Module, ResourceType, UserRole
 from app.models.user import User
 from app.schemas.common import Message, Page
 from app.schemas.user import (
+    ModuleAccessGrant,
+    ModuleAccessSummary,
     PasswordReset,
     UserCreateAdmin,
     UserPublic,
@@ -22,7 +24,7 @@ from app.schemas.user import (
     UserUpdate,
     UserUpdateAdmin,
 )
-from app.services import activity, auth
+from app.services import access, activity, auth
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -148,6 +150,9 @@ def create_user(
     )
     session.add(user)
     session.flush()
+    access.grant_defaults(session, user, granted_by=admin)
+    for module, level in (payload.module_access or {}).items():
+        access.grant(session, user, module, level, granted_by=admin)
 
     activity.log(
         session,
@@ -313,3 +318,141 @@ def deactivate_user(
         request=request,
     )
     return Message(detail="Account deactivated")
+
+
+# --------------------------------------------------------------------------
+# Module access
+# --------------------------------------------------------------------------
+def _access_summary(user: User) -> ModuleAccessSummary:
+    return ModuleAccessSummary(
+        user_id=user.id,
+        username=user.username,
+        is_platform_admin=user.role is UserRole.ADMIN,
+        access={grant.module: grant.level for grant in user.module_access},
+    )
+
+
+@router.get(
+    "/me/access",
+    response_model=ModuleAccessSummary,
+    summary="What modules you can reach",
+    description=(
+        "The modules this account has access to, and at what level. A client "
+        "reads this once at sign-in to decide which sections of the interface "
+        "to show.\n\n"
+        "A platform administrator holds every module implicitly and so reports "
+        "`is_platform_admin: true` with an empty `access` map — that is not the "
+        "same as having no access."
+    ),
+)
+def read_own_access(user: CurrentUser) -> ModuleAccessSummary:
+    return _access_summary(user)
+
+
+@router.get(
+    "/{user_id}/access",
+    response_model=ModuleAccessSummary,
+    summary="What modules a user can reach (administrator)",
+)
+def read_user_access(
+    user_id: uuid.UUID, session: DbSession, admin: RequireAdmin
+) -> ModuleAccessSummary:
+    target = session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    return _access_summary(target)
+
+
+@router.put(
+    "/{user_id}/access",
+    response_model=ModuleAccessSummary,
+    summary="Grant or change module access (administrator)",
+    description=(
+        "Sets the level this user holds in one module, replacing whatever they "
+        "held before. Access is additive across modules: granting museum access "
+        "does not touch their archaeology access.\n\n"
+        "Granting access to a platform administrator is refused — they already "
+        "hold every module, and a row would imply it could be taken away."
+    ),
+)
+def grant_user_access(
+    user_id: uuid.UUID,
+    payload: ModuleAccessGrant,
+    session: DbSession,
+    admin: RequireAdmin,
+    request: Request,
+) -> ModuleAccessSummary:
+    target = session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    if target.role is UserRole.ADMIN:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Platform administrators already hold every module. Change their "
+                "role first if their access should be limited."
+            ),
+        )
+
+    access.grant(
+        session,
+        target,
+        payload.module,
+        payload.level,
+        granted_by=admin,
+        note=payload.note,
+    )
+    activity.log(
+        session,
+        action=ActivityAction.UPDATE,
+        user=admin,
+        resource_type=ResourceType.USER,
+        resource_id=target.id,
+        resource_label=target.username,
+        summary=(
+            f"Granted {payload.level.value} access to the "
+            f"{payload.module.value.replace('_', ' ')} module"
+        ),
+        request=request,
+    )
+    return _access_summary(target)
+
+
+@router.delete(
+    "/{user_id}/access/{module}",
+    response_model=ModuleAccessSummary,
+    summary="Revoke module access (administrator)",
+    description=(
+        "Removes this user's access to one module entirely. Records they "
+        "created there are untouched — the account keeps its authorship, it "
+        "simply can no longer reach the module."
+    ),
+)
+def revoke_user_access(
+    user_id: uuid.UUID,
+    module: Module,
+    session: DbSession,
+    admin: RequireAdmin,
+    request: Request,
+) -> ModuleAccessSummary:
+    target = session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not access.revoke(session, target, module):
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail=f"That user has no access to the {module.value.replace('_', ' ')} module",
+        )
+
+    activity.log(
+        session,
+        action=ActivityAction.UPDATE,
+        user=admin,
+        resource_type=ResourceType.USER,
+        resource_id=target.id,
+        resource_label=target.username,
+        summary=f"Revoked access to the {module.value.replace('_', ' ')} module",
+        request=request,
+    )
+    return _access_summary(target)

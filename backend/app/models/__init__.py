@@ -18,6 +18,8 @@ from app.models.enums import (
     GeometryKind,
     LayerCategory,
     Model3DFormat,
+    Module,
+    ModuleLevel,
     NotificationType,
     PermissionLevel,
     ProjectRole,
@@ -34,7 +36,7 @@ from app.models.media import Document, Model3D, Photograph
 from app.models.project import Project, ProjectMembership
 from app.models.site import Site
 from app.models.taxonomy import Material, ObjectCategory, Period, Publication, SystemSetting
-from app.models.user import RecordPermission, RefreshToken, User
+from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess
 
 __all__ = [
     "ActivityAction",
@@ -68,6 +70,8 @@ __all__ = [
     "ProjectStatus",
     "ProtectionStatus",
     "Publication",
+    "Module",
+    "ModuleLevel",
     "RecordPermission",
     "RefreshToken",
     "ResourceType",
@@ -78,6 +82,7 @@ __all__ = [
     "StratigraphicRelation",
     "SystemSetting",
     "User",
+    "UserModuleAccess",
     "UserRole",
     "artifact_materials",
     "artifact_publications",

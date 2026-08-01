@@ -55,6 +55,75 @@ _ROLE_RANK: dict[UserRole, int] = {
 }
 
 
+class Module(str, enum.Enum):
+    """A functional area of the platform, permissioned independently.
+
+    A user holds a level in each module separately and additively: being an
+    editor in the archaeology module says nothing about whether they can see
+    the museum's loan records or the institution's budgets.
+    """
+
+    ARCHAEOLOGY = "archaeology"
+    MUSEUM = "museum"
+    SOCIAL_MEDIA = "social_media"
+    MANAGEMENT = "management"
+    INVENTORY = "inventory"
+    #: Declared before it is built. Adding a value to a PostgreSQL enum later
+    #: is a migration that cannot run inside a transaction on older servers,
+    #: and a grant for a module that does not exist yet is simply inert.
+    ARCHIVE = "archive"
+
+
+class ModuleLevel(str, enum.Enum):
+    """What a user may do *inside* one module, ordered from least to most.
+
+    - ``VIEWER`` reads.
+    - ``CONTRIBUTOR`` creates and edits their own work; it goes for approval.
+    - ``EDITOR`` edits anyone's work in the module; their own needs no approval.
+    - ``SUPERVISOR`` approves submissions, starts projects, manages teams.
+    - ``ADMINISTRATOR`` has full control of the module, deletion included.
+    """
+
+    VIEWER = "viewer"
+    CONTRIBUTOR = "contributor"
+    EDITOR = "editor"
+    SUPERVISOR = "supervisor"
+    ADMINISTRATOR = "administrator"
+
+    @property
+    def rank(self) -> int:
+        return _MODULE_LEVEL_RANK[self]
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ModuleLevel):
+            return NotImplemented
+        return self.rank < other.rank
+
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, ModuleLevel):
+            return NotImplemented
+        return self.rank <= other.rank
+
+    def __gt__(self, other: object) -> bool:
+        if not isinstance(other, ModuleLevel):
+            return NotImplemented
+        return self.rank > other.rank
+
+    def __ge__(self, other: object) -> bool:
+        if not isinstance(other, ModuleLevel):
+            return NotImplemented
+        return self.rank >= other.rank
+
+
+_MODULE_LEVEL_RANK: dict[ModuleLevel, int] = {
+    ModuleLevel.VIEWER: 0,
+    ModuleLevel.CONTRIBUTOR: 1,
+    ModuleLevel.EDITOR: 2,
+    ModuleLevel.SUPERVISOR: 3,
+    ModuleLevel.ADMINISTRATOR: 4,
+}
+
+
 class PermissionLevel(str, enum.Enum):
     """Per-record grant, also ordered."""
 

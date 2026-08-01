@@ -1,14 +1,19 @@
 """Authorisation policy.
 
-Access is decided by combining three independent sources, and the *most
+Access is decided by combining four independent sources, and the *most
 permissive* of them wins:
 
-1. **Global role** — a ceiling on what a user may ever do. A visitor cannot
-   write anything, no matter what grants exist.
-2. **Project membership** — the usual way access is granted: joining a
-   project's team confers a level on everything inside it.
+1. **Module access** — a ceiling, per functional area. A user with no grant on
+   the museum module cannot write museum records however senior they are in
+   archaeology. Held as rows in ``user_module_access``; see
+   :class:`~app.models.enums.ModuleLevel` for what each level means.
+2. **Project membership** — the usual way access is granted inside a module:
+   joining a project's team confers a level on everything in it.
 3. **Explicit record grants** — rows in ``record_permissions`` for sharing a
    single record outside the team.
+4. **The global role** — reserved for administering the *platform* (users,
+   taxonomy, settings). A platform administrator implicitly holds the top level
+   in every module; every other role is silent about module access.
 
 Ownership and the public flag are shortcuts on top of those: an owner always
 holds ``OWNER`` on their record, and a public record is readable by anyone,
@@ -29,6 +34,8 @@ from sqlalchemy import and_, false, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.models.enums import (
+    Module,
+    ModuleLevel,
     PermissionLevel,
     ProjectRole,
     ResourceType,
@@ -40,7 +47,7 @@ from app.models.user import RecordPermission, User
 
 
 class Capability(str, enum.Enum):
-    """Global, record-independent abilities."""
+    """A record-independent ability, checked against one module."""
 
     CREATE_PROJECT = "create_project"
     CREATE_RECORD = "create_record"
@@ -54,21 +61,54 @@ class Capability(str, enum.Enum):
     EXPORT_DATA = "export_data"
 
 
-#: Minimum global role for each capability. Anything not listed is admin-only.
-_CAPABILITY_MINIMUM: dict[Capability, UserRole] = {
-    Capability.CREATE_PROJECT: UserRole.RESEARCHER,
-    Capability.CREATE_RECORD: UserRole.STUDENT,
-    Capability.UPLOAD_FILE: UserRole.STUDENT,
-    Capability.APPROVE_SUBMISSION: UserRole.RESEARCHER,
-    Capability.EXPORT_DATA: UserRole.STUDENT,
-    Capability.VIEW_ACTIVITY_LOG: UserRole.RESEARCHER,
-    Capability.MANAGE_USERS: UserRole.ADMIN,
-    Capability.MANAGE_TAXONOMY: UserRole.ADMIN,
-    Capability.MANAGE_SYSTEM: UserRole.ADMIN,
-    # Deleting an entire project is destructive and irreversible for students
-    # and researchers alike; only the project's director or an admin may do it,
-    # which is enforced in ``can_delete`` rather than by role alone.
-    Capability.DELETE_PROJECT: UserRole.ADMIN,
+#: Capabilities that are properties of the *platform*, not of any one module.
+#: These belong to the global administrator role and are not reachable by being
+#: senior in a module: running a museum's collection must not confer the
+#: ability to create accounts.
+PLATFORM_CAPABILITIES: frozenset[Capability] = frozenset(
+    {Capability.MANAGE_USERS, Capability.MANAGE_TAXONOMY, Capability.MANAGE_SYSTEM}
+)
+
+#: Minimum level *within a module* for each module-scoped capability.
+_CAPABILITY_MINIMUM: dict[Capability, ModuleLevel] = {
+    Capability.CREATE_RECORD: ModuleLevel.CONTRIBUTOR,
+    Capability.UPLOAD_FILE: ModuleLevel.CONTRIBUTOR,
+    Capability.EXPORT_DATA: ModuleLevel.CONTRIBUTOR,
+    Capability.CREATE_PROJECT: ModuleLevel.SUPERVISOR,
+    Capability.APPROVE_SUBMISSION: ModuleLevel.SUPERVISOR,
+    Capability.VIEW_ACTIVITY_LOG: ModuleLevel.SUPERVISOR,
+    # Deleting an entire project is destructive and irreversible; the check in
+    # ``can_delete`` additionally requires being the project's director, so this
+    # level alone is not sufficient.
+    Capability.DELETE_PROJECT: ModuleLevel.ADMINISTRATOR,
+}
+
+#: Which module each kind of record belongs to. Everything is archaeology
+#: today; museum, inventory and the rest join this table as they are built.
+_RESOURCE_MODULE: dict[ResourceType, Module] = {
+    ResourceType.PROJECT: Module.ARCHAEOLOGY,
+    ResourceType.SITE: Module.ARCHAEOLOGY,
+    ResourceType.ARTIFACT: Module.ARCHAEOLOGY,
+    ResourceType.CONTEXT: Module.ARCHAEOLOGY,
+    ResourceType.PHOTOGRAPH: Module.ARCHAEOLOGY,
+    ResourceType.DOCUMENT: Module.ARCHAEOLOGY,
+    ResourceType.MODEL3D: Module.ARCHAEOLOGY,
+    ResourceType.GIS_LAYER: Module.ARCHAEOLOGY,
+    ResourceType.PUBLICATION: Module.ARCHAEOLOGY,
+    #: A user account is platform-wide, not the property of any module.
+    ResourceType.USER: Module.MANAGEMENT,
+}
+
+#: The level a user gets in the archaeology module from their legacy global
+#: role. Used when creating an account and by the backfill migration, so that
+#: the behaviour described in the original role table is preserved exactly.
+DEFAULT_MODULE_ACCESS: dict[UserRole, ModuleLevel | None] = {
+    UserRole.VISITOR: ModuleLevel.VIEWER,
+    UserRole.STUDENT: ModuleLevel.CONTRIBUTOR,
+    # Researchers approve student work and start projects, which is supervision.
+    UserRole.RESEARCHER: ModuleLevel.SUPERVISOR,
+    # Administrators need no row: they hold every module implicitly.
+    UserRole.ADMIN: None,
 }
 
 #: How a project role maps onto a permission level for the project's contents.
@@ -80,14 +120,46 @@ _PROJECT_ROLE_LEVEL: dict[ProjectRole, PermissionLevel] = {
 }
 
 
-def has_capability(user: User | None, capability: Capability) -> bool:
-    """Check a global ability, ignoring any particular record."""
+def module_of(resource_type: ResourceType) -> Module:
+    """Which module owns a kind of record."""
+    return _RESOURCE_MODULE.get(resource_type, Module.ARCHAEOLOGY)
+
+
+def module_level(user: User | None, module: Module) -> ModuleLevel | None:
+    """The level ``user`` holds in ``module``; ``None`` means no access."""
+    if user is None or not user.is_active:
+        return None
+    return user.level_in(module)
+
+
+def has_module_access(user: User | None, module: Module, minimum: ModuleLevel) -> bool:
+    level = module_level(user, module)
+    return level is not None and level >= minimum
+
+
+def has_capability(
+    user: User | None,
+    capability: Capability,
+    module: Module = Module.ARCHAEOLOGY,
+) -> bool:
+    """Check a record-independent ability within one module.
+
+    Platform capabilities ignore ``module`` entirely — they are the global
+    administrator's, and no amount of seniority inside a module reaches them.
+    """
     if user is None or not user.is_active:
         return False
+
+    if capability in PLATFORM_CAPABILITIES:
+        return user.role is UserRole.ADMIN
+
     if user.role is UserRole.ADMIN:
         return True
-    minimum = _CAPABILITY_MINIMUM.get(capability, UserRole.ADMIN)
-    return user.role >= minimum
+
+    minimum = _CAPABILITY_MINIMUM.get(capability)
+    if minimum is None:  # pragma: no cover - every capability is mapped
+        return False
+    return has_module_access(user, module, minimum)
 
 
 # --------------------------------------------------------------------------
@@ -192,7 +264,7 @@ def effective_level(
     let them delete a project. Role ceilings are applied by the ``can_*``
     helpers, not by this function.
     """
-    if user is not None and user.is_active and user.role is UserRole.ADMIN:
+    if has_module_access(user, module_of(resource_type), ModuleLevel.ADMINISTRATOR):
         return PermissionLevel.OWNER
 
     levels: list[PermissionLevel] = []
@@ -200,7 +272,7 @@ def effective_level(
     if _record_is_public(record):
         levels.append(PermissionLevel.VIEWER)
 
-    if user is not None and user.is_active:
+    if user is not None and user.is_active and module_level(user, module_of(resource_type)):
         owner_id = _record_owner_id(record)
         if owner_id is not None and owner_id == user.id:
             levels.append(PermissionLevel.OWNER)
@@ -241,8 +313,8 @@ def can_view(session: Session, user: User | None, record: Any, resource_type: Re
 
 
 def can_edit(session: Session, user: User | None, record: Any, resource_type: ResourceType) -> bool:
-    """Editing needs an ``EDITOR`` level *and* a role that may write at all."""
-    if user is None or not user.is_active or user.role is UserRole.VISITOR:
+    """Editing needs an ``EDITOR`` level *and* module access that may write."""
+    if not has_module_access(user, module_of(resource_type), ModuleLevel.CONTRIBUTOR):
         return False
     level = effective_level(session, user, record, resource_type)
     return level is not None and level >= PermissionLevel.EDITOR
@@ -252,11 +324,12 @@ def can_delete(
     session: Session, user: User | None, record: Any, resource_type: ResourceType
 ) -> bool:
     """Deletion needs ``OWNER``; deleting a project additionally needs the
-    project director role or an administrator, per the specification's rule
-    that students may never delete projects."""
-    if user is None or not user.is_active or user.role is UserRole.VISITOR:
+    project director role or a module administrator, per the rule that
+    contributors may never delete a whole project."""
+    module = module_of(resource_type)
+    if not has_module_access(user, module, ModuleLevel.CONTRIBUTOR):
         return False
-    if user.role is UserRole.ADMIN:
+    if has_module_access(user, module, ModuleLevel.ADMINISTRATOR):
         return True
 
     level = effective_level(session, user, record, resource_type)
@@ -264,7 +337,7 @@ def can_delete(
         return False
 
     if resource_type is ResourceType.PROJECT:
-        if user.role < UserRole.RESEARCHER:
+        if not has_module_access(user, module, ModuleLevel.SUPERVISOR):
             return False
         membership = session.scalar(
             select(ProjectMembership).where(
@@ -281,20 +354,24 @@ def can_approve(
     session: Session, user: User | None, record: Any, resource_type: ResourceType
 ) -> bool:
     """Approving a submission needs the capability and edit rights on the
-    record — a researcher may not approve work in a project they are not on."""
-    if not has_capability(user, Capability.APPROVE_SUBMISSION):
+    record — a supervisor may not approve work in a project they are not on."""
+    module = module_of(resource_type)
+    if not has_capability(user, Capability.APPROVE_SUBMISSION, module):
         return False
-    if user is not None and user.role is UserRole.ADMIN:
+    if has_module_access(user, module, ModuleLevel.ADMINISTRATOR):
         return True
     return can_edit(session, user, record, resource_type)
 
 
-def requires_approval(user: User | None) -> bool:
+def requires_approval(user: User | None, module: Module = Module.ARCHAEOLOGY) -> bool:
     """Whether records created by this user start as pending review.
 
-    Students submit for approval; researchers and administrators do not.
+    Contributors submit for approval; editors and above do not. This is the
+    level's defining difference: a contributor's work is checked, an editor's
+    is trusted.
     """
-    return user is not None and user.role is UserRole.STUDENT
+    level = module_level(user, module)
+    return level is not None and level < ModuleLevel.EDITOR
 
 
 # --------------------------------------------------------------------------
@@ -359,7 +436,7 @@ def _review_visibility_filter(user: User | None, model: Any, resource_type: Reso
 
     approved = model.review_status == ReviewStatus.APPROVED
 
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or module_level(user, module_of(resource_type)) is None:
         return approved
 
     allowed: list[Any] = [approved, model.owner_id == user.id]
@@ -384,12 +461,15 @@ def visibility_filter(user: User | None, model: Any, resource_type: ResourceType
     Mirrors :func:`can_view`, including the rule that records awaiting review
     stay hidden from everyone but their author and those who could act on them.
     """
-    if user is not None and user.is_active and user.role is UserRole.ADMIN:
+    module = module_of(resource_type)
+    if has_module_access(user, module, ModuleLevel.ADMINISTRATOR):
         return true()
 
     clauses: list[Any] = [model.is_public.is_(True)]
 
-    if user is not None and user.is_active:
+    # Module access is a per-user scalar, so it is resolved here rather than
+    # joined — the shape of the generated SQL is unchanged by this check.
+    if user is not None and user.is_active and module_level(user, module) is not None:
         clauses.append(model.owner_id == user.id)
 
         membership_clause = _scope_to_projects(model, _member_projects(user))
@@ -408,9 +488,10 @@ def editable_filter(user: User | None, model: Any, resource_type: ResourceType) 
 
     Mirrors :func:`can_edit` for queries that act on many rows at once.
     """
-    if user is None or not user.is_active or user.role is UserRole.VISITOR:
+    module = module_of(resource_type)
+    if not has_module_access(user, module, ModuleLevel.CONTRIBUTOR):
         return false()
-    if user.role is UserRole.ADMIN:
+    if has_module_access(user, module, ModuleLevel.ADMINISTRATOR):
         return true()
 
     clauses: list[Any] = [model.owner_id == user.id]

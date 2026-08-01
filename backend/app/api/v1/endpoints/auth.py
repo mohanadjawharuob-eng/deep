@@ -23,7 +23,7 @@ from app.schemas.auth import (
 )
 from app.schemas.common import Message
 from app.schemas.user import PasswordChange, UserCreate, UserRead
-from app.services import activity, auth
+from app.services import access, activity, auth
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -72,6 +72,10 @@ def register(payload: UserCreate, session: DbSession, request: Request) -> User:
     )
     session.add(user)
     session.flush()
+    # Registering gets you into the archaeology module at the level the signup
+    # role implies. Every other module is granted deliberately, by an
+    # administrator, because they hold other people's collections and budgets.
+    access.grant_defaults(session, user)
 
     activity.log(
         session,
