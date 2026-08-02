@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     auth,
     contexts,
     documents,
+    exports,
     floorplans,
     formlayouts,
     gis,
@@ -62,6 +63,7 @@ api_router.include_router(inventory.router)
 api_router.include_router(management.router)
 api_router.include_router(social.router)
 api_router.include_router(activities.router)
+api_router.include_router(exports.router)
 api_router.include_router(floorplans.router)
 api_router.include_router(formlayouts.router)
 api_router.include_router(imports.router)

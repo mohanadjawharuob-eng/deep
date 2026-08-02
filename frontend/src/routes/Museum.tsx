@@ -32,6 +32,7 @@ import {
   DetailGrid,
   Empty,
   ErrorNote,
+  ExportButton,
   LegacyMark,
   Loading,
   Pager,
@@ -864,9 +865,15 @@ export function CollectionDetail() {
         title={item.name}
         subtitle={item.institution}
         actions={
-          <Link className="btn" to={`/museum?collection_id=${item.id}`}>
-            Browse objects
-          </Link>
+          <>
+            <Link className="btn" to={`/museum?collection_id=${item.id}`}>
+              Browse objects
+            </Link>
+            <ExportButton
+              path={`/exports/collections/${item.id}.xlsx`}
+              label="Export everything"
+            />
+          </>
         }
       />
 

@@ -15,6 +15,7 @@ import {
   Badge,
   DeleteRecord,
   Detail,
+  ExportButton,
   DetailGrid,
   Empty,
   ErrorNote,
@@ -165,6 +166,10 @@ export function ProjectDetail() {
         actions={
           <>
             <Badge value={record.status} kind="status" />
+            <ExportButton
+              path={`/exports/projects/${record.id}.xlsx`}
+              label="Export everything"
+            />
             <DeleteRecord
               name={record.code}
               title="Delete this project?"
@@ -355,6 +360,7 @@ export function SiteDetail() {
         actions={
           <>
             <Badge value={record.review_status} kind="review" />
+            <ExportButton path={`/exports/sites/${record.id}.xlsx`} label="Export everything" />
             <DeleteRecord
               name={record.code ?? record.name}
               title="Delete this site?"

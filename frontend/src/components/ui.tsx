@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { api } from "../lib/api";
+
 /* --------------------------------------------------------------------------
  * Page furniture
  * ----------------------------------------------------------------------- */
@@ -625,6 +627,48 @@ export function DeleteRecord({
           }
         />
       )}
+    </>
+  );
+}
+
+/**
+ * Download something the server generates.
+ *
+ * A plain `<a href>` would be simpler and would quietly break: a link carries
+ * no Authorization header, so the server would answer as if nobody were
+ * signed in and hand back only the public rows — a short export with no error
+ * and no hint that anything was missing. `api.download` sends the session.
+ */
+export function ExportButton({
+  path,
+  label = "Export",
+  className = "btn",
+}: {
+  path: string;
+  label?: string;
+  className?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function run() {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.download(path);
+    } catch (cause) {
+      setFailed(cause instanceof Error ? cause.message : "It could not be exported.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className={className} onClick={() => void run()} disabled={busy}>
+        {busy ? "Preparing…" : label}
+      </button>
+      {failed && <ErrorNote message={failed} />}
     </>
   );
 }
