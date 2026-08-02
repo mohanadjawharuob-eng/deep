@@ -20,7 +20,10 @@ projects to store, search, visualise and manage archaeological information.
 > `bash start.sh` on macOS and Linux. Full instructions, written for somebody
 > who does not write software, are in
 > **[Running the platform locally](docs/running-locally.md)**. To let colleagues
-> reach it, see **[Letting other people use it](docs/deploying.md)**.
+> reach it, see **[Letting other people use it](docs/deploying.md)**. To let it
+> send password resets and invitations, see
+> **[Letting the platform send e-mail](docs/email-setup.md)** — optional, and
+> the platform runs perfectly well without it.
 
 ---
 
@@ -511,7 +514,7 @@ office & storage inventory — with a digital archive to follow.
 | **6 — done** | Museum module: catalogue, conservation, exhibitions, loans, environmental monitoring, form layouts, spreadsheet import, floor plans |
 | **6b — done** | React frontend: sign-in, dashboard, archaeology, museum record card, storage tree, map, search, light/dark |
 | **6c — done** | Spreadsheet import with per-column verification; floor plans of the store |
-| 7 | Inventory module and the excavation kit builder |
+| **7 — done** | Inventory module: equipment, stock with a ledger behind it, calibration, and the excavation kit builder |
 | 8 | Management module: budgets, grants, staff, tasks, calendar |
 | 9 | Social media repository; the [data-request system](docs/data-requests.md) and its upload links |
 | **10 — done** | The Stratum design applied; the [design brief](docs/design-brief.md) and its appendix |

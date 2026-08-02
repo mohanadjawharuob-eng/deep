@@ -70,12 +70,57 @@ class Settings(BaseSettings):
     FIRST_ADMIN_PASSWORD: str = "ChangeMe!2024"
     FIRST_ADMIN_USERNAME: str = "admin"
 
+    # --- E-mail ----------------------------------------------------------
+    # Used for password resets, project invitations and the data-request
+    # correspondence. All optional: with no host configured the platform runs
+    # perfectly well and simply does not send anything, which is the right
+    # behaviour for a machine in a dig house with no outbound mail.
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    #: For Gmail this is an **App Password**, not the account password. See
+    #: docs/email-setup.md. It belongs in .env on the machine that runs the
+    #: platform, and nowhere else — .env is git-ignored for this reason.
+    SMTP_PASSWORD: str | None = None
+    #: STARTTLS on port 587 is what Gmail and most providers want. Implicit
+    #: TLS on 465 is the alternative; setting both is a configuration error
+    #: rather than belt and braces, and is refused below.
+    SMTP_STARTTLS: bool = True
+    SMTP_SSL: bool = False
+    #: What recipients see in the From line. Defaults to the username, because
+    #: Gmail rejects a From address the account is not allowed to send as.
+    MAIL_FROM: str | None = None
+    MAIL_FROM_NAME: str = "Stratum"
+    SMTP_TIMEOUT_SECONDS: int = 20
+
     # --- Storage ---------------------------------------------------------
     #: "local" today; the storage service is an interface so S3/GCS can drop in.
     STORAGE_BACKEND: Literal["local"] = "local"
     STORAGE_ROOT: Path = Path("/data/uploads")
     MAX_UPLOAD_SIZE_MB: int = 200
     THUMBNAIL_SIZES: Annotated[list[int], NoDecode] = [200, 800]
+
+    @field_validator("SMTP_PASSWORD", mode="before")
+    @classmethod
+    def _ungroup_app_password(cls, value: object) -> object:
+        """Accept a Gmail App Password pasted exactly as Google shows it.
+
+        Google displays the password in four groups of four — "abcd efgh ijkl
+        mnop" — and the spaces are for reading, not part of the password. That
+        is not obvious, and pasting what is on the screen fails with "Username
+        and Password not accepted", which sounds like the wrong password
+        rather than the right one with four extra characters.
+
+        The rewrite is deliberately narrow: exactly four groups of exactly
+        four, nothing else. A provider whose password genuinely contains
+        spaces keeps it.
+        """
+        if not isinstance(value, str):
+            return value
+        groups = value.split(" ")
+        if len(groups) == 4 and all(len(group) == 4 and group.isalnum() for group in groups):
+            return "".join(groups)
+        return value
 
     @field_validator("CORS_ORIGINS", "THUMBNAIL_SIZES", mode="before")
     @classmethod
@@ -108,7 +153,28 @@ class Settings(BaseSettings):
                 raise ValueError("POSTGRES_PASSWORD must be changed in production")
             if self.FIRST_ADMIN_PASSWORD == "ChangeMe!2024":
                 raise ValueError("FIRST_ADMIN_PASSWORD must be changed in production")
+
+        # Both at once is not belt and braces: STARTTLS upgrades a plain
+        # connection, implicit TLS wraps it from the first byte, and a client
+        # doing both talks TLS inside TLS to a server expecting neither. The
+        # symptom is a timeout with no explanation, so it is refused here
+        # where the reason can be given.
+        if self.SMTP_SSL and self.SMTP_STARTTLS:
+            raise ValueError(
+                "SMTP_SSL and SMTP_STARTTLS cannot both be on. Use STARTTLS on "
+                "port 587 (what Gmail wants), or SSL on port 465 — not both."
+            )
         return self
+
+    @property
+    def mail_sender(self) -> str | None:
+        """The address mail is sent from, falling back to the account itself."""
+        return self.MAIL_FROM or self.SMTP_USERNAME
+
+    @property
+    def mail_configured(self) -> bool:
+        """Whether there is enough here to send anything at all."""
+        return bool(self.SMTP_HOST and self.mail_sender)
 
     @property
     def sqlalchemy_url(self) -> str:
