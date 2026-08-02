@@ -1,0 +1,56 @@
+# Line endings, decided here rather than by each machine's Git settings.
+#
+# This file exists because of one specific failure. Git for Windows converts
+# text files to CRLF on checkout by default. A shell script converted that way
+# still looks fine in an editor, but its first line becomes
+#
+#     #!/usr/bin/env bash\r
+#
+# and Linux looks for an interpreter literally called "bash\r". Inside a
+# container that is an immediate exit with "no such file or directory" — and
+# from the outside all anybody sees is `container archeo-api is unhealthy`,
+# which names neither the file nor the reason.
+#
+# The scripts in this repository are copied into Linux containers, so they must
+# be LF wherever they were checked out. The Windows launchers must be CRLF for
+# the same reason in reverse: cmd.exe mis-parses an LF-only batch file.
+#
+# After changing this file, run `git add --renormalize .` so what is already
+# committed is brought into line rather than only new work.
+
+# Default: Git decides what is text, and text is stored and checked out as LF.
+* text=auto eol=lf
+
+# Runs on Linux, whatever machine it was checked out on.
+*.sh text eol=lf
+*.bash text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+docker/** text eol=lf
+backend/docker/** text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Runs on Windows. cmd.exe needs CRLF; PowerShell tolerates either but is kept
+# consistent with the launchers beside it.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary: never converted, never diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.gz binary
+*.xlsx binary
+*.shp binary
+*.dbf binary
+*.shx binary

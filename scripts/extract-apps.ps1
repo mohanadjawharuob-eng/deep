@@ -1,6 +1,11 @@
+# ASCII only in this file, deliberately. Windows PowerShell 5.1 reads a .ps1
+# with no byte-order mark as ANSI, not UTF-8, so a typographic dash turns into
+# three mojibake characters and the script fails to parse - reporting errors on
+# lines that are not the problem. Use a plain hyphen.
+#
 # Lift the four offline apps out of this project and into a folder of their own.
 #
-# Do not run this directly — double-click "Extract Apps.cmd" instead.
+# Do not run this directly - double-click "Extract Apps.cmd" instead.
 #
 # They were never part of the archaeology platform: nothing in it imports them,
 # links to them, or serves them. This moves them out with their history intact,
@@ -26,7 +31,7 @@ function Fail([string]$Text) {
 # checkout to discover it from.
 $SourceCommit = "fa8e2739e51a6df65610697fd137e009faa29d9b"
 
-# Next to the project, not inside it — putting the extracted repository under
+# Next to the project, not inside it - putting the extracted repository under
 # a git checkout makes a nested repository, which git treats as an untracked
 # blob and which confuses every tool that looks at either one.
 $parent = Split-Path -Parent $Root
@@ -97,7 +102,7 @@ Write-Host ""
 Say "  1. Go to https://github.com/new"
 Say "  2. Name it            offline-apps" "Green"
 Say "  3. Leave it Private unless you want the world to see it."
-Say "  4. Do NOT tick 'Add a README' — the folder already has files,"
+Say "  4. Do NOT tick 'Add a README' - the folder already has files,"
 Say "     and an extra one only causes a conflict."
 Say "  5. Press Create repository."
 Write-Host ""

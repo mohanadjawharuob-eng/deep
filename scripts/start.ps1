@@ -1,6 +1,11 @@
+# ASCII only in this file, deliberately. Windows PowerShell 5.1 reads a .ps1
+# with no byte-order mark as ANSI, not UTF-8, so a typographic dash turns into
+# three mojibake characters and the script fails to parse - reporting errors on
+# lines that are not the problem. Use a plain hyphen.
+#
 # Start the whole platform: Docker, the backend, the website, the browser.
 #
-# Do not run this file directly — double-click "Start Stratum.cmd" in the
+# Do not run this file directly - double-click "Start Stratum.cmd" in the
 # project folder instead. Windows opens a .ps1 in Notepad rather than running
 # it, which is a security default worth keeping.
 #
@@ -18,7 +23,7 @@
 $ErrorActionPreference = "Stop"
 
 # The project folder is this script's parent, so the launcher works from
-# anywhere — including a shortcut on the desktop.
+# anywhere - including a shortcut on the desktop.
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -Path $Root
 
@@ -44,7 +49,7 @@ function Show-ApiLog {
     Write-Host "-------------------------------------------------------" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "The last few lines are the ones that matter. If it is not" -ForegroundColor Gray
-    Write-Host "obvious, copy them out and send them on — that block is" -ForegroundColor Gray
+    Write-Host "obvious, copy them out and send them on - that block is" -ForegroundColor Gray
     Write-Host "enough to say exactly what went wrong." -ForegroundColor Gray
 }
 
@@ -110,7 +115,7 @@ if (Test-DockerReady) {
 
     # Built from whichever of these variables actually exist. On Windows for
     # ARM there is no ProgramFiles(x86), and Join-Path on an unset variable
-    # throws — turning "Docker is not where I expected" into a PowerShell
+    # throws - turning "Docker is not where I expected" into a PowerShell
     # stack trace, which is the least useful thing this could show somebody.
     $bases = @(
         @{ Root = $env:ProgramFiles;         Tail = "Docker\Docker\Docker Desktop.exe" }
@@ -181,8 +186,8 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
 Write-Host ""
 Say "Starting the backend. The first run after an update takes a few minutes." "White"
 
-# --build every time. Rebuilding is nearly instant when nothing has changed —
-# Docker reuses its cached layers — and skipping it is the single most
+# --build every time. Rebuilding is nearly instant when nothing has changed -
+# Docker reuses its cached layers - and skipping it is the single most
 # common way to end up running last week's code with this week's database.
 docker compose up --build -d
 if ($LASTEXITCODE -ne 0) {

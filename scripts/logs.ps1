@@ -1,11 +1,16 @@
+# ASCII only in this file, deliberately. Windows PowerShell 5.1 reads a .ps1
+# with no byte-order mark as ANSI, not UTF-8, so a typographic dash turns into
+# three mojibake characters and the script fails to parse - reporting errors on
+# lines that are not the problem. Use a plain hyphen.
+#
 # What the platform said about itself.
 #
-# Do not run this directly — double-click "Show Log.cmd" instead.
+# Do not run this directly - double-click "Show Log.cmd" instead.
 #
 # When something will not start, Docker's own message is always the same
 # unhelpful sentence: "container archeo-api is unhealthy". That is a symptom.
 # The reason is in the container's log, and getting at it otherwise means
-# opening a terminal and knowing a Docker command — which is a lot to ask of
+# opening a terminal and knowing a Docker command - which is a lot to ask of
 # somebody whose actual problem is that the platform will not open.
 #
 # So this prints the log, and writes it to a file that can be attached to a
@@ -49,7 +54,7 @@ function Collect([string]$Line) {
     $collected.Add($Line) | Out-Null
 }
 
-Collect "Stratum log — $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+Collect "Stratum log - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Collect ""
 
 # --------------------------------------------------------------------------
@@ -82,8 +87,8 @@ foreach ($service in @("api", "db", "web")) {
 
     $log = & docker compose @composeArgs logs --tail 80 --no-color $service 2>&1
     if (-not $log) {
-        Write-Host "(nothing — this one has not run)"
-        Collect "(nothing — this one has not run)"
+        Write-Host "(nothing - this one has not run)"
+        Collect "(nothing - this one has not run)"
     } else {
         foreach ($line in $log) {
             Write-Host $line
@@ -98,7 +103,7 @@ foreach ($service in @("api", "db", "web")) {
 # Written out, so it can be sent rather than retyped
 # --------------------------------------------------------------------------
 # Deliberately no .env in here, at all. That file holds the database password,
-# the signing key and — if it has been set up — the mail password, and a log
+# the signing key and - if it has been set up - the mail password, and a log
 # people are encouraged to send on is the last place any of them should be.
 try {
     Set-Content -Path $outputPath -Value $collected -Encoding UTF8
@@ -107,8 +112,8 @@ try {
     Say "  The same text is saved here:" "White"
     Say "      $outputPath" "Green"
     Write-Host ""
-    Say "  It contains no passwords — the settings file is not" "Gray"
-    Say "  read by this at all — so it is safe to send on." "Gray"
+    Say "  It contains no passwords - the settings file is not" "Gray"
+    Say "  read by this at all - so it is safe to send on." "Gray"
     Say "-------------------------------------------------------" "White"
 } catch {
     Say "Could not write $outputPath, but the log is above." "Yellow"

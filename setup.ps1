@@ -1,3 +1,8 @@
+# ASCII only in this file, deliberately. Windows PowerShell 5.1 reads a .ps1
+# with no byte-order mark as ANSI, not UTF-8, so a typographic dash turns into
+# three mojibake characters and the script fails to parse - reporting errors on
+# lines that are not the problem. Use a plain hyphen.
+#
 # First-time setup for Windows.
 #
 # Right-click this file and choose "Run with PowerShell", or from a PowerShell
@@ -40,9 +45,9 @@ function New-RandomString {
     # database URL, where punctuation would need escaping.
     $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
-    # RandomNumberGenerator::Create() exists on both .NET Framework — which is
+    # RandomNumberGenerator::Create() exists on both .NET Framework - which is
     # what Windows PowerShell 5.1 runs on, and 5.1 is what Windows ships by
-    # default — and modern .NET. The static Fill() method does not: it is .NET
+    # default - and modern .NET. The static Fill() method does not: it is .NET
     # Core 2.1 and later only, so calling it fails on a stock Windows machine.
     $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     try {
@@ -69,7 +74,7 @@ function New-RandomString {
 
 $secretKey    = New-RandomString -Length 64
 $dbPassword   = New-RandomString -Length 24
-# Built to satisfy the password policy by construction — at least ten
+# Built to satisfy the password policy by construction - at least ten
 # characters with upper case, lower case and a digit.
 $adminPassword = "Dig" + (New-RandomString -Length 12) + "7x"
 

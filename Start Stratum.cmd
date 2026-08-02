@@ -2,7 +2,7 @@
 REM Double-click this file to start the platform.
 REM
 REM It exists because Windows opens a .ps1 file in Notepad rather than running
-REM it — a security default worth keeping — so this asks PowerShell to run the
+REM it - a security default worth keeping - so this asks PowerShell to run the
 REM real script next door.
 REM
 REM -ExecutionPolicy Bypass applies to this one run only. It does not change

@@ -4,7 +4,7 @@ REM
 REM They install nothing. This prints an address; they type it into a browser.
 REM Everyone shares one database.
 REM
-REM Use "Start Stratum.cmd" instead when you are working alone — it is quicker
+REM Use "Start Stratum.cmd" instead when you are working alone - it is quicker
 REM to start and rebuilds as you change things.
 
 title Stratum - sharing on this network

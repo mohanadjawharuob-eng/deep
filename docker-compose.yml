@@ -63,6 +63,24 @@ services:
       FIRST_ADMIN_EMAIL: ${FIRST_ADMIN_EMAIL:-admin@example.org}
       FIRST_ADMIN_USERNAME: ${FIRST_ADMIN_USERNAME:-admin}
       FIRST_ADMIN_PASSWORD: ${FIRST_ADMIN_PASSWORD:?FIRST_ADMIN_PASSWORD must be set in .env}
+      # --- Mail ---------------------------------------------------------
+      # Passed through explicitly, because `.env` is read by Compose for
+      # substituting ${...} here — it is *not* handed to the container. Without
+      # these lines the platform reads its own defaults, decides mail is not
+      # configured, and quietly sends nothing, however carefully the settings
+      # were filled in. See docs/email-setup.md.
+      #
+      # Every one is optional and every one has a working default: a machine
+      # with no outbound mail is a supported way to run this.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL: ${SMTP_SSL:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-20}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Stratum}
       # Not configurable from .env: it has to match the volume mount below,
       # and changing one without the other would write uploads into the
       # container's own filesystem, where they vanish on the next rebuild.

@@ -1,6 +1,11 @@
+# ASCII only in this file, deliberately. Windows PowerShell 5.1 reads a .ps1
+# with no byte-order mark as ANSI, not UTF-8, so a typographic dash turns into
+# three mojibake characters and the script fails to parse - reporting errors on
+# lines that are not the problem. Use a plain hyphen.
+#
 # Serve the platform to everyone on the same WiFi.
 #
-# Do not run this directly — double-click "Share on WiFi.cmd" instead.
+# Do not run this directly - double-click "Share on WiFi.cmd" instead.
 #
 # The difference from "Start Stratum.cmd": that one runs a development setup
 # only this computer can reach. This one builds the interface properly, serves
@@ -35,7 +40,7 @@ function Show-ApiLog {
     Write-Host "-------------------------------------------------------" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "The last few lines are the ones that matter. If it is not" -ForegroundColor Gray
-    Write-Host "obvious, copy them out and send them on — that block is" -ForegroundColor Gray
+    Write-Host "obvious, copy them out and send them on - that block is" -ForegroundColor Gray
     Write-Host "enough to say exactly what went wrong." -ForegroundColor Gray
 }
 
@@ -65,7 +70,7 @@ if (-not (Test-Path (Join-Path $Root ".env"))) {
 
 # The adapter with a default gateway is the one actually on the network. A
 # laptop typically also has virtual adapters from Docker, VPNs and WSL, whose
-# addresses are real but reach nobody — handing one of those to a colleague
+# addresses are real but reach nobody - handing one of those to a colleague
 # produces a page that never loads and no clue why.
 function Get-LanAddress {
     try {
@@ -109,7 +114,7 @@ Say "This computer is $ip on the network." "Green"
 # --------------------------------------------------------------------------
 
 # The router hands out addresses on a lease, so this machine's number can
-# change after a reboot or overnight — and then every bookmark and every
+# change after a reboot or overnight - and then every bookmark and every
 # printed QR code points at nothing.
 #
 # The computer's *name* does not change. Windows answers to it on a local
@@ -125,7 +130,7 @@ $dotLocal = "http://$computerName.local"
 # --------------------------------------------------------------------------
 
 # The platform prints its own address into QR codes and e-mails, so it has to
-# be told the one people actually type — not localhost, which would send
+# be told the one people actually type - not localhost, which would send
 # somebody scanning a label to their own machine.
 #
 # The *name* goes in, not the number, so a printed label outlives the lease.

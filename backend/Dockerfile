@@ -49,8 +49,22 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY --chown=archeo:archeo . .
 
+# The `sed` is not decoration. Git for Windows converts text files to CRLF on
+# checkout by default, and a shell script converted that way begins
+#
+#     #!/usr/bin/env bash\r
+#
+# so Linux looks for an interpreter literally called "bash\r" and the container
+# exits before it has run a line. From the outside all anybody sees is
+# `container archeo-api is unhealthy`, which names neither the file nor the
+# reason — and the build succeeded, so it looks like the platform's fault.
+#
+# `.gitattributes` pins these files to LF in the repository, which fixes it at
+# the source. This fixes it for a working copy that already has CRLF, which is
+# every copy checked out before that file existed.
 RUN mkdir -p /data/uploads /data/backups \
     && chown -R archeo:archeo /data \
+    && sed -i 's/\r$//' /app/docker/entrypoint.sh \
     && chmod +x /app/docker/entrypoint.sh
 
 USER archeo

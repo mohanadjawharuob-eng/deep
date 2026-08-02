@@ -106,6 +106,22 @@ MAIL_FROM_NAME=Stratum
 
 Save it and close.
 
+**Then restart the platform**, so it reads them:
+
+```
+docker compose up -d
+```
+
+or, if you are sharing it on the network,
+
+```
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Settings are read once when the platform starts. Editing `.env` while it is
+running changes nothing until it is restarted — which looks exactly like the
+settings being wrong.
+
 ### Three things that trip people up
 
 - **No quotes.** Write `SMTP_PASSWORD=abcdefgh`, not `SMTP_PASSWORD="abcdefgh"`.
