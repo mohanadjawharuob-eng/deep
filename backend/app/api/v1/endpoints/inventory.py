@@ -1080,14 +1080,20 @@ def _kit_detail(session: DbSession, kit: Kit, user: User | None) -> KitDetail:
     payload.checkouts = entries
     payload.outstanding_items = sum(1 for entry in entries if entry.returned_at is None)
 
-    payload.stock_movements = [
-        StockMovementRead.model_validate(row)
-        for row in session.scalars(
-            select(StockMovement)
-            .where(StockMovement.kit_id == kit.id)
-            .order_by(StockMovement.occurred_at)
-        ).all()
-    ]
+    # Joined rather than left bare: on a kit, "50 issued" is not a sentence.
+    issued = []
+    for movement, stock in session.execute(
+        select(StockMovement, Consumable)
+        .join(Consumable, Consumable.id == StockMovement.consumable_id)
+        .where(StockMovement.kit_id == kit.id)
+        .order_by(StockMovement.occurred_at)
+    ).all():
+        entry = StockMovementRead.model_validate(movement)
+        entry.consumable_code = stock.code
+        entry.consumable_name = stock.name
+        entry.unit = stock.unit
+        issued.append(entry)
+    payload.stock_movements = issued
 
     payload.can_edit = _may_edit(user, kit)
     payload.can_delete = has_module_access(user, MODULE, Level.SUPERVISOR)

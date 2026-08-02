@@ -162,6 +162,40 @@ class TestCheckout:
         assert second.status_code == 409
         assert "Rania" in second.json()["detail"], "say who has it, not just that it is out"
 
+    def test_an_item_cannot_be_created_already_on_loan(
+        self, client: TestClient, storekeeper: User
+    ) -> None:
+        """It would have no loan behind it, so the register would say the item
+        is gone without being able to say who has it."""
+        response = client.post(
+            "/api/v1/inventory/equipment",
+            json={"asset_number": "EQ-9", "name": "Theodolite", "status": "checked_out"},
+            headers=auth_headers(client, "storekeeper"),
+        )
+
+        assert response.status_code == 422
+
+    def test_the_form_does_not_offer_a_status_the_api_refuses(
+        self, client: TestClient, storekeeper: User
+    ) -> None:
+        """A dropdown holding out an option that always fails is a trap, and
+        the frontend renders exactly what the layout says."""
+        layout = client.get(
+            "/api/v1/forms/layouts/equipment", headers=auth_headers(client, "storekeeper")
+        ).json()
+
+        field = next(
+            f
+            for tab in layout["tabs"]
+            for group in tab["groups"]
+            for f in group["fields"]
+            if f["name"] == "status"
+        )
+        options = layout["value_list_options"][field["value_list"]]
+
+        assert "checked_out" not in {option["value"] for option in options}
+        assert "available" in {option["value"] for option in options}
+
     def test_the_status_cannot_be_edited_to_checked_out(
         self, client: TestClient, storekeeper: User
     ) -> None:
@@ -778,6 +812,25 @@ class TestKitBuilder:
         out = client.get("/api/v1/inventory/equipment/out", headers=headers).json()
         assert out["total"] == 0
 
+    def test_a_kit_says_what_was_issued_not_just_how_much(
+        self, client: TestClient, storekeeper: User
+    ) -> None:
+        """ "50 issued" is not a sentence. The movement rows are shown away from
+        their own stock line, so they have to carry its name."""
+        bags = add_consumable(client, opening_quantity=500)
+        template = self._template(client, [{"consumable_id": bags["id"], "quantity": 50}])
+
+        kit = client.post(
+            f"/api/v1/inventory/kit-templates/{template['id']}/build",
+            json={"issued_to_label": "Rania"},
+            headers=auth_headers(client, "storekeeper"),
+        ).json()
+
+        issued = kit["stock_movements"][0]
+        assert issued["consumable_name"] == "Finds bags, small"
+        assert issued["consumable_code"] == "BAG-S"
+        assert issued["unit"] == "bag"
+
     def test_consumables_do_not_come_back_with_the_kit(
         self, client: TestClient, storekeeper: User
     ) -> None:
@@ -914,7 +967,8 @@ class TestLayouts:
         assert consumable.status_code == 200, consumable.text
         assert equipment.json()["key_field"] == "asset_number"
         assert [
-            option["value"] for option in equipment.json()["value_list_options"]["equipment_status"]
+            option["value"]
+            for option in equipment.json()["value_list_options"]["equipment_status_settable"]
         ]
 
     def test_the_stock_total_is_read_only_on_the_form(

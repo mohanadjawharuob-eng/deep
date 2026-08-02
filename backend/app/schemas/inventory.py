@@ -57,11 +57,23 @@ class EquipmentCreate(EquipmentBase):
         description="The number on the item itself — what somebody reads off the case",
     )
     is_public: bool = False
-    #: Settable on creation, because kit is sometimes catalogued after it has
-    #: already gone out or already broken. Not settable afterwards: see
-    #: :class:`EquipmentUpdate`.
+    #: Kit is sometimes catalogued after it has already broken, so "in repair"
+    #: and the rest are settable here. "Checked out" is not — an item created
+    #: in that state has no loan behind it, and the register would say it is
+    #: gone without being able to say who has it. That is precisely the
+    #: inconsistency :class:`EquipmentUpdate` refuses; allowing it at creation
+    #: would just move the hole one screen earlier.
     status: EquipmentStatus = EquipmentStatus.AVAILABLE
     calibration_due_on: date | None = None
+
+    @model_validator(mode="after")
+    def _created_items_are_not_already_on_loan(self) -> EquipmentCreate:
+        if self.status is EquipmentStatus.CHECKED_OUT:
+            raise ValueError(
+                "An item cannot be created as 'checked out', because there "
+                "would be no record of who has it. Create it, then issue it."
+            )
+        return self
 
 
 class EquipmentUpdate(EquipmentBase):
@@ -364,6 +376,13 @@ class StockMovementRead(ORMModel):
     recorded_by_id: uuid.UUID | None = None
     recorded_by_label: str | None = None
     created_at: datetime
+
+    #: Filled where the movement is shown away from its own stock line — on a
+    #: kit, "50 issued" says nothing without them. Left empty on a consumable's
+    #: own ledger, where the page already names it.
+    consumable_code: str | None = None
+    consumable_name: str | None = None
+    unit: str | None = None
 
 
 # --------------------------------------------------------------------------

@@ -120,6 +120,29 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    heading: "Inventory",
+    items: [
+      {
+        to: "/inventory/equipment",
+        label: "Equipment",
+        module: "inventory",
+        icon: icon("M4 7h12v9H4zM7 7V4.5h6V7M2.5 11h15"),
+      },
+      {
+        to: "/inventory/stock",
+        label: "Stock",
+        module: "inventory",
+        icon: icon("M3 6.5 10 3l7 3.5v7L10 17l-7-3.5zM3 6.5 10 10m0 0 7-3.5M10 10v7"),
+      },
+      {
+        to: "/inventory/kit-templates",
+        label: "Kits",
+        module: "inventory",
+        icon: icon("M3.5 6.5h13v10h-13zM7 6.5V4h6v2.5M3.5 10.5h13"),
+      },
+    ],
+  },
+  {
     heading: "Store",
     items: [
       {

@@ -30,6 +30,19 @@ import {
   ObjectDetail,
 } from "./routes/Museum";
 import { CatalogueGrid } from "./routes/Grid";
+import {
+  EquipmentDetailScreen,
+  EquipmentList,
+  KitScreen,
+  KitTemplateScreen,
+  KitTemplates,
+  Kits,
+  NewEquipment,
+  NewStockLine,
+  OutOnLoan,
+  StockDetail,
+  StockList,
+} from "./routes/Inventory";
 import { ImportBatch, ImportUpload } from "./routes/Import";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
 import { Empty, Loading } from "./components/ui";
@@ -78,6 +91,19 @@ export function App() {
         <Route path="museum/import/:batchId" element={<ImportBatch />} />
         <Route path="museum/collections" element={<Collections />} />
         <Route path="museum/collections/:collectionId" element={<CollectionDetail />} />
+
+        <Route path="inventory/equipment" element={<EquipmentList />} />
+        {/* Before the :equipmentId route, or "new" is read as an id. */}
+        <Route path="inventory/equipment/new" element={<NewEquipment />} />
+        <Route path="inventory/equipment/:equipmentId" element={<EquipmentDetailScreen />} />
+        <Route path="inventory/out" element={<OutOnLoan />} />
+        <Route path="inventory/stock" element={<StockList />} />
+        <Route path="inventory/stock/new" element={<NewStockLine />} />
+        <Route path="inventory/stock/:consumableId" element={<StockDetail />} />
+        <Route path="inventory/kit-templates" element={<KitTemplates />} />
+        <Route path="inventory/kit-templates/:templateId" element={<KitTemplateScreen />} />
+        <Route path="inventory/kits" element={<Kits />} />
+        <Route path="inventory/kits/:kitId" element={<KitScreen />} />
 
         <Route path="storage" element={<Storage />} />
         <Route path="floorplans" element={<FloorPlansForLocation />} />

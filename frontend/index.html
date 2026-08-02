@@ -7,21 +7,21 @@
     <title>Stratum — Institute of Archaeology</title>
 
     <!--
-      Three faces, all SIL Open Font Licence, so they can be self-hosted the
-      day this runs somewhere without outbound internet — which a site house
-      often is. Served from Google for now; swapping to local files is a
-      change to this block alone, because nothing else names a font file.
+      Three faces, all SIL Open Font Licence, served from this machine.
 
-      `display=swap` shows the fallback immediately: an interface that is
-      blank until a webfont arrives is an interface that looks broken on a
-      slow connection.
+      They were loaded from Google until a site-house test showed what that
+      costs: with no upstream internet, the stylesheet request does not fail
+      quickly — it hangs, and the page is blank for as long as it takes to
+      time out. A platform meant to run on a laptop in a dig house cannot
+      depend on a third party being reachable, and an institution hosting its
+      own records should not announce every page view to one either.
+
+      `display=swap` still shows the fallback immediately, which matters on
+      the first load before the files are cached.
+
+      Regenerate the files with scripts/fetch-fonts.sh.
     -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..800;1,400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-    />
+    <link rel="stylesheet" href="/fonts/fonts.css" />
   </head>
   <body>
     <div id="root"></div>

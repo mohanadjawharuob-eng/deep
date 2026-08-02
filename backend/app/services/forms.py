@@ -515,7 +515,7 @@ def equipment_layout() -> FormLayout:
         title="Equipment record",
         title_field="name",
         key_field="asset_number",
-        value_lists=["equipment_status"],
+        value_lists=["equipment_status_settable"],
         tabs=[
             FormTab(
                 key="identification",
@@ -550,7 +550,7 @@ def equipment_layout() -> FormLayout:
                                 name="status",
                                 label="Status",
                                 kind="select",
-                                value_list="equipment_status",
+                                value_list="equipment_status_settable",
                                 width=4,
                                 help="Whether it can go out. Issuing it is a checkout, not an edit.",
                             ),
@@ -861,11 +861,24 @@ def value_lists(session: Session, names: list[str]) -> dict[str, list[dict[str, 
         "stock_reason": StockReason,
         "calibration_result": CalibrationResult,
     }
+
+    # Every status *except* "checked out". A form that offers it produces an
+    # item the register says is gone with nothing saying who has it, which is
+    # what the API refuses — so the dropdown should not hold out the option in
+    # the first place. Filtering here rather than in the frontend keeps the one
+    # rule in one place.
+    settable_statuses = [
+        option
+        for option in _enum_options(EquipmentStatus)
+        if option["value"] != EquipmentStatus.CHECKED_OUT.value
+    ]
     tables = {"period": Period, "material": Material, "object_category": ObjectCategory}
 
     resolved: dict[str, list[dict[str, str]]] = {}
     for name in names:
-        if name in static:
+        if name == "equipment_status_settable":
+            resolved[name] = settable_statuses
+        elif name in static:
             resolved[name] = _enum_options(static[name])
         elif name in tables:
             model = tables[name]

@@ -419,3 +419,165 @@ export type FormLayout = {
   value_lists: string[];
   value_list_options: Record<string, { value: string; label: string }[]>;
 };
+
+/* --- Inventory ----------------------------------------------------------- */
+export type Equipment = {
+  id: string;
+  asset_number: string;
+  name: string;
+  category?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  status: string;
+  needs_calibration: boolean;
+  calibration_due_on?: string | null;
+  storage_location_id?: string | null;
+  is_public: boolean;
+  created_at: string;
+  [key: string]: unknown;
+};
+
+export type EquipmentDetail = Equipment & {
+  storage_path?: string | null;
+  open_checkout?: Checkout | null;
+  last_calibration?: Calibration | null;
+  calibration_overdue: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+export type Checkout = {
+  id: string;
+  equipment_id: string;
+  borrower_id?: string | null;
+  borrower_label: string;
+  project_id?: string | null;
+  destination?: string | null;
+  taken_at: string;
+  due_on?: string | null;
+  returned_at?: string | null;
+  condition_out?: string | null;
+  condition_in?: string | null;
+  notes?: string | null;
+  kit_id?: string | null;
+  asset_number?: string | null;
+  equipment_name?: string | null;
+  days_overdue?: number | null;
+};
+
+export type Calibration = {
+  id: string;
+  equipment_id: string;
+  performed_on: string;
+  performed_by?: string | null;
+  certificate_number?: string | null;
+  result: string;
+  next_due_on?: string | null;
+  cost?: number | null;
+  notes?: string | null;
+};
+
+export type Consumable = {
+  id: string;
+  code: string;
+  name: string;
+  category?: string | null;
+  unit: string;
+  quantity: number;
+  reorder_level?: number | null;
+  storage_location_id?: string | null;
+  expires_on?: string | null;
+  is_active: boolean;
+  is_public: boolean;
+  created_at: string;
+  [key: string]: unknown;
+};
+
+export type ConsumableDetail = Consumable & {
+  storage_path?: string | null;
+  needs_reorder: boolean;
+  expired: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+export type StockMovement = {
+  id: string;
+  consumable_id: string;
+  change: number;
+  balance_after: number;
+  reason: string;
+  project_id?: string | null;
+  issued_to_label?: string | null;
+  kit_id?: string | null;
+  notes?: string | null;
+  occurred_at: string;
+  recorded_by_label?: string | null;
+  /** Filled where the movement is shown away from its own stock line. */
+  consumable_code?: string | null;
+  consumable_name?: string | null;
+  unit?: string | null;
+};
+
+export type KitTemplateLine = {
+  id: string;
+  position: number;
+  equipment_id?: string | null;
+  consumable_id?: string | null;
+  equipment_category?: string | null;
+  quantity: number;
+  is_optional: boolean;
+  notes?: string | null;
+  label?: string | null;
+};
+
+export type KitTemplate = {
+  id: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  is_public: boolean;
+  line_count: number;
+  created_at: string;
+};
+
+export type KitTemplateDetail = KitTemplate & {
+  lines: KitTemplateLine[];
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+/** One thing a build could not supply. Data, not prose, so it can be listed. */
+export type KitShortfall = {
+  line_id?: string | null;
+  what: string;
+  wanted: number;
+  supplied: number;
+  reason: string;
+  is_optional: boolean;
+};
+
+export type Kit = {
+  id: string;
+  name: string;
+  template_id?: string | null;
+  project_id?: string | null;
+  issued_to_label: string;
+  destination?: string | null;
+  issued_at: string;
+  due_on?: string | null;
+  returned_at?: string | null;
+  is_public: boolean;
+  created_at: string;
+};
+
+export type KitDetail = Kit & {
+  notes?: string | null;
+  shortfalls: KitShortfall[];
+  checkouts: Checkout[];
+  stock_movements: StockMovement[];
+  outstanding_items: number;
+  can_edit: boolean;
+  can_delete: boolean;
+};

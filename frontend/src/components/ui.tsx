@@ -210,6 +210,15 @@ const STATUS_TONE: Record<string, Tone> = {
   deaccessioned: { className: "badge-danger", mark: "!" },
   missing: { className: "badge-danger", mark: "!" },
   destroyed: { className: "badge-danger", mark: "!" },
+
+  // Equipment. "Available" is the only one that means you can take it out
+  // tomorrow, so it is the only green one — an amber checked-out badge would
+  // read as a warning about an item that is doing exactly what it should.
+  available: { className: "badge-success", mark: "✓" },
+  checked_out: { className: "badge-info" },
+  in_repair: { className: "badge-warning", mark: "◔" },
+  out_for_calibration: { className: "badge-warning", mark: "◔" },
+  retired: { className: "" },
 };
 
 const CONDITION_TONE: Record<string, Tone> = {
