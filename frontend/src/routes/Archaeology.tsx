@@ -135,7 +135,12 @@ export function Projects() {
 }
 
 export function ProjectDetail() {
-  const { id } = useParams<{ id: string }>();
+  // The name has to match the route's `:projectId` in App.tsx. Destructuring
+  // the wrong name is silent — `id` is simply undefined, the request goes to
+  // /projects/undefined, and the API rejects "undefined" as an identifier. The
+  // screen then shows "Validation failed", which reads like the record is
+  // broken rather than the link to it.
+  const { projectId: id } = useParams<{ projectId: string }>();
 
   const project = useQuery<Project>((signal) => api.get(`/projects/${id}`, undefined, signal), [id]);
   const sites = useQuery<Page<Site>>(
@@ -308,7 +313,7 @@ export function Sites() {
 }
 
 export function SiteDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { siteId: id } = useParams<{ siteId: string }>();
 
   const site = useQuery<Site & Record<string, unknown>>(
     (signal) => api.get(`/sites/${id}`, undefined, signal),
@@ -483,7 +488,7 @@ export function Artifacts() {
 }
 
 export function ArtifactDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { artifactId: id } = useParams<{ artifactId: string }>();
 
   const artifact = useQuery<Artifact & Record<string, unknown>>(
     (signal) => api.get(`/artifacts/${id}`, undefined, signal),
