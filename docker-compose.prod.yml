@@ -1,0 +1,66 @@
+# Serving the platform to other people.
+#
+#     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What this adds to the base file:
+#
+#   * A `web` service — the interface, built once into static files and served
+#     by Caddy, which also passes /api through to the backend. One origin for
+#     both halves, so there is no CORS to configure and a session behaves.
+#   * Ports 80 and 443 published instead of 8000. The backend is reachable only
+#     from inside the compose network; nothing else is exposed.
+#
+# SITE_ADDRESS in .env decides what this is:
+#
+#   SITE_ADDRESS=:80                 an office network — plain HTTP, by IP
+#   SITE_ADDRESS=stratum.example.org the internet — Caddy gets and renews an
+#                                    HTTPS certificate on its own
+#
+# The second form needs the name to already point at this machine and ports 80
+# and 443 to be reachable from outside, because that is how Let's Encrypt
+# checks you own it.
+
+services:
+  api:
+    # The backend is no longer published to the host. Everything reaches it
+    # through Caddy, which means one thing to secure rather than two.
+    ports: !reset []
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      # One origin, so the browser never makes a cross-origin request and
+      # there is nothing for a CORS list to get wrong.
+      CORS_ORIGINS: ${PUBLIC_URL:-http://localhost}
+      FRONTEND_URL: ${PUBLIC_URL:-http://localhost}
+      # Sample data is a demonstration, not a collection. A real deployment
+      # starts empty apart from the administrator and the vocabularies.
+      SEED_SAMPLE_DATA: "false"
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: archeo-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      # QUIC, which Caddy uses for HTTP/3 when it has a certificate.
+      - "443:443/udp"
+    volumes:
+      # Certificates and Caddy's own state. Without this the platform asks
+      # Let's Encrypt for a new certificate every restart and is rate-limited
+      # into a corner within a day.
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -19,7 +19,8 @@ projects to store, search, visualise and manage archaeological information.
 > To try it: double-click **`Start Stratum.cmd`** on Windows, or run
 > `bash start.sh` on macOS and Linux. Full instructions, written for somebody
 > who does not write software, are in
-> **[Running the platform locally](docs/running-locally.md)**.
+> **[Running the platform locally](docs/running-locally.md)**. To let colleagues
+> reach it, see **[Letting other people use it](docs/deploying.md)**.
 
 ---
 

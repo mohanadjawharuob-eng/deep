@@ -1,0 +1,77 @@
+# How the platform is served to everyone else.
+#
+# SITE_ADDRESS decides what this is:
+#
+#   :80                     an office network. Plain HTTP, reachable by IP.
+#   stratum.example.org     the internet. Caddy obtains and renews an HTTPS
+#                           certificate from Let's Encrypt by itself, with no
+#                           command to run and nothing to remember in a year.
+#
+# One origin for both halves. The browser asks this server for everything;
+# requests beginning /api are passed through to the backend container. That is
+# why there is no CORS configuration anywhere — from the browser's point of
+# view the interface and the API are the same site, which is also what makes
+# a session cookie behave.
+
+{$SITE_ADDRESS::80} {
+	encode gzip zstd
+
+	# The API. `to api:8000` is the container's name on the compose network,
+	# not a port on the host — the backend is never published to the outside.
+	handle /api/* {
+		reverse_proxy api:8000 {
+			# Uploads of drone imagery and photogrammetry sets are large and
+			# slow. The default minute is not enough and fails them halfway.
+			transport http {
+				read_timeout 300s
+				write_timeout 300s
+			}
+		}
+	}
+
+	# Everything else is the interface.
+	handle {
+		root * /srv
+
+		# The build's own files are content-addressed, so they can be cached
+		# for ever. Everything else answers with index.html, which cannot be:
+		# it is what points at the current build, so a cached copy pins
+		# somebody to an old version until they clear their browser.
+		#
+		# `@app` is "not an asset" rather than the literal `/index.html`.
+		# Matchers see the *request* path, and no request ever asks for
+		# `/index.html` — the browser asks for `/`, or `/museum/objects/<id>`,
+		# or any other deep link, and `try_files` resolves that to the file
+		# afterwards. A rule written against the filename validates cleanly,
+		# serves correctly, and sets the header on nothing at all; it surfaces
+		# months later as "why are people still seeing last week's version".
+		# Both rules below were checked against a running server.
+		@asset path /assets/*
+		@app not path /assets/*
+		header @asset Cache-Control "public, max-age=31536000, immutable"
+		header @app Cache-Control "no-cache"
+
+		# The application routes in the browser, so a deep link like
+		# /museum/objects/<id> is a real address a person may paste, bookmark
+		# or be sent. The server has no such file; it must answer with the
+		# application and let it read the path. Without this, every refresh on
+		# any screen but the first is a 404.
+		try_files {path} /index.html
+		file_server
+	}
+
+	# Sensible defaults rather than a security theatre checklist. Frame denial
+	# matters because an archaeological platform showing restricted site
+	# coordinates should not be embeddable in somebody else's page.
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
