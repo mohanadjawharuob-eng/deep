@@ -143,6 +143,28 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    heading: "What we do",
+    items: [
+      {
+        to: "/activities",
+        label: "Activity hub",
+        module: "activities",
+        end: true,
+        // A flag on a pole: the record of an undertaking, not of a thing.
+        icon: icon("M5 3v14M5 4h9l-2 3 2 3H5"),
+      },
+      {
+        // Deliberately *not* gated on a module. The calendar is the
+        // institution's shared diary and everybody keeps it, so hiding the
+        // link from somebody who may add to it would be a lie about what they
+        // can do.
+        to: "/management/calendar",
+        label: "Calendar",
+        icon: icon("M3.5 5h13v12h-13zM3.5 8.5h13M7 3v3.5M13 3v3.5"),
+      },
+    ],
+  },
+  {
     heading: "Management",
     items: [
       {
@@ -156,12 +178,6 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         label: "Tasks",
         module: "management",
         icon: icon("M4 5.5h12M4 10h12M4 14.5h7"),
-      },
-      {
-        to: "/management/calendar",
-        label: "Calendar",
-        module: "management",
-        icon: icon("M3.5 5h13v12h-13zM3.5 8.5h13M7 3v3.5M13 3v3.5"),
       },
     ],
   },

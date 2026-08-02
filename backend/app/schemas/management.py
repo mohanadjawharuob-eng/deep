@@ -311,7 +311,10 @@ class TaskBoard(BaseModel):
 
 
 class EventBase(BaseModel):
-    title: str = Field(min_length=1, max_length=300)
+    #: Optional only because ``activity_id`` can supply it. One of the two has
+    #: to be given, which the validator below enforces — an untitled event
+    #: attached to nothing is a coloured block nobody can interpret.
+    title: str | None = Field(default=None, min_length=1, max_length=300)
     description: str | None = None
     kind: str | None = Field(
         default=None, max_length=80, description="Field season, deadline, visit, meeting…"
@@ -322,11 +325,26 @@ class EventBase(BaseModel):
     location: str | None = Field(default=None, max_length=300)
     project_id: uuid.UUID | None = None
     budget_id: uuid.UUID | None = None
+    activity_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "Pick one of the hub's activities and this day becomes part of "
+            "it. Anything left blank — the title, where it is, what kind of "
+            "thing it is — is filled in from the activity, so adding the next "
+            "season to the calendar is one choice rather than five fields."
+        ),
+    )
 
     @model_validator(mode="after")
     def _it_cannot_end_before_it_begins(self) -> EventBase:
         if self.ends_at and self.ends_at < self.starts_at:
             raise ValueError("The event ends before it starts")
+        return self
+
+    @model_validator(mode="after")
+    def _it_has_to_say_what_it_is(self) -> EventBase:
+        if not (self.title or "").strip() and self.activity_id is None:
+            raise ValueError("Give the event a title, or pick an activity to take one from")
         return self
 
 
@@ -344,6 +362,7 @@ class EventUpdate(BaseModel):
     location: str | None = Field(default=None, max_length=300)
     project_id: uuid.UUID | None = None
     budget_id: uuid.UUID | None = None
+    activity_id: uuid.UUID | None = None
     is_public: bool | None = None
 
 
@@ -362,3 +381,11 @@ class EventRead(ORMModel):
     is_public: bool
     created_at: datetime
     project_name: str | None = None
+    activity_id: uuid.UUID | None = None
+    #: What the linked activity is called, so the calendar can say "part of the
+    #: 2019 north trench season" without a second request per entry.
+    activity_title: str | None = None
+    activity_kind: str | None = None
+    #: Whether the person reading may change this one. The calendar is open to
+    #: everybody, so a screen has to be able to tell which blocks are theirs.
+    can_edit: bool = False

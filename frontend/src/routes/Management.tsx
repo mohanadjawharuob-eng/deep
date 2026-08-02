@@ -23,6 +23,7 @@ import {
   type Budget,
   type BudgetDetail,
   type BudgetTotals,
+  type ActivityOption,
   type CalendarEvent,
   type Expense,
   type Page,
@@ -914,9 +915,30 @@ export function Tasks() {
 /* ==========================================================================
  * Calendar
  * ======================================================================= */
+
+/**
+ * The shared diary.
+ *
+ * This is the one screen in the management module that is *not* closed.
+ * Everything else here — the funds, the spending — is private by default,
+ * because a field director needs no sight of what a conservator is paid. The
+ * calendar is the opposite: anybody signed in can read it and add to it,
+ * because a diary half the staff cannot write in is a diary that is wrong
+ * within a fortnight.
+ *
+ * Changing an entry is still narrower than adding one: your own, or anybody's
+ * if you supervise the module. "Everyone can add a day" and "anyone can move
+ * anyone's day" are different propositions.
+ *
+ * The **activity dropdown** is the part worth explaining. Choosing a previous
+ * activity fills in the title, the place, the kind and the project from it, so
+ * putting the next season in the diary is one choice rather than five fields —
+ * and the entry then links back to everything that season needed.
+ */
 export function Calendar() {
   const now = new Date();
   const [months, setMonths] = useState(6);
+  const [adding, setAdding] = useState(false);
 
   const events = useQuery<Page<CalendarEvent>>(
     (signal) =>
@@ -935,19 +957,34 @@ export function Calendar() {
     <>
       <PageHeader
         title="Calendar"
-        subtitle="Seasons, deadlines and visits"
+        subtitle="Everybody's — seasons, deadlines, visits and days off"
         actions={
-          <select
-            className="input input-sm filter-select"
-            value={months}
-            onChange={(event) => setMonths(Number(event.target.value))}
-          >
-            <option value={3}>Next 3 months</option>
-            <option value={6}>Next 6 months</option>
-            <option value={12}>Next year</option>
-          </select>
+          <>
+            <select
+              className="input input-sm filter-select"
+              value={months}
+              onChange={(event) => setMonths(Number(event.target.value))}
+            >
+              <option value={3}>Next 3 months</option>
+              <option value={6}>Next 6 months</option>
+              <option value={12}>Next year</option>
+            </select>
+            <button className="btn btn-primary" onClick={() => setAdding(true)}>
+              Add a day
+            </button>
+          </>
         }
       />
+
+      {adding && (
+        <AddDay
+          onClose={() => setAdding(false)}
+          onAdded={() => {
+            setAdding(false);
+            events.reload();
+          }}
+        />
+      )}
 
       {events.loading ? (
         <Loading />
@@ -955,32 +992,181 @@ export function Calendar() {
         <ErrorNote message={events.error} onRetry={events.reload} />
       ) : events.data && events.data.items.length === 0 ? (
         <Empty title="Nothing coming up">
-          Add a field season, a reporting deadline or a visit and it appears here.
+          Add a field season, a reporting deadline, a visit — or the day somebody is away. Anyone
+          signed in can add to this, and everybody sees it.
         </Empty>
       ) : (
         <section className="card">
-          <ul className="agenda">
-            {events.data?.items.map((event) => (
-              <li key={event.id}>
-                <div className="agenda-when">
-                  <span className="strong">{formatDate(event.starts_at)}</span>
-                  {event.ends_at && (
-                    <span className="small muted">to {formatDate(event.ends_at)}</span>
-                  )}
-                </div>
-                <div className="agenda-what">
-                  <span className="strong">{event.title}</span>
-                  <span className="small muted">
-                    {[event.kind && humanise(event.kind), event.location, event.project_name]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="card-body">
+            <ul className="agenda">
+              {events.data?.items.map((event) => (
+                <li key={event.id}>
+                  <div className="agenda-when">
+                    <span className="strong">{formatDate(event.starts_at)}</span>
+                    {event.ends_at && (
+                      <span className="small muted">to {formatDate(event.ends_at)}</span>
+                    )}
+                  </div>
+                  <div className="agenda-what">
+                    <span className="strong">{event.title}</span>
+                    <span className="small muted">
+                      {[event.kind && humanise(event.kind), event.location, event.project_name]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                    {event.activity_id && (
+                      <Link className="small" to={`/activities/${event.activity_id}`}>
+                        Part of {event.activity_title} — what it takes
+                      </Link>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       )}
     </>
+  );
+}
+
+function AddDay({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const [form, setForm] = useState({
+    title: "",
+    activity_id: "",
+    starts_at: "",
+    ends_at: "",
+    kind: "",
+    location: "",
+  });
+
+  // Loaded for anybody signed in, and deliberately thin: it carries a name, a
+  // kind, a date and a place, and nothing else. Choosing a season from a list
+  // must not hand over its costings.
+  const options = useQuery<ActivityOption[]>(
+    (signal) => api.get("/activities/options", { limit: 200 }, signal),
+    [],
+  );
+
+  const chosen = options.data?.find((option) => option.id === form.activity_id);
+
+  const add = useAction(async () => {
+    await api.post("/management/events", {
+      // Left blank with an activity chosen, the backend fills these in from
+      // it. Sending empty strings rather than omitting them would overwrite
+      // that with nothing.
+      title: form.title || undefined,
+      activity_id: form.activity_id || undefined,
+      starts_at: new Date(form.starts_at).toISOString(),
+      ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
+      kind: form.kind || undefined,
+      location: form.location || undefined,
+    });
+    onAdded();
+  });
+
+  return (
+    <div className="modal-scrim" role="dialog" aria-modal="true">
+      <div className="modal">
+        <h2 className="modal-title">Add a day</h2>
+
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void add.run();
+          }}
+        >
+          {add.error && <ErrorNote message={add.error} />}
+
+          <div className="field">
+            <label className="field-label" htmlFor="day-activity">
+              Part of
+            </label>
+            <select
+              id="day-activity"
+              className="input select"
+              value={form.activity_id}
+              onChange={(event) => setForm({ ...form, activity_id: event.target.value })}
+            >
+              <option value="">Nothing in particular</option>
+              {options.data?.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="field-help">
+              {chosen
+                ? `Anything you leave blank below is taken from "${chosen.title}".`
+                : "Pick a previous activity and this day fills itself in from it."}
+            </p>
+          </div>
+
+          <div className="field">
+            <label className="field-label" htmlFor="day-title">
+              What is it?
+            </label>
+            <input
+              id="day-title"
+              className="input"
+              required={!form.activity_id}
+              value={form.title}
+              onChange={(event) => setForm({ ...form, title: event.target.value })}
+              placeholder={chosen ? chosen.title : "Field season, deadline, visit, day off…"}
+            />
+          </div>
+
+          <div className="row">
+            <div className="field col">
+              <label className="field-label" htmlFor="day-from">
+                From
+              </label>
+              <input
+                id="day-from"
+                className="input"
+                type="datetime-local"
+                required
+                value={form.starts_at}
+                onChange={(event) => setForm({ ...form, starts_at: event.target.value })}
+              />
+            </div>
+            <div className="field col">
+              <label className="field-label" htmlFor="day-to">
+                To
+              </label>
+              <input
+                id="day-to"
+                className="input"
+                type="datetime-local"
+                value={form.ends_at}
+                onChange={(event) => setForm({ ...form, ends_at: event.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="field-label" htmlFor="day-where">
+              Where
+            </label>
+            <input
+              id="day-where"
+              className="input"
+              value={form.location}
+              onChange={(event) => setForm({ ...form, location: event.target.value })}
+              placeholder={chosen?.location ?? ""}
+            />
+          </div>
+
+          <div className="row-tight">
+            <button className="btn" type="button" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="submit" disabled={add.running}>
+              {add.running ? "Adding…" : "Add it"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

@@ -17,9 +17,32 @@ Set-Location -Path $Root
 
 function Say([string]$Text, [string]$Colour = "Gray") { Write-Host $Text -ForegroundColor $Colour }
 
-function Fail([string]$Text) {
+# The backend's own log, when it is the backend that went wrong.
+#
+# Docker Compose only ever says "container archeo-api is unhealthy", which is
+# a symptom and never a reason. The reason is always in the container's log,
+# and telling somebody to go and run `docker compose logs api` themselves is
+# asking them to learn Docker in the middle of a problem. So print it here.
+function Show-ApiLog {
+    Write-Host ""
+    Write-Host "What the backend itself said:" -ForegroundColor Yellow
+    Write-Host "-------------------------------------------------------" -ForegroundColor Yellow
+    try {
+        docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 60 --no-color api
+    } catch {
+        Write-Host "(could not read the log)" -ForegroundColor Yellow
+    }
+    Write-Host "-------------------------------------------------------" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "The last few lines are the ones that matter. If it is not" -ForegroundColor Gray
+    Write-Host "obvious, copy them out and send them on — that block is" -ForegroundColor Gray
+    Write-Host "enough to say exactly what went wrong." -ForegroundColor Gray
+}
+
+function Fail([string]$Text, [switch]$WithApiLog) {
     Write-Host ""
     Write-Host $Text -ForegroundColor Red
+    if ($WithApiLog) { Show-ApiLog }
     Write-Host ""
     Read-Host "Press Enter to close"
     exit 1
@@ -159,7 +182,7 @@ Say "Building. The first time takes several minutes; after that it is quick." "W
 Write-Host ""
 
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-if ($LASTEXITCODE -ne 0) { Fail "It did not start. The messages above say why." }
+if ($LASTEXITCODE -ne 0) { Fail "It did not start." -WithApiLog }
 
 Say "Waiting for it to be ready..."
 $deadline = (Get-Date).AddMinutes(3)
@@ -170,7 +193,7 @@ while (-not $ready) {
         if ($r.StatusCode -eq 200) { $ready = $true; break }
     } catch { }
     if ((Get-Date) -gt $deadline) {
-        Fail "It started but never answered. Run 'docker compose logs api' to see why."
+        Fail "It started but never answered." -WithApiLog
     }
     Start-Sleep -Seconds 2
 }

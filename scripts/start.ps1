@@ -26,9 +26,32 @@ function Say([string]$Text, [string]$Colour = "Gray") {
     Write-Host $Text -ForegroundColor $Colour
 }
 
-function Fail([string]$Text) {
+# The backend's own log, when it is the backend that went wrong.
+#
+# Docker Compose only ever says the container is unhealthy, which is a symptom
+# and never a reason. The reason is always in the container's log, and telling
+# somebody to go and run `docker compose logs api` themselves is asking them to
+# learn Docker in the middle of a problem. So print it here.
+function Show-ApiLog {
+    Write-Host ""
+    Write-Host "What the backend itself said:" -ForegroundColor Yellow
+    Write-Host "-------------------------------------------------------" -ForegroundColor Yellow
+    try {
+        docker compose logs --tail 60 --no-color api
+    } catch {
+        Write-Host "(could not read the log)" -ForegroundColor Yellow
+    }
+    Write-Host "-------------------------------------------------------" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "The last few lines are the ones that matter. If it is not" -ForegroundColor Gray
+    Write-Host "obvious, copy them out and send them on — that block is" -ForegroundColor Gray
+    Write-Host "enough to say exactly what went wrong." -ForegroundColor Gray
+}
+
+function Fail([string]$Text, [switch]$WithApiLog) {
     Write-Host ""
     Write-Host $Text -ForegroundColor Red
+    if ($WithApiLog) { Show-ApiLog }
     Write-Host ""
     Read-Host "Press Enter to close"
     exit 1
@@ -163,7 +186,7 @@ Say "Starting the backend. The first run after an update takes a few minutes." "
 # common way to end up running last week's code with this week's database.
 docker compose up --build -d
 if ($LASTEXITCODE -ne 0) {
-    Fail "The backend did not start. The messages above say why."
+    Fail "The backend did not start." -WithApiLog
 }
 
 # Up is not the same as ready: the container still has migrations to run.
@@ -178,13 +201,7 @@ while (-not $ready) {
         # Not up yet. Expected, repeatedly, for the first half-minute.
     }
     if ((Get-Date) -gt $deadline) {
-        Fail @"
-The backend started but never answered.
-
-Run this to see what it is complaining about:
-
-    docker compose logs api
-"@
+        Fail "The backend started but never answered." -WithApiLog
     }
     Start-Sleep -Seconds 2
 }

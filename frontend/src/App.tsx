@@ -51,6 +51,12 @@ import {
   Tasks,
 } from "./routes/Management";
 import { Channels, Outreach, PostScreen } from "./routes/Social";
+import {
+  Activities,
+  ActivityHub,
+  ActivityScreen,
+  NewActivity,
+} from "./routes/Activities";
 import { ImportBatch, ImportUpload } from "./routes/Import";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
 import { Empty, Loading } from "./components/ui";
@@ -118,6 +124,12 @@ export function App() {
         <Route path="management/expenses" element={<Expenses />} />
         <Route path="management/tasks" element={<Tasks />} />
         <Route path="management/calendar" element={<Calendar />} />
+
+        <Route path="activities" element={<ActivityHub />} />
+        {/* Before the :activityId route, or these are read as identifiers. */}
+        <Route path="activities/all" element={<Activities />} />
+        <Route path="activities/new" element={<NewActivity />} />
+        <Route path="activities/:activityId" element={<ActivityScreen />} />
 
         <Route path="social" element={<Outreach />} />
         <Route path="social/accounts" element={<Channels />} />

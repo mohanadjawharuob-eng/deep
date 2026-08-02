@@ -68,6 +68,11 @@ class Module(str, enum.Enum):
     SOCIAL_MEDIA = "social_media"
     MANAGEMENT = "management"
     INVENTORY = "inventory"
+    #: The record of what the institution has actually done in the field, and
+    #: what it took. Held open on purpose: every account gets it on creation,
+    #: because a hub only half the team can read is a hub that stops being
+    #: filled in.
+    ACTIVITIES = "activities"
     #: Declared before it is built. Adding a value to a PostgreSQL enum later
     #: is a migration that cannot run inside a transaction on older servers,
     #: and a grant for a module that does not exist yet is simply inert.
@@ -541,6 +546,7 @@ class ResourceType(str, enum.Enum):
     PUBLICATION = "publication"
     MUSEUM_OBJECT = "museum_object"
     EQUIPMENT = "equipment"
+    ACTIVITY = "activity"
 
 
 class EquipmentStatus(str, enum.Enum):
@@ -733,3 +739,65 @@ class PostStatus(str, enum.Enum):
     #: Taken down. Kept, because "why was that removed" is a question that gets
     #: asked and a deleted row cannot answer it.
     WITHDRAWN = "withdrawn"
+
+
+class ActivityKind(str, enum.Enum):
+    """What sort of undertaking an activity was.
+
+    Kept closed because the first thing anyone asks the hub is "what have we
+    done like this before" — and free text does not answer that. It is the
+    field the repeat-a-previous-activity dropdown groups by.
+    """
+
+    EXCAVATION = "excavation"
+    SURVEY = "survey"
+    FIELDWALKING = "fieldwalking"
+    GEOPHYSICS = "geophysics"
+    #: Diving, coring, anything where the logistics are the whole problem.
+    UNDERWATER = "underwater"
+    #: Photogrammetry, laser scanning, drone work.
+    RECORDING = "recording"
+    CONSERVATION = "conservation"
+    LABORATORY = "laboratory"
+    TRAINING = "training"
+    OUTREACH = "outreach"
+    EXHIBITION = "exhibition"
+    CONFERENCE = "conference"
+    SITE_VISIT = "site_visit"
+    #: Fixing the store, servicing the kit, re-roofing the shelter.
+    MAINTENANCE = "maintenance"
+    OTHER = "other"
+
+
+class ActivityStatus(str, enum.Enum):
+    """Where an activity stands.
+
+    ``POSTPONED`` is separate from ``CANCELLED`` on purpose. A season pushed to
+    next spring keeps its permits, its costings and its kit list, and the whole
+    value of the hub is being able to pick it back up; a cancelled one is a
+    decision somebody may have to explain.
+    """
+
+    PLANNED = "planned"
+    #: Signed off internally — the money and the permission are in place.
+    APPROVED = "approved"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    POSTPONED = "postponed"
+    CANCELLED = "cancelled"
+
+
+class PermitStatus(str, enum.Enum):
+    """How far along one piece of permission is.
+
+    ``NOT_REQUIRED`` is a real state and is recorded rather than left blank,
+    because "we checked, and we did not need one" and "nobody has looked into
+    it" are the same empty field otherwise — and only one of them is safe.
+    """
+
+    NOT_REQUIRED = "not_required"
+    TO_APPLY = "to_apply"
+    APPLIED = "applied"
+    GRANTED = "granted"
+    REFUSED = "refused"
+    EXPIRED = "expired"

@@ -1469,3 +1469,53 @@ button.stat {
   cursor: pointer;
   width: 100%;
 }
+
+/* --------------------------------------------------------------------------
+ * The activity hub
+ * ----------------------------------------------------------------------- */
+
+/* Two equal columns, unlike `.split`, which is a fixed sidebar beside a
+   flexible panel. Used for "coming up" against "recently", where neither is
+   subordinate to the other. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .pair { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Anything not yet settled: an estimated cost, an ungranted permit, an
+   unticked preparation.
+   
+   A broken line, as everywhere else in this platform — the same mark the map
+   uses for an approximate location and the catalogue for a provisional
+   number. It is never the only signal: every row drawn this way also carries
+   a word ("estimate", "to apply") for anybody who cannot see the difference,
+   and for anybody reading it printed in black and white. */
+.provisional {
+  border-left: var(--border-width) dashed var(--border-strong);
+  padding-left: var(--space-3);
+}
+tr.provisional > td:first-child {
+  border-left: var(--border-width) dashed var(--border-strong);
+  padding-left: var(--space-3);
+}
+
+/* A list of things that are either done or not: preparations, permits, kit.
+   Roomier than a table because each row carries a second line of detail —
+   when it is due, who has it, how long it took last time — and that line is
+   usually the reason somebody is reading the list at all. */
+.checklist { list-style: none; margin: 0; padding: 0; }
+.checklist > li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 0;
+  border-bottom: var(--border-width) solid var(--border);
+}
+.checklist > li:last-child { border-bottom: none; }
+.checklist > li.provisional { padding-left: var(--space-3); }
+.checklist label { cursor: pointer; }

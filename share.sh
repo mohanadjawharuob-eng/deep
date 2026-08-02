@@ -21,6 +21,27 @@ BOLD=$'\033[1m'; OFF=$'\033[0m'
 
 fail() { echo; echo "${RED}${*}${OFF}"; echo; exit 1; }
 
+# The backend's own log, when it is the backend that went wrong.
+#
+# Docker Compose only ever says "container archeo-api is unhealthy", which is a
+# symptom and never a reason. The reason is always in the container's log, and
+# telling somebody to go and run `docker compose logs api` themselves is asking
+# them to learn Docker in the middle of a problem. So print it here.
+show_api_log() {
+    echo
+    echo "${YELLOW}What the backend itself said:${OFF}"
+    echo "${YELLOW}-------------------------------------------------------${OFF}"
+    docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+        logs --tail 60 --no-color api 2>&1 || echo "(could not read the log)"
+    echo "${YELLOW}-------------------------------------------------------${OFF}"
+    echo
+    echo "The last few lines are the ones that matter. If it is not obvious,"
+    echo "copy them out and send them on — that block is enough to say"
+    echo "exactly what went wrong."
+}
+
+fail_with_log() { echo; echo "${RED}${*}${OFF}"; show_api_log; echo; exit 1; }
+
 echo
 echo "${BOLD}Stratum — share on this network${OFF}"
 echo
@@ -112,12 +133,12 @@ echo "${BOLD}Building. The first time takes several minutes; after that it is qu
 echo
 
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build \
-    || fail "It did not start. The messages above say why."
+    || fail_with_log "It did not start."
 
 echo "Waiting for it to be ready..."
 deadline=$(( $(date +%s) + 180 ))
 until curl -fsS http://localhost/api/v1/health >/dev/null 2>&1; do
-    [ "$(date +%s)" -gt "$deadline" ] && fail "It started but never answered. Run 'docker compose logs api'."
+    [ "$(date +%s)" -gt "$deadline" ] && fail_with_log "It started but never answered."
     sleep 2
 done
 

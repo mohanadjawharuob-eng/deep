@@ -325,6 +325,61 @@ Two decisions worth calling out:
   excavation access; a field director needs no access to the store's
   valuations. That is what the per-module model was built for.
 
+### Milestone 9c — the activity hub
+
+**What we did, what it took, and what it cost.** Every other module records a
+*thing* — a find, an object, a piece of kit, a fund. This one records an
+*undertaking*: the 2019 season at the north trench, the week of geophysics
+before it, the school visit in March. It is what somebody opens when they are
+about to do the same thing again.
+
+**Lead time is the point.** A permit carries the date it was applied for and
+the date it was granted, so the hub can answer "the ministry took 46 days last
+time" — a number no institution can produce from memory, and the one that
+decides when planning has to start. A preparation carries how far ahead it has
+to be done. Put together with a start date, they produce the only warning worth
+showing: *not enough time left, going by how long these took before*.
+
+**Everything links, and nothing requires a link.** A kit line points at the
+inventory or is the words "borrowed generator", because the season from 2014 is
+worth keeping even though half its equipment was never catalogued. A cost
+points at an expense or stands alone, because plenty of work was paid for by
+somebody else, in cash, or before this platform existed. A hub that only
+accepts records the platform already holds is a hub nobody can enter the past
+into.
+
+**The logistics come out as plain text.** `GET /activities/{id}/brief.txt`
+returns the whole thing — kit, permissions, preparations, costs — in a form
+that survives e-mail, printing, and being read on a phone in a field.
+`POST /activities/{id}/email` sends the same text, and **returns it either
+way**: a laptop in a dig house with no outbound mail leaves somebody something
+to copy rather than an error.
+
+**Doing it again is one button.** `POST /activities/{id}/repeat` copies a past
+activity forward. Equipment comes across as it was, performance notes included.
+Permits come across needing to be applied for again — dates cleared, reference
+dropped — but keeping how long they took. Preparations come across unticked,
+with their due dates recalculated from the new start. Costs come across marked
+as **estimates**, because last year's price is an estimate of this year's and
+calling it anything else is how a budget goes wrong. The outcome and the
+lessons stay with the season they describe; the new activity links back to
+them.
+
+Two decisions worth calling out:
+
+- **The calendar is open to everybody.** Reading it and adding to it need
+  nothing but a signed-in account — it is the institution's shared diary, and a
+  diary half the staff cannot write in is wrong within a fortnight. Changing
+  somebody else's entry is still narrower: your own, or anybody's if you
+  supervise the module. Choosing a previous activity from the dropdown fills
+  the entry in from it — title, place, kind, project — so putting the next
+  season in the diary is one choice rather than five fields, and the day then
+  links back to everything that season needed.
+- **Costs are never summed across currencies, and estimates stay separable.**
+  There is no single total anywhere in the module. A figure that mixes a dinar
+  with a dollar, or a quotation with an invoice, is a figure somebody
+  eventually has to explain to a funder.
+
 ### Endpoints
 
 | Method | Path | Who |
@@ -500,9 +555,12 @@ Tests need a PostgreSQL with PostGIS; they create and drop their own database.
 
 ## Roadmap
 
-The platform is five permissioned modules over one authentication system and
-one database — archaeology, museum collections, social media, management, and
-office & storage inventory — with a digital archive to follow.
+The platform is six permissioned modules over one authentication system and
+one database — archaeology, museum collections, social media, management,
+office & storage inventory, and the activity hub — with a digital archive to
+follow. The hub is the one every account is given on creation: it is the
+institution's shared record of what it has done, and a record only half the
+team can open is a record one person ends up keeping.
 
 | Milestone | Contents |
 |-----------|----------|
@@ -517,6 +575,7 @@ office & storage inventory — with a digital archive to follow.
 | **7 — done** | Inventory module: equipment, stock with a ledger behind it, calibration, and the excavation kit builder |
 | **8 — done** | Management module: funds with a paid/committed/available balance, spending by category, tasks and the calendar |
 | **9a — done** | Social media repository: channels, posts, engagement over time, and a check on what a post would give away about where a site is |
+| **9c — done** | The activity hub: what we did, what it took and what it cost; the plain-text logistics brief; repeat-a-past-activity; the calendar opened to everybody and linked to the hub |
 | 9b | The [data-request system](docs/data-requests.md) and its upload links |
 | **10 — done** | The Stratum design applied; the [design brief](docs/design-brief.md) and its appendix |
 | 11 | Admin panel; the digital archive module |

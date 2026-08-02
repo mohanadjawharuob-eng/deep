@@ -272,6 +272,8 @@ export type ModuleName =
   | "social_media"
   | "management"
   | "inventory"
+  /** The activity hub. Seeded to every account on creation, unlike the rest. */
+  | "activities"
   | "archive";
 
 export type ModuleAccess = {
@@ -700,6 +702,209 @@ export type CalendarEvent = {
   project_id?: string | null;
   project_name?: string | null;
   created_at: string;
+  activity_id?: string | null;
+  activity_title?: string | null;
+  activity_kind?: string | null;
+  /** The calendar is open to everybody, so a screen has to be able to say
+   *  which blocks are the reader's to move. */
+  can_edit: boolean;
+};
+
+/* --- The activity hub ----------------------------------------------------- */
+/**
+ * One undertaking: a season, a survey, a school visit, a week in the store.
+ *
+ * Named `HubActivity` rather than `Activity` because `Activity` above is a
+ * line in the audit log — a thing that *happened to a record*. These are the
+ * things the institution did. Two different meanings of one English word, and
+ * conflating them in the type names is how somebody ends up passing one to a
+ * function expecting the other.
+ */
+export type HubActivity = {
+  id: string;
+  title: string;
+  kind: string;
+  status: string;
+  starts_on?: string | null;
+  ends_on?: string | null;
+  location?: string | null;
+  lead_label?: string | null;
+  team_size?: number | null;
+  project_id?: string | null;
+  site_id?: string | null;
+  is_public: boolean;
+  owner_id?: string | null;
+  created_at: string;
+  duration_days?: number | null;
+  project_name?: string | null;
+  site_name?: string | null;
+  photo_count: number;
+  equipment_count: number;
+  outstanding_count: number;
+  cover_photo_id?: string | null;
+};
+
+export type ActivityEquipment = {
+  id: string;
+  activity_id: string;
+  equipment_id?: string | null;
+  label: string;
+  quantity: number;
+  unit?: string | null;
+  source?: string | null;
+  performance_notes?: string | null;
+  was_essential?: boolean | null;
+  position: number;
+  notes?: string | null;
+  equipment_name?: string | null;
+  asset_number?: string | null;
+  equipment_exists: boolean;
+};
+
+export type ActivityPermit = {
+  id: string;
+  activity_id: string;
+  name: string;
+  issuer?: string | null;
+  reference?: string | null;
+  status: string;
+  applied_on?: string | null;
+  granted_on?: string | null;
+  expires_on?: string | null;
+  cost?: number | null;
+  currency?: string | null;
+  lead_time_days?: number | null;
+  contact?: string | null;
+  position: number;
+  notes?: string | null;
+  /** Elapsed days from applying to being granted — the number the hub exists
+   *  to be able to produce. */
+  days_to_obtain?: number | null;
+  days_until_expiry?: number | null;
+};
+
+export type ActivityPreparation = {
+  id: string;
+  activity_id: string;
+  description: string;
+  category?: string | null;
+  lead_time_days?: number | null;
+  due_on?: string | null;
+  is_done: boolean;
+  done_on?: string | null;
+  responsible_label?: string | null;
+  position: number;
+  notes?: string | null;
+  days_until_due?: number | null;
+};
+
+export type ActivityCost = {
+  id: string;
+  activity_id: string;
+  description: string;
+  category: string;
+  unit_cost: number;
+  quantity: number;
+  unit?: string | null;
+  currency: string;
+  supplier?: string | null;
+  is_estimate: boolean;
+  expense_id?: string | null;
+  position: number;
+  notes?: string | null;
+  total: number;
+};
+
+export type ActivityPhoto = {
+  id: string;
+  activity_id: string;
+  photograph_id: string;
+  caption?: string | null;
+  is_cover: boolean;
+  position: number;
+  title?: string | null;
+  thumbnail_url?: string | null;
+  taken_at?: string | null;
+  photographer?: string | null;
+};
+
+export type CurrencyLine = {
+  currency: string;
+  amount: number;
+  estimated_amount: number;
+};
+
+export type CostSummary = {
+  /** Never one figure. Adding a dinar to a dollar produces a number that is
+   *  wrong in a way nobody notices until a funder does. */
+  by_currency: CurrencyLine[];
+  line_count: number;
+  estimate_count: number;
+  linked_to_expenses: number;
+  any_estimates: boolean;
+};
+
+export type OutstandingSummary = {
+  permits: string[];
+  preparations: string[];
+  /** Items whose usual lead time no longer fits before the start date. */
+  too_late: string[];
+  longest_lead_days?: number | null;
+  is_clear: boolean;
+  /** False once the activity is over. The same unticked box means a task
+   *  before, and a record of something never done after. */
+  is_actionable: boolean;
+};
+
+export type HubActivityDetail = HubActivity & {
+  summary?: string | null;
+  team_notes?: string | null;
+  outcome?: string | null;
+  lessons?: string | null;
+  budget_id?: string | null;
+  lead_id?: string | null;
+  updated_at?: string | null;
+  equipment: ActivityEquipment[];
+  permits: ActivityPermit[];
+  preparations: ActivityPreparation[];
+  costs: ActivityCost[];
+  photos: ActivityPhoto[];
+  cost_summary: CostSummary;
+  outstanding: OutstandingSummary;
+  repeated_from_id?: string | null;
+  repeated_from_title?: string | null;
+  repeat_count: number;
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+export type ActivityOption = {
+  id: string;
+  title: string;
+  kind: string;
+  status: string;
+  starts_on?: string | null;
+  location?: string | null;
+  label: string;
+};
+
+export type HubSummary = {
+  total: number;
+  by_kind: Record<string, number>;
+  by_status: Record<string, number>;
+  upcoming: HubActivity[];
+  recent: HubActivity[];
+  needing_attention: HubActivity[];
+  expiring_permits: ActivityPermit[];
+};
+
+export type BriefResult = {
+  sent: boolean;
+  detail: string;
+  recipients: string[];
+  /** Returned whether or not the mail went out, so a machine with no outbound
+   *  mail still leaves somebody something to copy. */
+  brief: string;
 };
 
 /* --- Social media -------------------------------------------------------- */

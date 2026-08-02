@@ -305,6 +305,17 @@ class CalendarEvent(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, Base)
     budget_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("budgets.id", ondelete="SET NULL"), index=True
     )
+    #: The undertaking this date belongs to, if any. Set by picking a previous
+    #: activity from the dropdown when adding an event, which is what makes the
+    #: calendar the front door to the hub rather than a separate list of dates:
+    #: from one entry you can reach the kit list, the permits and the costings
+    #: of the last time the same thing was done.
+    #:
+    #: ``SET NULL`` rather than ``CASCADE``: deleting an activity must not
+    #: silently take days off everybody's calendar.
+    activity_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("activities.id", ondelete="SET NULL"), index=True
+    )
 
     project: Mapped[Project | None] = relationship()
 

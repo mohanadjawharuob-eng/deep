@@ -29,6 +29,7 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, CurrentUserOptional, DbSession, require_module
 from app.core.permissions import flat_can_edit, flat_visibility_filter, has_module_access
+from app.models.activities import Activity
 from app.models.enums import (
     ActivityAction,
     BudgetStatus,
@@ -702,22 +703,93 @@ def delete_task(
 # --------------------------------------------------------------------------
 # Calendar
 # --------------------------------------------------------------------------
+# The one part of this module that is *not* closed.
+#
+# Everything else here is deliberately private — a field director needs no
+# sight of what a conservator is paid. The calendar is the opposite: it is the
+# institution's shared diary, and a diary only half the staff can write in is a
+# diary that is wrong within a fortnight. So reading it and adding to it need
+# nothing but a signed-in account, and the module level only governs *other
+# people's* entries.
+#
+# Changing an entry still follows the ordinary rule — your own, or a
+# supervisor's — because "everybody can add a day" and "anybody can move
+# anybody's day" are different propositions, and only the first was asked for.
+def _may_edit_event(user: User | None, event: CalendarEvent) -> bool:
+    if user is None:
+        return False
+    if event.owner_id is not None and event.owner_id == user.id:
+        return True
+    return has_module_access(user, MODULE, Level.SUPERVISOR)
+
+
+def _event_read(session: DbSession, event: CalendarEvent, user: User | None) -> EventRead:
+    result = EventRead.model_validate(event)
+    result.project_name = _project_name(session, event.project_id)
+    if event.activity_id is not None:
+        linked = session.get(Activity, event.activity_id)
+        if linked is not None:
+            result.activity_title = linked.title
+            result.activity_kind = linked.kind.value
+    result.can_edit = _may_edit_event(user, event)
+    return result
+
+
+def _fill_from_activity(session: DbSession, data: dict[str, Any]) -> None:
+    """Take what the event did not say from the activity it points at.
+
+    This is the whole of the "automatic workflow": pick the season from the
+    dropdown and the day names itself, sits in the right place, and carries the
+    project across. Only *blank* fields are filled, so anything typed by hand
+    always wins.
+    """
+    activity_id = data.get("activity_id")
+    if activity_id is None:
+        return
+
+    linked = session.get(Activity, activity_id)
+    if linked is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="That activity does not exist")
+
+    if not (data.get("title") or "").strip():
+        data["title"] = linked.title
+    if not data.get("location"):
+        data["location"] = linked.location
+    if not data.get("kind"):
+        data["kind"] = linked.kind.value
+    if data.get("project_id") is None:
+        data["project_id"] = linked.project_id
+    if data.get("budget_id") is None:
+        data["budget_id"] = linked.budget_id
+
+
 @router.post(
-    "/events", response_model=EventRead, status_code=status.HTTP_201_CREATED, summary="Add an event"
+    "/events",
+    response_model=EventRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add an event",
+    description=(
+        "Open to anyone signed in. The calendar is the institution's shared "
+        "diary and everybody keeps it.\n\n"
+        "Give `activity_id` and the event fills itself in from that activity "
+        "— its title, where it is, what kind of thing it is, and the project "
+        "and fund it belongs to. Anything typed by hand wins over what the "
+        "activity would have supplied."
+    ),
 )
 def create_event(
-    payload: EventCreate, session: DbSession, request: Request, user: ManagementContributor
+    payload: EventCreate, session: DbSession, request: Request, user: CurrentUser
 ) -> EventRead:
-    event = CalendarEvent(**payload.model_dump(), owner_id=user.id)
+    data = payload.model_dump()
+    _fill_from_activity(session, data)
+
+    event = CalendarEvent(**data, owner_id=user.id)
     session.add(event)
     session.flush()
 
     records.on_created(session, event, RESOURCE, user=user, request=request, label=event.title)
     session.flush()
-
-    result = EventRead.model_validate(event)
-    result.project_name = _project_name(session, event.project_id)
-    return result
+    return _event_read(session, event, user)
 
 
 @router.get(
@@ -733,16 +805,24 @@ def create_event(
 )
 def list_events(
     session: DbSession,
-    user: ManagementViewer,
+    user: CurrentUser,
     since: Annotated[datetime | None, Query()] = None,
     until: Annotated[datetime | None, Query()] = None,
     project_id: Annotated[uuid.UUID | None, Query()] = None,
+    activity_id: Annotated[uuid.UUID | None, Query()] = None,
     kind: Annotated[str | None, Query()] = None,
+    mine: Annotated[bool, Query(description="Only entries you added")] = False,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[EventRead]:
-    statement = select(CalendarEvent).where(_visible(user, CalendarEvent))
+    # No visibility filter. The calendar is shared, and an entry only some of
+    # the team can see defeats the point of having one.
+    statement = select(CalendarEvent)
 
+    if activity_id is not None:
+        statement = statement.where(CalendarEvent.activity_id == activity_id)
+    if mine:
+        statement = statement.where(CalendarEvent.owner_id == user.id)
     if until is not None:
         statement = statement.where(CalendarEvent.starts_at <= until)
     if since is not None:
@@ -762,16 +842,24 @@ def list_events(
     statement = statement.order_by(CalendarEvent.starts_at)
     rows, total = records.paginate(session, statement, limit, offset)
 
-    items = []
-    for row in rows:
-        entry = EventRead.model_validate(row)
-        entry.project_name = _project_name(session, row.project_id)
-        items.append(entry)
+    return Page[EventRead](
+        items=[_event_read(session, row, user) for row in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
-    return Page[EventRead](items=items, total=total, limit=limit, offset=offset)
 
-
-@router.patch("/events/{event_id}", response_model=EventRead, summary="Edit an event")
+@router.patch(
+    "/events/{event_id}",
+    response_model=EventRead,
+    summary="Edit an event",
+    description=(
+        "Your own entries, or anybody's if you supervise the management "
+        "module. Everyone may *add* to the shared calendar; moving somebody "
+        "else's day is a different thing and needs the seniority."
+    ),
+)
 def update_event(
     event_id: uuid.UUID,
     payload: EventUpdate,
@@ -780,9 +868,28 @@ def update_event(
     user: CurrentUser,
 ) -> EventRead:
     event = records.get_or_404(session, CalendarEvent, event_id, "Event")
-    _require_editable(user, event, "Event")
+    if not _may_edit_event(user, event):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Somebody else added this. Ask them, or a supervisor, to change it.",
+        )
 
-    before = records.apply_changes(event, payload.model_dump(exclude_unset=True))
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("activity_id") is not None:
+        # Attaching an existing event to an activity fills in whatever the
+        # event does not already say, and never overwrites what it does. A day
+        # somebody titled "Ahmed's last shift" stays that, and gains the link.
+        merged = {
+            name: changes.get(name, getattr(event, name))
+            for name in ("title", "location", "kind", "project_id", "budget_id")
+        }
+        merged["activity_id"] = changes["activity_id"]
+        _fill_from_activity(session, merged)
+        # What the request asked for still wins; the activity only supplied
+        # what was blank in both the request and the event.
+        changes = merged | changes
+
+    before = records.apply_changes(event, changes)
     if event.ends_at and event.ends_at < event.starts_at:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The event would end before it starts"
@@ -790,17 +897,24 @@ def update_event(
 
     records.on_updated(session, event, RESOURCE, before=before, user=user, request=request)
     session.flush()
-
-    result = EventRead.model_validate(event)
-    result.project_name = _project_name(session, event.project_id)
-    return result
+    return _event_read(session, event, user)
 
 
-@router.delete("/events/{event_id}", response_model=Message, summary="Delete an event")
+@router.delete(
+    "/events/{event_id}",
+    response_model=Message,
+    summary="Delete an event",
+    description="Your own entries, or anybody's if you supervise the module.",
+)
 def delete_event(
-    event_id: uuid.UUID, session: DbSession, request: Request, user: ManagementSupervisor
+    event_id: uuid.UUID, session: DbSession, request: Request, user: CurrentUser
 ) -> Message:
     event = records.get_or_404(session, CalendarEvent, event_id, "Event")
+    if not _may_edit_event(user, event):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Somebody else added this. Ask them, or a supervisor, to remove it.",
+        )
     label = event.title
     activity.log(
         session,

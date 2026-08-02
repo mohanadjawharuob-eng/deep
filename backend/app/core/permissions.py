@@ -96,6 +96,7 @@ _RESOURCE_MODULE: dict[ResourceType, Module] = {
     ResourceType.GIS_LAYER: Module.ARCHAEOLOGY,
     ResourceType.PUBLICATION: Module.ARCHAEOLOGY,
     ResourceType.MUSEUM_OBJECT: Module.MUSEUM,
+    ResourceType.ACTIVITY: Module.ACTIVITIES,
     #: A user account is platform-wide, not the property of any module.
     ResourceType.USER: Module.MANAGEMENT,
 }
@@ -105,7 +106,7 @@ _RESOURCE_MODULE: dict[ResourceType, Module] = {
 #: membership half of the policy has nothing to say about them and access is
 #: decided by module level plus ownership alone. See :func:`flat_can_edit`.
 FLAT_MODULES: frozenset[Module] = frozenset(
-    {Module.MUSEUM, Module.INVENTORY, Module.SOCIAL_MEDIA, Module.MANAGEMENT}
+    {Module.MUSEUM, Module.INVENTORY, Module.SOCIAL_MEDIA, Module.MANAGEMENT, Module.ACTIVITIES}
 )
 
 #: The level a user gets in the archaeology module from their legacy global
@@ -119,6 +120,20 @@ DEFAULT_MODULE_ACCESS: dict[UserRole, ModuleLevel | None] = {
     # Administrators need no row: they hold every module implicitly.
     UserRole.ADMIN: None,
 }
+
+#: The modules a new account is seeded with, at the level its role implies.
+#:
+#: Archaeology is the platform's original module and has been seeded since the
+#: beginning. Activities joins it because the hub and the calendar are the
+#: institution's shared memory rather than one team's working area: a record of
+#: what we did, what it cost and what permission it needed is only worth
+#: keeping if everybody can open it, and a calendar half the staff cannot add a
+#: day to is a calendar that goes stale in a fortnight.
+#:
+#: Everything else stays deliberate. Being able to read the kit list from the
+#: 2019 season says nothing about whether you should see what a conservator is
+#: paid.
+SEEDED_MODULES: tuple[Module, ...] = (Module.ARCHAEOLOGY, Module.ACTIVITIES)
 
 #: How a project role maps onto a permission level for the project's contents.
 _PROJECT_ROLE_LEVEL: dict[ProjectRole, PermissionLevel] = {

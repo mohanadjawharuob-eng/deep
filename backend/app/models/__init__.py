@@ -6,12 +6,22 @@ added here.
 """
 
 from app.db.base import Base
+from app.models.activities import (
+    Activity,
+    ActivityCost,
+    ActivityEquipment,
+    ActivityPermit,
+    ActivityPhoto,
+    ActivityPreparation,
+)
 from app.models.artifact import Artifact, artifact_materials, artifact_publications
 from app.models.audit import ActivityLog, Comment, Notification, Revision
 from app.models.context import ContextRelationship, ExcavationContext
 from app.models.enums import (
     AcquisitionMethod,
     ActivityAction,
+    ActivityKind,
+    ActivityStatus,
     BudgetStatus,
     CalibrationResult,
     ConditionState,
@@ -34,6 +44,7 @@ from app.models.enums import (
     NotificationType,
     ObjectStatus,
     PermissionLevel,
+    PermitStatus,
     PostKind,
     PostStatus,
     ProjectRole,
@@ -85,6 +96,15 @@ from app.models.taxonomy import Material, ObjectCategory, Period, Publication, S
 from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess
 
 __all__ = [
+    "Activity",
+    "ActivityCost",
+    "ActivityEquipment",
+    "ActivityKind",
+    "ActivityPermit",
+    "ActivityPhoto",
+    "ActivityPreparation",
+    "ActivityStatus",
+    "PermitStatus",
     "PostAsset",
     "PostKind",
     "PostMetric",

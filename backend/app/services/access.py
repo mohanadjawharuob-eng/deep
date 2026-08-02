@@ -4,9 +4,11 @@ Access is deliberately explicit: a user reaches a module because somebody gave
 them a row, not because their job title implies it. The one exception is the
 platform administrator, who holds every module by definition and needs no rows.
 
-New accounts are seeded with the access their signup role implies, so that
-registering still gets you into the archaeology module without an administrator
-having to act first. Everything beyond that is granted deliberately.
+New accounts are seeded with the access their signup role implies, in the
+modules listed in :data:`~app.core.permissions.SEEDED_MODULES` — archaeology
+and the activity hub — so that registering gets somebody as far as recording
+work and putting a date in the shared calendar without an administrator having
+to act first. Everything beyond that is granted deliberately.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.permissions import DEFAULT_MODULE_ACCESS
+from app.core.permissions import DEFAULT_MODULE_ACCESS, SEEDED_MODULES
 from app.models.enums import Module, ModuleLevel, UserRole
 from app.models.user import User, UserModuleAccess
 
@@ -93,14 +95,15 @@ def grant_defaults(session: Session, user: User, *, granted_by: User | None = No
     level = DEFAULT_MODULE_ACCESS.get(user.role)
     if level is None:
         return
-    grant(
-        session,
-        user,
-        Module.ARCHAEOLOGY,
-        level,
-        granted_by=granted_by,
-        note="Granted automatically when the account was created",
-    )
+    for module in SEEDED_MODULES:
+        grant(
+            session,
+            user,
+            module,
+            level,
+            granted_by=granted_by,
+            note="Granted automatically when the account was created",
+        )
 
 
 def current_access(session: Session, user_id: uuid.UUID) -> dict[Module, ModuleLevel]:

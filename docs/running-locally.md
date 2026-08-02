@@ -313,6 +313,48 @@ want to start clean.
 
 ## If something goes wrong
 
+### First: find out what it actually said
+
+Nearly every failure ends the same way from the outside. The window closes,
+or Docker prints one sentence:
+
+```
+dependency failed to start: container archeo-api is unhealthy
+```
+
+That sentence is a symptom, not a reason. It means the backend started and
+then stopped, and it never says why. **The reason is always in the backend's
+own log**, and there is a button for it:
+
+> **Double-click `Show Log.cmd`** (Windows), or run `bash logs.sh`
+> (macOS and Linux).
+
+It changes nothing. It prints what each part of the platform said about
+itself, and writes the same text to **`stratum-log.txt`** next to the
+launcher, so the whole thing can be attached to a message rather than
+retyped.
+
+It reads no passwords. The settings file is not opened by it at all, so the
+log is safe to send on.
+
+What to look for, in this order:
+
+1. A block headed **`STRATUM DID NOT START`** — the backend saying in plain
+   words what stopped it, and usually what to do.
+2. Any line containing **`ERROR`**.
+3. The last few lines of the **api** log. Whatever went wrong is near the
+   bottom, not the top.
+
+The three things that stop it most often:
+
+- **A value in `.env` is not valid.** The log says which setting. Fix that
+  line and start it again.
+- **The database is a newer version than this copy of the code expects.**
+  Get the newer version of the project (see *Getting a newer version*).
+- **The port is already taken** by something else on the machine.
+
+### The rest
+
 **The website loads but says "Something went wrong" everywhere.** The backend is
 not running. Check the first terminal, and check <http://localhost:8000/docs>.
 

@@ -240,6 +240,7 @@ def model_for(resource_type: ResourceType) -> type[Any] | None:
     every endpoint, and pulling the whole model layer in at import time makes a
     circular import out of a lookup table.
     """
+    from app.models.activities import Activity
     from app.models.artifact import Artifact
     from app.models.context import ExcavationContext
     from app.models.gis import GisLayer
@@ -264,6 +265,7 @@ def model_for(resource_type: ResourceType) -> type[Any] | None:
         ResourceType.PUBLICATION: Publication,
         ResourceType.MUSEUM_OBJECT: MuseumObject,
         ResourceType.EQUIPMENT: Equipment,
+        ResourceType.ACTIVITY: Activity,
     }.get(resource_type)
 
 

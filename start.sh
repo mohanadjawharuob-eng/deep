@@ -28,6 +28,26 @@ ok()   { echo "${GREEN}${*}${OFF}"; }
 warn() { echo "${YELLOW}${*}${OFF}"; }
 fail() { echo; echo "${RED}${*}${OFF}"; echo; exit 1; }
 
+# The backend's own log, when it is the backend that went wrong.
+#
+# Docker Compose only ever says the container is unhealthy, which is a symptom
+# and never a reason. The reason is always in the container's log, and telling
+# somebody to go and run `docker compose logs api` themselves is asking them to
+# learn Docker in the middle of a problem. So print it here.
+show_api_log() {
+    echo
+    echo "${YELLOW}What the backend itself said:${OFF}"
+    echo "${YELLOW}-------------------------------------------------------${OFF}"
+    docker compose logs --tail 60 --no-color api 2>&1 || echo "(could not read the log)"
+    echo "${YELLOW}-------------------------------------------------------${OFF}"
+    echo
+    echo "The last few lines are the ones that matter. If it is not obvious,"
+    echo "copy them out and send them on — that block is enough to say"
+    echo "exactly what went wrong."
+}
+
+fail_with_log() { echo; echo "${RED}${*}${OFF}"; show_api_log; echo; exit 1; }
+
 echo
 echo "${BOLD}Stratum${OFF}"
 echo "Archaeological research and collections platform"
@@ -105,14 +125,14 @@ echo "${BOLD}Starting the backend. The first run after an update takes a few min
 # --build every time. Rebuilding is nearly instant when nothing has changed —
 # Docker reuses its cached layers — and skipping it is the single most common
 # way to end up running last week's code against this week's database.
-docker compose up --build -d || fail "The backend did not start. The messages above say why."
+docker compose up --build -d || fail_with_log "The backend did not start."
 
 # Up is not the same as ready: the container still has migrations to run.
 say "Waiting for the backend to be ready..."
 deadline=$(( $(date +%s) + 180 ))
 until curl -fsS http://localhost:8000/api/v1/health >/dev/null 2>&1; do
     if [ "$(date +%s)" -gt "$deadline" ]; then
-        fail "The backend started but never answered. Run 'docker compose logs api' to see why."
+        fail_with_log "The backend started but never answered."
     fi
     sleep 2
 done

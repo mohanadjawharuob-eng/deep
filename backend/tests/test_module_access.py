@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import (
     DEFAULT_MODULE_ACCESS,
     PLATFORM_CAPABILITIES,
+    SEEDED_MODULES,
     Capability,
     has_capability,
     has_module_access,
@@ -26,6 +27,16 @@ from app.core.permissions import (
 from app.models import Module, ModuleLevel, ResourceType, User, UserRole
 from app.services import access
 from tests.conftest import auth_headers, make_user
+
+
+def seeded(level: str) -> dict[str, str]:
+    """What a new account holds, at ``level``, in every seeded module.
+
+    Written against :data:`SEEDED_MODULES` rather than spelled out, so that
+    adding a module every account gets is one line in the policy rather than a
+    handful of assertions in here going red for a change that was intended.
+    """
+    return {module.value: level for module in SEEDED_MODULES}
 
 
 # --------------------------------------------------------------------------
@@ -362,7 +373,7 @@ class TestAccessEndpoints:
         body = response.json()
 
         assert body["is_platform_admin"] is False
-        assert body["access"] == {"archaeology": "supervisor"}
+        assert body["access"] == seeded("supervisor")
 
     def test_an_administrator_reports_holding_everything_implicitly(
         self, client: TestClient, db: Session, admin: User
@@ -384,11 +395,11 @@ class TestAccessEndpoints:
             headers=headers,
         )
         assert granted.status_code == 200, granted.text
-        assert granted.json()["access"] == {"archaeology": "contributor", "museum": "editor"}
+        assert granted.json()["access"] == seeded("contributor") | {"museum": "editor"}
 
         revoked = client.delete(f"/api/v1/users/{student.id}/access/museum", headers=headers)
         assert revoked.status_code == 200
-        assert revoked.json()["access"] == {"archaeology": "contributor"}
+        assert revoked.json()["access"] == seeded("contributor")
 
     def test_revoking_access_nobody_holds_is_reported(
         self, client: TestClient, db: Session, admin: User, student: User
@@ -438,7 +449,7 @@ class TestAccessEndpoints:
         headers = auth_headers(client, "newcomer")
 
         before = client.get("/api/v1/users/me/access", headers=headers).json()
-        assert before["access"] == {"archaeology": "viewer"}
+        assert before["access"] == seeded("viewer")
 
         client.put(
             f"/api/v1/users/{newcomer.id}/access",
@@ -472,7 +483,7 @@ class TestAccessEndpoints:
         self, client: TestClient, db: Session, admin: User
     ) -> None:
         created = self._create_account(client, "defaulted")
-        assert created["access"] == {"archaeology": "contributor"}
+        assert created["access"] == seeded("contributor")
 
     def test_an_explicit_map_replaces_the_default_rather_than_adding_to_it(
         self, client: TestClient, db: Session, admin: User

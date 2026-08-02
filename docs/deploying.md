@@ -336,7 +336,20 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 Database changes are applied automatically when it starts. Nobody needs to be
 logged out first, though anyone mid-edit will need to press Save again.
 
-**Seeing what it is doing:**
+**When it will not start.** Docker only ever says `container archeo-api is
+unhealthy`, which is a symptom and never a reason. The reason is in the
+backend's own log, and there is a button for it:
+
+> **Double-click `Show Log.cmd`** (Windows), or run `bash logs.sh`
+> (macOS and Linux).
+
+It changes nothing, and it writes the same text to `stratum-log.txt` next to
+the launcher so it can be attached to a message. It reads no passwords — the
+settings file is not opened by it at all. Look for a block headed
+`STRATUM DID NOT START`, then for any line with `ERROR` in it, then at the
+last few lines of the api log.
+
+**Watching it as it runs:**
 
 ```bash
 cd ~/deep
