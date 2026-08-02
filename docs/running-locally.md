@@ -55,7 +55,37 @@ your machine.
 
 ---
 
+## The short way: one button
+
+After the first-time setup below, you never need to remember any of these
+commands again.
+
+**Windows** — double-click **`Start Stratum.cmd`** in the project folder.
+
+**macOS or Linux** — run `bash start.sh` in the project folder.
+
+It opens Docker Desktop if it is closed and waits for it, fetches any newer
+version of the project, starts the backend with `--build` so you can never end
+up running last week's code, waits until the backend actually answers, starts
+the website, and opens your browser at it.
+
+Leave the window open while you use the platform. Closing it stops the
+website; the backend keeps running in Docker. **`Stop Stratum.cmd`** (or
+`bash stop.sh`) shuts that down too. Neither deletes any data.
+
+If you have edited a file in the project folder, the launcher says so and does
+**not** update — your work is never overwritten.
+
+### Put it on the desktop
+
+Right-click `Start Stratum.cmd` → **Show more options** → **Send to** →
+**Desktop (create shortcut)**. Then it really is one double-click.
+
+---
+
 ## Getting a newer version
+
+*(The launcher above does this for you. This section is for doing it by hand.)*
 
 **You never need to download the project again.** `git pull` brings the changes
 into the folder you already have.

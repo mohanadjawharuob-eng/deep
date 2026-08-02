@@ -16,7 +16,10 @@ projects to store, search, visualise and manage archaeological information.
 > from a spreadsheet with every column verified before a row is written, and the
 > store can be **drawn as a floor plan** whose cases show what they hold.
 >
-> To try it, see **[Running the platform locally](docs/running-locally.md)**.
+> To try it: double-click **`Start Stratum.cmd`** on Windows, or run
+> `bash start.sh` on macOS and Linux. Full instructions, written for somebody
+> who does not write software, are in
+> **[Running the platform locally](docs/running-locally.md)**.
 
 ---
 
