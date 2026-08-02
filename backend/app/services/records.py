@@ -227,6 +227,62 @@ def label_for(record: Any) -> str | None:
     return None
 
 
+def model_for(resource_type: ResourceType) -> type[Any] | None:
+    """The table behind a polymorphic reference.
+
+    The platform points at records by ``(resource_type, resource_id)`` in four
+    places — activity, revisions, permissions and the storage register — and
+    every one of them eventually needs to turn that pair back into something
+    readable. Mapping it once here beats four near-identical dictionaries that
+    drift apart as modules are added.
+
+    Imported inside the function on purpose: this module is imported by nearly
+    every endpoint, and pulling the whole model layer in at import time makes a
+    circular import out of a lookup table.
+    """
+    from app.models.artifact import Artifact
+    from app.models.context import ExcavationContext
+    from app.models.gis import GisLayer
+    from app.models.inventory import Equipment
+    from app.models.media import Document, Model3D, Photograph
+    from app.models.museum import MuseumObject
+    from app.models.project import Project
+    from app.models.site import Site
+    from app.models.taxonomy import Publication
+    from app.models.user import User
+
+    return {
+        ResourceType.PROJECT: Project,
+        ResourceType.SITE: Site,
+        ResourceType.ARTIFACT: Artifact,
+        ResourceType.CONTEXT: ExcavationContext,
+        ResourceType.PHOTOGRAPH: Photograph,
+        ResourceType.DOCUMENT: Document,
+        ResourceType.MODEL3D: Model3D,
+        ResourceType.GIS_LAYER: GisLayer,
+        ResourceType.USER: User,
+        ResourceType.PUBLICATION: Publication,
+        ResourceType.MUSEUM_OBJECT: MuseumObject,
+        ResourceType.EQUIPMENT: Equipment,
+    }.get(resource_type)
+
+
+def label_for_resource(
+    session: Session, resource_type: ResourceType, resource_id: uuid.UUID
+) -> str | None:
+    """What a polymorphic reference points at, in words.
+
+    Returns ``None`` when the record has since been deleted, which callers
+    should show as "a record that no longer exists" rather than hiding — a
+    reference to something gone is a fact worth seeing.
+    """
+    model = model_for(resource_type)
+    if model is None:
+        return None
+    record = session.get(model, resource_id)
+    return label_for(record) if record is not None else None
+
+
 # --------------------------------------------------------------------------
 # Reading
 # --------------------------------------------------------------------------

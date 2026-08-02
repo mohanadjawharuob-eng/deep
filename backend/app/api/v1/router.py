@@ -28,6 +28,7 @@ from app.api.v1.endpoints import (
     review,
     search,
     sites,
+    social,
     spatial,
     storage,
     taxonomy,
@@ -58,6 +59,7 @@ api_router.include_router(spatial.router)
 api_router.include_router(museum.router)
 api_router.include_router(inventory.router)
 api_router.include_router(management.router)
+api_router.include_router(social.router)
 api_router.include_router(floorplans.router)
 api_router.include_router(formlayouts.router)
 api_router.include_router(imports.router)

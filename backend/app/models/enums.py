@@ -673,3 +673,63 @@ class TaskPriority(str, enum.Enum):
     NORMAL = "normal"
     HIGH = "high"
     URGENT = "urgent"
+
+
+class SocialPlatform(str, enum.Enum):
+    """Where a channel publishes.
+
+    A closed list because the platform's name changes how a post is written —
+    a thread is not a caption is not a press release — and because reporting
+    outreach to a funder means counting by channel.
+
+    Deliberately excludes short-form video platforms whose terms grant broad
+    licences over uploaded material. An institution publishing excavation
+    photography needs to know what rights it is giving away, and "we are on
+    every platform" is not a heritage policy.
+    """
+
+    INSTAGRAM = "instagram"
+    FACEBOOK = "facebook"
+    X = "x"
+    YOUTUBE = "youtube"
+    LINKEDIN = "linkedin"
+    THREADS = "threads"
+    BLUESKY = "bluesky"
+    MASTODON = "mastodon"
+    #: The institution's own site — the only channel it controls outright, and
+    #: the only one certain to still be there in ten years.
+    WEBSITE = "website"
+    NEWSLETTER = "newsletter"
+    PRESS = "press"
+    OTHER = "other"
+
+
+class PostKind(str, enum.Enum):
+    """What shape the thing is."""
+
+    POST = "post"
+    STORY = "story"
+    REEL = "reel"
+    VIDEO = "video"
+    THREAD = "thread"
+    ARTICLE = "article"
+    ANNOUNCEMENT = "announcement"
+
+
+class PostStatus(str, enum.Enum):
+    """Where a post is in getting out of the door.
+
+    ``NEEDS_APPROVAL`` is its own state rather than a flag. Outreach about an
+    unpublished excavation is a decision with consequences — for a permit, for
+    a funder's embargo, and for whether looters learn where to dig — so it is
+    somebody's job to say yes, and the record has to show who did.
+    """
+
+    DRAFT = "draft"
+    NEEDS_APPROVAL = "needs_approval"
+    APPROVED = "approved"
+    SCHEDULED = "scheduled"
+    PUBLISHED = "published"
+    #: Taken down. Kept, because "why was that removed" is a question that gets
+    #: asked and a deleted row cannot answer it.
+    WITHDRAWN = "withdrawn"
