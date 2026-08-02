@@ -782,9 +782,26 @@ export function Tasks() {
     [mine],
   );
 
+  const [assignee, setAssignee] = useState("");
+  const [dueOn, setDueOn] = useState("");
+
+  // Anybody signed in may be given work, so the picker lists everybody rather
+  // than only people with management access. /users is readable by any account
+  // for exactly this reason.
+  const people = useQuery<Page<{ id: string; username: string; full_name?: string | null }>>(
+    (signal) => api.get("/users", { limit: 200 }, signal),
+    [],
+  );
+
   const add = useAction(async () => {
-    await api.post("/management/tasks", { title: title.trim() });
+    await api.post("/management/tasks", {
+      title: title.trim(),
+      assignee_id: assignee || null,
+      due_on: dueOn || null,
+    });
     setTitle("");
+    setAssignee("");
+    setDueOn("");
     board.reload();
   });
 
@@ -832,6 +849,27 @@ export function Tasks() {
               if (event.key === "Enter" && title.trim()) void add.run();
             }}
           />
+          <select
+            className="input input-sm filter-select"
+            value={assignee}
+            onChange={(event) => setAssignee(event.target.value)}
+            aria-label="Who is doing it"
+          >
+            <option value="">Nobody yet</option>
+            {people.data?.items.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.full_name || person.username}
+              </option>
+            ))}
+          </select>
+          <input
+            className="input input-sm"
+            type="date"
+            value={dueOn}
+            onChange={(event) => setDueOn(event.target.value)}
+            aria-label="When it is due"
+            style={{ maxWidth: 170 }}
+          />
           <button
             type="button"
             className="btn btn-sm"
@@ -841,6 +879,12 @@ export function Tasks() {
             Add
           </button>
         </div>
+      )}
+      {can("management", "contributor") && (
+        <p className="small muted" style={{ marginTop: -6, marginBottom: "var(--space-4)" }}>
+          Whoever you pick is told, and it appears on their dashboard - even if
+          they have no other access to this module.
+        </p>
       )}
 
       {add.error && <ErrorNote message={add.error} />}

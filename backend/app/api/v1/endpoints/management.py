@@ -35,6 +35,7 @@ from app.models.enums import (
     BudgetStatus,
     ExpenseStatus,
     Module,
+    NotificationType,
     ResourceType,
     TaskStatus,
 )
@@ -62,7 +63,7 @@ from app.schemas.management import (
     TaskRead,
     TaskUpdate,
 )
-from app.services import activity, finance, records
+from app.services import activity, finance, notifications, records
 
 router = APIRouter(prefix="/management", tags=["Management"])
 
@@ -521,6 +522,34 @@ def _task_read(session: DbSession, task: Task) -> TaskRead:
     return payload
 
 
+def _tell_the_assignee(
+    session: DbSession, task: Task, actor: User, *, reassigned: bool = False
+) -> None:
+    """Let somebody know work has been put on their list.
+
+    Without this, assigning a task is a private act: the manager believes it
+    is somebody's job now, and that somebody has no idea. The notification is
+    the whole difference between a task list and a plan.
+
+    ``notify`` already declines to notify a person about their own action, so
+    picking your own name off the dropdown does not ping you.
+    """
+    if task.assignee_id is None:
+        return
+    due = f" Due {task.due_on.isoformat()}." if task.due_on else ""
+    notifications.notify(
+        session,
+        user_id=task.assignee_id,
+        type=NotificationType.SYSTEM,
+        title=("A task was reassigned to you" if reassigned else "You have been given a task"),
+        body=f"{task.title}.{due}",
+        link="/dashboard",
+        resource_type=RESOURCE,
+        resource_id=task.project_id,
+        actor_id=actor.id,
+    )
+
+
 @router.post(
     "/tasks", response_model=TaskRead, status_code=status.HTTP_201_CREATED, summary="Add a task"
 )
@@ -543,6 +572,7 @@ def create_task(
     session.flush()
 
     records.on_created(session, task, RESOURCE, user=user, request=request, label=task.title)
+    _tell_the_assignee(session, task, user)
     session.flush()
     return _task_read(session, task)
 
@@ -583,6 +613,44 @@ def list_tasks(
         )
 
     statement = statement.order_by(Task.position, Task.created_at)
+    rows, total = records.paginate(session, statement, limit, offset)
+    return Page[TaskRead](
+        items=[_task_read(session, row) for row in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
+    "/tasks/mine",
+    response_model=Page[TaskRead],
+    summary="Work assigned to you",
+    description=(
+        "Open to anyone signed in, and scoped to the reader — it returns "
+        "**only** tasks assigned to them.\n\n"
+        "The rest of this module is closed, and rightly: a field director "
+        "needs no sight of the accounts. But a task is given *to* somebody, "
+        "and work you cannot see is work you will not do. Refusing an "
+        "assignee their own list would make the assignment decorative.\n\n"
+        "Declared before `/tasks/{id}`, which would otherwise read 'mine' as "
+        "an identifier."
+    ),
+)
+def my_tasks(
+    session: DbSession,
+    user: CurrentUser,
+    include_done: Annotated[bool, Query(description="Show finished ones too")] = False,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[TaskRead]:
+    statement = select(Task).where(Task.assignee_id == user.id)
+    if not include_done:
+        statement = statement.where(Task.status.notin_([TaskStatus.DONE, TaskStatus.CANCELLED]))
+
+    # Overdue first, then by date, then by the order they were arranged in.
+    # Somebody opening their own list wants the late thing at the top.
+    statement = statement.order_by(Task.due_on.asc().nullslast(), Task.position, Task.created_at)
     rows, total = records.paginate(session, statement, limit, offset)
     return Page[TaskRead](
         items=[_task_read(session, row) for row in rows],
@@ -675,6 +743,10 @@ def update_task(
 
     before = records.apply_changes(task, changes)
     records.on_updated(session, task, RESOURCE, before=before, user=user, request=request)
+    # Only when the name actually changed. Editing the due date of somebody's
+    # task should not tell them they have been given it again.
+    if "assignee_id" in before:
+        _tell_the_assignee(session, task, user, reassigned=True)
     session.flush()
     return _task_read(session, task)
 

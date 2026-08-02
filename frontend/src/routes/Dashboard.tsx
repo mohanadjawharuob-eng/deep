@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 
-import { api, type Activity, type Page, type Project } from "../lib/api";
+import { api, type Activity, type Page, type Project, type Task } from "../lib/api";
 import { useQuery, useSession } from "../lib/hooks";
-import { Badge, ErrorNote, Loading, PageHeader, timeAgo } from "../components/ui";
+import { Badge, ErrorNote, Loading, PageHeader, formatDate, timeAgo } from "../components/ui";
 
 type Counts = { projects: number; sites: number; artifacts: number; objects: number };
 
@@ -52,6 +52,14 @@ export function Dashboard() {
     [],
   );
 
+  // Work somebody has put on this person's list. Deliberately not gated on
+  // management access: the rest of that module is closed, but your own
+  // assignments are yours, and work you cannot see is work you will not do.
+  const mine = useQuery<Page<Task>>(
+    (signal) => api.get("/management/tasks/mine", { limit: 8 }, signal),
+    [],
+  );
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const firstName = user?.full_name?.split(/\s+/)[0] ?? user?.username;
@@ -67,6 +75,49 @@ export function Dashboard() {
           year: "numeric",
         })}
       />
+
+      {/* Above the counts. Somebody opening this page wants to know what is
+          being asked of them before they want to know how many finds exist. */}
+      {mine.data && mine.data.items.length > 0 && (
+        <section className="card" style={{ marginBottom: "var(--space-5)" }}>
+          <div className="card-header">
+            <span className="card-title">Assigned to you</span>
+            <span className="small muted">
+              {mine.data.total} {mine.data.total === 1 ? "task" : "tasks"}
+            </span>
+          </div>
+          <div className="card-body">
+            <ul className="checklist">
+              {mine.data.items.map((task) => (
+                <li key={task.id} className={task.days_overdue ? "provisional" : undefined}>
+                  <div className="row-tight wrap">
+                    <span className="strong">{task.title}</span>
+                    {task.days_overdue ? (
+                      <Badge
+                        value="rejected"
+                        kind="review"
+                        label={`${task.days_overdue} ${task.days_overdue === 1 ? "day" : "days"} late`}
+                      />
+                    ) : null}
+                    {task.priority && task.priority !== "normal" ? (
+                      <Badge value={task.priority} kind="status" />
+                    ) : null}
+                  </div>
+                  <div className="small muted">
+                    {[
+                      task.due_on ? `Due ${formatDate(task.due_on)}` : null,
+                      task.project_name,
+                      task.description,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {counts.loading ? (
         <Loading rows={1} />

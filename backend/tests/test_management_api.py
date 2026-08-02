@@ -688,3 +688,130 @@ class TestCalendar:
         ).json()
 
         assert window["total"] == 1
+
+
+# --------------------------------------------------------------------------
+# Work assigned to a person
+# --------------------------------------------------------------------------
+class TestAssignedWork:
+    """A task given to somebody they cannot see is a task that will not happen.
+
+    The management module is closed by default, and rightly — but the closure
+    has to stop at the assignee's own list, or assigning work to a field
+    archaeologist is a private note the manager makes to themselves.
+    """
+
+    def add_task(self, client: TestClient, *, who: str = "treasurer", **fields) -> dict:
+        payload = {"title": "Photograph the 2024 sherds"} | fields
+        response = client.post(
+            "/api/v1/management/tasks", json=payload, headers=auth_headers(client, who)
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    def test_an_assignee_with_no_management_access_can_read_their_own_list(
+        self, client: TestClient, treasurer: User, digger: User
+    ) -> None:
+        self.add_task(client, assignee_id=str(digger.id))
+
+        response = client.get(
+            "/api/v1/management/tasks/mine", headers=auth_headers(client, "fielder")
+        )
+        assert response.status_code == 200, response.text
+        assert [item["title"] for item in response.json()["items"]] == [
+            "Photograph the 2024 sherds"
+        ]
+
+    def test_the_same_person_still_cannot_read_the_whole_board(
+        self, client: TestClient, treasurer: User, digger: User
+    ) -> None:
+        self.add_task(client, assignee_id=str(digger.id))
+        # Their own work, yes. Everybody's work and the accounts beside it, no.
+        assert (
+            client.get(
+                "/api/v1/management/tasks", headers=auth_headers(client, "fielder")
+            ).status_code
+            == 403
+        )
+
+    def test_it_shows_only_your_own(
+        self, client: TestClient, treasurer: User, digger: User, assistant: User
+    ) -> None:
+        self.add_task(client, title="Theirs", assignee_id=str(digger.id))
+        self.add_task(client, title="Somebody else's", assignee_id=str(assistant.id))
+        self.add_task(client, title="Nobody's")
+
+        titles = [
+            item["title"]
+            for item in client.get(
+                "/api/v1/management/tasks/mine", headers=auth_headers(client, "fielder")
+            ).json()["items"]
+        ]
+        assert titles == ["Theirs"]
+
+    def test_finished_work_is_out_of_the_way_unless_asked_for(
+        self, client: TestClient, treasurer: User, digger: User
+    ) -> None:
+        task = self.add_task(client, assignee_id=str(digger.id))
+        client.patch(
+            f"/api/v1/management/tasks/{task['id']}",
+            json={"status": "done"},
+            headers=auth_headers(client, "treasurer"),
+        )
+
+        headers = auth_headers(client, "fielder")
+        assert client.get("/api/v1/management/tasks/mine", headers=headers).json()["total"] == 0
+        with_done = client.get(
+            "/api/v1/management/tasks/mine?include_done=true", headers=headers
+        )
+        assert with_done.json()["total"] == 1
+
+    def test_being_given_a_task_notifies_you(
+        self, client: TestClient, treasurer: User, digger: User
+    ) -> None:
+        self.add_task(client, assignee_id=str(digger.id), due_on="2026-09-01")
+
+        response = client.get("/api/v1/notifications", headers=auth_headers(client, "fielder"))
+        assert response.status_code == 200, response.text
+        items = response.json()["items"]
+        assert len(items) == 1
+        assert "given a task" in items[0]["title"]
+        # The date is in the body, because "when" is the first thing anybody
+        # asks about work that has just appeared.
+        assert "2026-09-01" in (items[0]["body"] or "")
+
+    def test_editing_the_date_does_not_claim_to_reassign_it(
+        self, client: TestClient, treasurer: User, digger: User
+    ) -> None:
+        task = self.add_task(client, assignee_id=str(digger.id))
+        client.patch(
+            f"/api/v1/management/tasks/{task['id']}",
+            json={"due_on": "2026-10-01"},
+            headers=auth_headers(client, "treasurer"),
+        )
+
+        items = client.get(
+            "/api/v1/notifications", headers=auth_headers(client, "fielder")
+        ).json()["items"]
+        # One for the assignment, and nothing for the date change. A list that
+        # pings on every edit is a list people mute.
+        assert len(items) == 1
+
+    def test_reassigning_tells_the_new_person(
+        self, client: TestClient, treasurer: User, digger: User, assistant: User
+    ) -> None:
+        task = self.add_task(client, assignee_id=str(assistant.id))
+        client.patch(
+            f"/api/v1/management/tasks/{task['id']}",
+            json={"assignee_id": str(digger.id)},
+            headers=auth_headers(client, "treasurer"),
+        )
+
+        items = client.get(
+            "/api/v1/notifications", headers=auth_headers(client, "fielder")
+        ).json()["items"]
+        assert len(items) == 1
+        assert "reassigned" in items[0]["title"]
+
+    def test_your_own_list_needs_an_account(self, client: TestClient) -> None:
+        assert client.get("/api/v1/management/tasks/mine").status_code == 401
