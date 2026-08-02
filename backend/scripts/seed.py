@@ -28,6 +28,7 @@ import logging
 import os
 import sys
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -40,18 +41,23 @@ from app.models import (
     ActivityAction,
     ActivityLog,
     Artifact,
+    CalibrationResult,
     Collection,
     ConditionState,
     ConservationRecord,
     ConservationStatus,
+    Consumable,
     ContextRelationship,
     ContextType,
     Document,
     DocumentType,
+    Equipment,
     ExcavationContext,
     GeometryKind,
     GisFeature,
     GisLayer,
+    KitTemplate,
+    KitTemplateLine,
     LayerCategory,
     Material,
     MovementReason,
@@ -68,6 +74,7 @@ from app.models import (
     ResourceType,
     Site,
     SiteType,
+    StockReason,
     StorageKind,
     StorageLocation,
     StratigraphicRelation,
@@ -76,7 +83,7 @@ from app.models import (
     User,
     UserRole,
 )
-from app.services import access, accession, geo, images
+from app.services import access, accession, geo, images, inventory
 from app.services import documents as document_service
 from app.services import storage_locations as storage_tree
 from app.services.storage import (
@@ -847,6 +854,166 @@ def seed_sample_museum(session: Session, *, artifacts: list[Artifact], user: Use
     )
 
 
+def seed_sample_inventory(session: Session, *, user: User) -> None:
+    """Stock the store with a plausible field kit.
+
+    The point is to show the three things the module is for at once: an item
+    that is out with somebody, a stock line low enough to be on the reorder
+    list, and a packing list that can be built into a kit in one action.
+    """
+    if session.scalar(select(Equipment).where(Equipment.asset_number == "IOA-TS-01")):
+        logger.info("Sample inventory already present; skipping")
+        return
+
+    store = session.scalar(select(StorageLocation).where(StorageLocation.code == "MS"))
+    home_id = store.id if store else None
+    today = date.today()
+
+    equipment = [
+        Equipment(
+            asset_number="IOA-TS-01",
+            name="Total station",
+            category="total station",
+            manufacturer="Leica",
+            model="TS07",
+            serial_number="TS07-4471",
+            purchased_on=today - timedelta(days=900),
+            purchase_price=Decimal("14500.00"),
+            currency="USD",
+            supplier="Leica Geosystems",
+            funding_source="Institute capital grant 2022",
+            needs_calibration=True,
+            calibration_interval_days=365,
+            storage_location_id=home_id,
+            owner_id=user.id,
+        ),
+        Equipment(
+            asset_number="IOA-LV-01",
+            name="Dumpy level",
+            category="level",
+            manufacturer="Sokkia",
+            model="B40A",
+            needs_calibration=True,
+            calibration_interval_days=730,
+            storage_location_id=home_id,
+            owner_id=user.id,
+        ),
+        Equipment(
+            asset_number="IOA-CAM-01",
+            name="Field camera 1",
+            category="camera",
+            manufacturer="Nikon",
+            model="D7500",
+            storage_location_id=home_id,
+            owner_id=user.id,
+        ),
+        Equipment(
+            asset_number="IOA-CAM-02",
+            name="Field camera 2",
+            category="camera",
+            manufacturer="Nikon",
+            model="D7500",
+            condition_notes="Zoom ring stiff. Usable.",
+            storage_location_id=home_id,
+            owner_id=user.id,
+        ),
+        Equipment(
+            asset_number="IOA-GPS-01",
+            name="Handheld GPS",
+            category="gps",
+            manufacturer="Garmin",
+            model="GPSMAP 66i",
+            storage_location_id=home_id,
+            owner_id=user.id,
+        ),
+    ]
+    session.add_all(equipment)
+    session.flush()
+
+    # A certificate on file, so the calibration tab has something in it and the
+    # due date is not simply blank.
+    inventory.record_calibration(
+        session,
+        equipment[0],
+        performed_on=today - timedelta(days=200),
+        result=CalibrationResult.PASSED,
+        performed_by="Regional Metrology Laboratory",
+        certificate_number="RML-2025-1184",
+        user=user,
+    )
+
+    # One item genuinely out, because an equipment register with nothing on
+    # loan does not show what it is for.
+    inventory.issue(
+        session,
+        equipment[4],
+        borrower_label="Rania Haddad",
+        issued_by=user,
+        destination="Survey, north ridge",
+        taken_at=datetime.now(UTC) - timedelta(days=3),
+        due_on=today + timedelta(days=4),
+    )
+
+    consumables = [
+        ("BAG-S", "Finds bags, small", "bags", "bag", 500, 200),
+        ("BAG-L", "Finds bags, large", "bags", "bag", 40, 100),
+        ("LABEL-T", "Tyvek labels", "labels", "sheet", 60, 25),
+        ("PERMA", "Permatrace", "drawing", "metre", Decimal("12.5"), 5),
+        ("BATT-AA", "AA batteries", "power", "cell", 24, 40),
+    ]
+    for code, name, category, unit, opening, reorder in consumables:
+        stock = Consumable(
+            code=code,
+            name=name,
+            category=category,
+            unit=unit,
+            reorder_level=Decimal(str(reorder)),
+            storage_location_id=home_id,
+            owner_id=user.id,
+        )
+        session.add(stock)
+        session.flush()
+        inventory.apply_stock_change(
+            session,
+            stock,
+            change=Decimal(str(opening)),
+            reason=StockReason.STOCKTAKE,
+            user=user,
+            notes="Opening stock",
+        )
+
+    template = KitTemplate(
+        name="Standard trench kit",
+        description="What a trench needs for a day. Loaded at six in the morning.",
+        owner_id=user.id,
+    )
+    session.add(template)
+    session.flush()
+
+    bags_small = session.scalar(select(Consumable).where(Consumable.code == "BAG-S"))
+    labels = session.scalar(select(Consumable).where(Consumable.code == "LABEL-T"))
+    for position, line in enumerate(
+        [
+            # A category, not a specific camera: a template pinned to camera 1
+            # breaks the day camera 1 goes in for repair.
+            KitTemplateLine(equipment_category="camera", quantity=1),
+            KitTemplateLine(equipment_category="level", quantity=1),
+            KitTemplateLine(consumable_id=bags_small.id, quantity=50),
+            KitTemplateLine(consumable_id=labels.id, quantity=5),
+            KitTemplateLine(equipment_category="gps", quantity=1, is_optional=True),
+        ]
+    ):
+        line.position = position
+        template.lines.append(line)
+    session.flush()
+
+    logger.info(
+        "Sample inventory created: %d items, %d stock lines, 1 packing list",
+        len(equipment),
+        len(consumables),
+    )
+
+
 def _resume_samples(session: Session, project: Project) -> None:
     """Run the sample sections a partly-seeded database is missing."""
     site = session.scalar(select(Site).where(Site.project_id == project.id))
@@ -868,6 +1035,7 @@ def _resume_samples(session: Session, project: Project) -> None:
     seed_sample_storage(session, artifacts=artifacts, user=user)
     seed_sample_gis(session, project=project, site=site, user=user)
     seed_sample_museum(session, artifacts=artifacts, user=user)
+    seed_sample_inventory(session, user=user)
 
 
 def seed_samples(session: Session, admin: User) -> None:
@@ -1187,6 +1355,7 @@ def seed_samples(session: Session, admin: User) -> None:
     seed_sample_storage(session, artifacts=artifacts, user=researcher)
     seed_sample_gis(session, project=project, site=site, user=researcher)
     seed_sample_museum(session, artifacts=artifacts, user=researcher)
+    seed_sample_inventory(session, user=researcher)
 
     now = datetime.now(UTC)
     for offset, (label, action) in enumerate(

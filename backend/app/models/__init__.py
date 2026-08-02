@@ -12,10 +12,12 @@ from app.models.context import ContextRelationship, ExcavationContext
 from app.models.enums import (
     AcquisitionMethod,
     ActivityAction,
+    CalibrationResult,
     ConditionState,
     ConservationStatus,
     ContextType,
     DocumentType,
+    EquipmentStatus,
     ExhibitionStatus,
     GeometryKind,
     LayerCategory,
@@ -35,6 +37,7 @@ from app.models.enums import (
     ReviewStatus,
     ShapeKind,
     SiteType,
+    StockReason,
     StorageKind,
     StratigraphicRelation,
     TreatmentType,
@@ -43,6 +46,16 @@ from app.models.enums import (
 from app.models.floorplan import FloorPlan, FloorPlanShape
 from app.models.gis import GisFeature, GisLayer
 from app.models.imports import ImportBatch
+from app.models.inventory import (
+    Calibration,
+    Checkout,
+    Consumable,
+    Equipment,
+    Kit,
+    KitTemplate,
+    KitTemplateLine,
+    StockMovement,
+)
 from app.models.media import Document, Model3D, Photograph
 from app.models.museum import (
     Collection,
@@ -61,6 +74,17 @@ from app.models.taxonomy import Material, ObjectCategory, Period, Publication, S
 from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess
 
 __all__ = [
+    "Calibration",
+    "CalibrationResult",
+    "Checkout",
+    "Consumable",
+    "Equipment",
+    "EquipmentStatus",
+    "Kit",
+    "KitTemplate",
+    "KitTemplateLine",
+    "StockMovement",
+    "StockReason",
     "TreatmentType",
     "ObjectStatus",
     "MuseumObject",

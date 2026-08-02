@@ -504,7 +504,311 @@ def museum_object_layout() -> FormLayout:
     )
 
 
-LAYOUTS = {"museum_object": museum_object_layout}
+def equipment_layout() -> FormLayout:
+    """The record card for one piece of kit.
+
+    Ordered the way somebody with the thing in their hands fills it in: the
+    number on the case first, then what it is, then the paperwork.
+    """
+    return FormLayout(
+        record_type="equipment",
+        title="Equipment record",
+        title_field="name",
+        key_field="asset_number",
+        value_lists=["equipment_status"],
+        tabs=[
+            FormTab(
+                key="identification",
+                label="Identification",
+                groups=[
+                    FormGroup(
+                        label="What it is",
+                        help="The asset number is what somebody reads off the case.",
+                        fields=[
+                            FormField(
+                                name="asset_number",
+                                label="Asset no.",
+                                required=True,
+                                max_length=80,
+                                width=4,
+                            ),
+                            FormField(
+                                name="name", label="Name", required=True, max_length=200, width=8
+                            ),
+                            FormField(
+                                name="category",
+                                label="Category",
+                                max_length=120,
+                                width=4,
+                                help=(
+                                    "Free text against what is already in use. Kit lists "
+                                    "differ everywhere, and a closed list sends people "
+                                    "back to their spreadsheet."
+                                ),
+                            ),
+                            FormField(
+                                name="status",
+                                label="Status",
+                                kind="select",
+                                value_list="equipment_status",
+                                width=4,
+                                help="Whether it can go out. Issuing it is a checkout, not an edit.",
+                            ),
+                            FormField(
+                                name="description", label="Description", kind="textarea", width=12
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Make and model",
+                        fields=[
+                            FormField(
+                                name="manufacturer", label="Manufacturer", max_length=160, width=4
+                            ),
+                            FormField(name="model", label="Model", max_length=160, width=4),
+                            FormField(
+                                name="serial_number",
+                                label="Serial no.",
+                                max_length=160,
+                                width=4,
+                                help="The manufacturer's number, not yours. Insurers ask for it.",
+                            ),
+                            FormField(
+                                name="condition_notes",
+                                label="Condition",
+                                kind="textarea",
+                                width=12,
+                                help='"Scratched lens, still usable" is the useful answer.',
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="where",
+                label="Where it lives",
+                groups=[
+                    FormGroup(
+                        label="Home",
+                        help=(
+                            "Where it belongs when nobody has it — not where it is. "
+                            "Where it is now is the open loan, below."
+                        ),
+                        fields=[
+                            FormField(
+                                name="storage_location_id",
+                                label="Home shelf",
+                                kind="reference",
+                                references="storage_location",
+                                width=6,
+                            ),
+                            FormField(name="notes", label="Notes", kind="textarea", width=12),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="calibration",
+                label="Calibration",
+                groups=[
+                    FormGroup(
+                        label="Servicing",
+                        help=(
+                            "A trowel needs none of this. A total station, a level, a "
+                            "pH meter and a set of scales all do, and using one that is "
+                            "out of date can put a season's readings in doubt."
+                        ),
+                        fields=[
+                            FormField(
+                                name="needs_calibration",
+                                label="Needs calibration",
+                                kind="boolean",
+                                width=4,
+                            ),
+                            FormField(
+                                name="calibration_interval_days",
+                                label="Interval",
+                                kind="integer",
+                                unit="days",
+                                width=4,
+                                help="How long a certificate lasts. 365 is common.",
+                            ),
+                            FormField(
+                                name="calibration_due_on",
+                                label="Due",
+                                kind="date",
+                                width=4,
+                                read_only=True,
+                                help="Set from the most recent certificate on file.",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="purchase",
+                label="Purchase",
+                groups=[
+                    FormGroup(
+                        label="How it was bought",
+                        help="What an insurance claim or an audit asks for.",
+                        fields=[
+                            FormField(name="purchased_on", label="Purchased", kind="date", width=4),
+                            FormField(name="purchase_price", label="Price", kind="number", width=4),
+                            FormField(name="currency", label="Currency", max_length=3, width=4),
+                            FormField(name="supplier", label="Supplier", max_length=200, width=6),
+                            FormField(
+                                name="warranty_until", label="Warranty until", kind="date", width=6
+                            ),
+                            FormField(
+                                name="funding_source",
+                                label="Funded by",
+                                max_length=200,
+                                width=6,
+                                help="Which grant paid for it. Grants get reported on.",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+        portals=[
+            FormPortal(
+                key="checkouts",
+                label="Who has had it",
+                endpoint="/inventory/equipment/{id}/checkouts",
+                columns=["borrower_label", "destination", "taken_at", "due_on", "returned_at"],
+            ),
+            FormPortal(
+                key="calibrations",
+                label="Calibration history",
+                endpoint="/inventory/equipment/{id}/calibrations",
+                columns=["performed_on", "performed_by", "result", "next_due_on"],
+            ),
+        ],
+    )
+
+
+def consumable_layout() -> FormLayout:
+    """The record card for a stock line.
+
+    The quantity is read-only here on purpose. It is the sum of a ledger, and
+    a form that could type over the total would make the ledger decorative —
+    so changing stock is a movement, with a reason attached.
+    """
+    return FormLayout(
+        record_type="consumable",
+        title="Stock line",
+        title_field="name",
+        key_field="code",
+        value_lists=["stock_reason"],
+        tabs=[
+            FormTab(
+                key="identification",
+                label="Identification",
+                groups=[
+                    FormGroup(
+                        label="What it is",
+                        fields=[
+                            FormField(
+                                name="code", label="Code", required=True, max_length=80, width=4
+                            ),
+                            FormField(
+                                name="name", label="Name", required=True, max_length=200, width=8
+                            ),
+                            FormField(name="category", label="Category", max_length=120, width=4),
+                            FormField(
+                                name="unit",
+                                label="Unit",
+                                max_length=60,
+                                width=4,
+                                help=(
+                                    "What one of it is — bag, box of 100, roll, metre. "
+                                    "A unit that does not match how the store buys the "
+                                    "thing makes every count a translation exercise."
+                                ),
+                            ),
+                            FormField(
+                                name="description", label="Description", kind="textarea", width=12
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="On the shelf",
+                        fields=[
+                            FormField(
+                                name="quantity",
+                                label="In stock",
+                                kind="number",
+                                read_only=True,
+                                width=4,
+                                help="The sum of the ledger. Change it with a movement.",
+                            ),
+                            FormField(
+                                name="reorder_level",
+                                label="Reorder at",
+                                kind="number",
+                                width=4,
+                                help="Below this it appears on the reorder list.",
+                            ),
+                            FormField(
+                                name="expires_on",
+                                label="Expires",
+                                kind="date",
+                                width=4,
+                                help="Adhesives and chemicals go off. Before, not after.",
+                            ),
+                            FormField(
+                                name="storage_location_id",
+                                label="Kept in",
+                                kind="reference",
+                                references="storage_location",
+                                width=6,
+                            ),
+                            FormField(name="is_active", label="In use", kind="boolean", width=6),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="buying",
+                label="Buying",
+                groups=[
+                    FormGroup(
+                        label="Supplier",
+                        fields=[
+                            FormField(name="supplier", label="Supplier", max_length=200, width=6),
+                            FormField(
+                                name="supplier_reference",
+                                label="Their reference",
+                                max_length=120,
+                                width=6,
+                                help="What to quote when reordering.",
+                            ),
+                            FormField(name="unit_cost", label="Unit cost", kind="number", width=4),
+                            FormField(name="currency", label="Currency", max_length=3, width=4),
+                            FormField(name="notes", label="Notes", kind="textarea", width=12),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+        portals=[
+            FormPortal(
+                key="movements",
+                label="The ledger",
+                endpoint="/inventory/consumables/{id}/movements",
+                columns=["occurred_at", "change", "balance_after", "reason", "issued_to_label"],
+            ),
+        ],
+    )
+
+
+LAYOUTS = {
+    "museum_object": museum_object_layout,
+    "equipment": equipment_layout,
+    "consumable": consumable_layout,
+}
 
 
 def get_layout(record_type: str) -> FormLayout | None:
@@ -530,12 +834,15 @@ def value_lists(session: Session, names: list[str]) -> dict[str, list[dict[str, 
     """
     from app.models.enums import (
         AcquisitionMethod,
+        CalibrationResult,
         ConditionState,
         ConservationStatus,
+        EquipmentStatus,
         ExhibitionStatus,
         LoanDirection,
         LoanStatus,
         ObjectStatus,
+        StockReason,
         TreatmentType,
     )
     from app.models.museum import Collection
@@ -550,6 +857,9 @@ def value_lists(session: Session, names: list[str]) -> dict[str, list[dict[str, 
         "exhibition_status": ExhibitionStatus,
         "loan_direction": LoanDirection,
         "loan_status": LoanStatus,
+        "equipment_status": EquipmentStatus,
+        "stock_reason": StockReason,
+        "calibration_result": CalibrationResult,
     }
     tables = {"period": Period, "material": Material, "object_category": ObjectCategory}
 

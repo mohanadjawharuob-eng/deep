@@ -540,3 +540,55 @@ class ResourceType(str, enum.Enum):
     USER = "user"
     PUBLICATION = "publication"
     MUSEUM_OBJECT = "museum_object"
+    EQUIPMENT = "equipment"
+
+
+class EquipmentStatus(str, enum.Enum):
+    """Where a piece of equipment stands right now.
+
+    Deliberately not the same list as an object's condition: a total station
+    can be in perfect condition and still unavailable because somebody has it
+    in a trench. Condition is what shape it is in; this is whether you can
+    take it out tomorrow.
+    """
+
+    AVAILABLE = "available"
+    CHECKED_OUT = "checked_out"
+    IN_REPAIR = "in_repair"
+    OUT_FOR_CALIBRATION = "out_for_calibration"
+    #: Missing, but not yet written off. Things turn up in the back of a van.
+    MISSING = "missing"
+    #: Written off: broken beyond repair, sold, or handed on. Kept rather than
+    #: deleted, because the loan history and the purchase record still matter.
+    RETIRED = "retired"
+
+
+class CalibrationResult(str, enum.Enum):
+    """How a calibration or service went."""
+
+    PASSED = "passed"
+    #: Brought back into tolerance by the calibrating engineer. Worth
+    #: distinguishing from a clean pass: readings taken before this date may
+    #: need looking at again.
+    ADJUSTED = "adjusted"
+    FAILED = "failed"
+
+
+class StockReason(str, enum.Enum):
+    """Why the amount of a consumable on the shelf changed.
+
+    A closed list because a stock figure is only worth anything if every
+    change to it can be accounted for. "Issued to a project" and "found to be
+    missing at stock-take" are very different facts about the same shortfall.
+    """
+
+    RECEIVED = "received"
+    ISSUED = "issued"
+    RETURNED = "returned"
+    USED = "used"
+    DAMAGED = "damaged"
+    EXPIRED = "expired"
+    #: A stock-take found the shelf and the ledger disagreeing. The correction
+    #: is recorded as its own event rather than by quietly editing the total.
+    STOCKTAKE = "stocktake"
+    OTHER = "other"

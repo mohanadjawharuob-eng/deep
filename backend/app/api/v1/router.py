@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     health,
     history,
     imports,
+    inventory,
     labels,
     models3d,
     museum,
@@ -54,6 +55,7 @@ api_router.include_router(spatial.router)
 
 # Museum collections, and the form layouts a cataloguing client renders.
 api_router.include_router(museum.router)
+api_router.include_router(inventory.router)
 api_router.include_router(floorplans.router)
 api_router.include_router(formlayouts.router)
 api_router.include_router(imports.router)
