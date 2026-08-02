@@ -157,6 +157,45 @@ Sign in as **`admin@example.org`** for the full tour.
 10. **Archaeology → Projects → Tell el-Demo.** Sites, contexts, finds,
     photographs.
 
+11. **Museum → Import.** The spreadsheet importer, and the screen you asked
+    for. Drag a `.xlsx` or `.csv` onto the box and press **Read the file** —
+    nothing is written to the catalogue by that.
+
+    The next screen is the point: every column of your file, the values it
+    actually contains, and a dropdown saying what it fills. Correct anything
+    the platform guessed wrongly; set a column to **Do not import** to leave
+    it out on purpose. Choose the collection at the top — almost no
+    spreadsheet names one.
+
+    Then **Check every row**. It reports what would happen, failures first,
+    numbered as the rows are numbered in Excel. Only **Create** writes
+    anything, and the run can be undone afterwards.
+
+    There is a test file at `backend/tests/` if you want one, but the point is
+    to try it with **your own register**. It will refuse things — a cell with
+    two measurements in it, a date that could be day/month or month/day — and
+    the refusals are the feature. Nothing is guessed at.
+
+12. **Store → Floor plans.** Pick a location in the storage tree first
+    (**Store → Locations → Finds Room 203**), then press **Show on the plan**
+    or **Draw a plan**.
+
+    Press **Edit plan** and drag on the grid to draw. Four tools: **Case** for
+    a cabinet or shelf run, **Wall** for scenery so the room is recognisable,
+    **Pin** for something standing on the floor, **Text** for a note.
+
+    The important step is on the right: with a shape selected, set **This
+    shape is** to a place in the store. That is what makes the plan useful —
+    it then shows what that place holds, and **keeps showing the right thing
+    when objects move**, because the plan stores no inventory of its own. An
+    empty case is drawn hollow and dashed.
+
+    If your museum already has a floor plan as an image, that is the normal
+    way in. In **Edit plan** there is an **Upload a plan** button on the right;
+    the drawing then goes on top of your image. Replacing it later with a
+    better scan is safe — shapes are stored as fractions of the plan, not
+    pixels, so nothing moves.
+
 ---
 
 ## Making notes for changes
@@ -170,6 +209,8 @@ line says **where** and **what**, like:
 > *Catalogue list* — add a column for storage location.
 >
 > *Storage tree* — box icons are hard to tell apart at depth.
+>
+> *Import* — I want a column mapped to two fields at once.
 
 Screenshots with arrows drawn on them are just as good. Anything that names a
 screen and a change can be acted on directly.

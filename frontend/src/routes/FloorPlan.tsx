@@ -224,6 +224,8 @@ export function FloorPlanScreen() {
         />
 
         <aside className="col">
+          {editing && <PlanBackground plan={record} onUploaded={() => plan.reload()} />}
+
           {editing && (
             <section className="card">
               <div className="card-header">
@@ -298,6 +300,71 @@ export function FloorPlanScreen() {
         />
       )}
     </>
+  );
+}
+
+/**
+ * The plan the institution already has.
+ *
+ * This is the normal way in. Almost every museum owns its floor plan as a scan
+ * or an export, and asking somebody to redraw it in a browser is asking them
+ * not to use the feature — so the image goes underneath and the shapes are
+ * drawn on top of it.
+ *
+ * Replacing it later is safe: shapes are stored as fractions of the plan, so a
+ * better scan at a different size leaves every case exactly where it was.
+ */
+function PlanBackground({ plan, onUploaded }: { plan: Plan; onUploaded: () => void }) {
+  const upload = useAction(async (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+
+    // FormData, so this one call cannot go through the JSON client.
+    const response = await fetch(`/api/v1/floorplans/${plan.id}/image`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${localStorage.getItem("archeo.access") ?? ""}` },
+      body,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail ?? "That image could not be read");
+    onUploaded();
+  });
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <span className="card-title">Background</span>
+        {plan.image_width && (
+          <span className="small muted mono">
+            {plan.image_width} × {plan.image_height}
+          </span>
+        )}
+      </div>
+      <div className="card-body">
+        <p className="small muted" style={{ marginBottom: 8 }}>
+          {plan.image_url
+            ? "Replacing this leaves every shape where it is — they are stored as fractions of the plan, not pixels."
+            : "Upload the plan you already have and draw on top of it, or keep the grid and draw from nothing."}
+        </p>
+        <label className="btn btn-sm" style={{ width: "100%", cursor: "pointer" }}>
+          {upload.running
+            ? "Uploading…"
+            : plan.image_url
+              ? "Replace the background"
+              : "Upload a plan"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void upload.run(file);
+            }}
+          />
+        </label>
+        {upload.error && <ErrorNote message={upload.error} />}
+      </div>
+    </section>
   );
 }
 
