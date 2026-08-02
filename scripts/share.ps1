@@ -33,7 +33,7 @@ function Show-ApiLog {
     Write-Host "What the backend itself said:" -ForegroundColor Yellow
     Write-Host "-------------------------------------------------------" -ForegroundColor Yellow
     try {
-        docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 60 --no-color api
+        docker compose @script:ComposeFiles logs --tail 60 --no-color api
     } catch {
         Write-Host "(could not read the log)" -ForegroundColor Yellow
     }
@@ -57,9 +57,57 @@ Write-Host ""
 Say "Stratum - share on this network" "White"
 Write-Host ""
 
+
+# --------------------------------------------------------------------------
+# Which compose files to use
+#
+# docker-compose.storage.yml puts the uploaded photographs and the backups in a
+# folder you choose rather than inside Docker's own area. It is opt-in, and the
+# way you opt in is by setting DATA_ROOT in .env - which is no use at all if
+# the launcher never passes the file. So: if DATA_ROOT is set, it is used.
+#
+# Reading .env here rather than trusting the environment, because a variable
+# set in .env is not set in this PowerShell session; Compose reads that file
+# itself, and by then it is too late to decide which files to read.
+# --------------------------------------------------------------------------
+function Get-ComposeFiles([string[]]$Base) {
+    $files = @()
+    foreach ($name in $Base) { $files += @("-f", $name) }
+
+    $envPath = Join-Path $Root ".env"
+    if (Test-Path $envPath) {
+        foreach ($line in Get-Content $envPath) {
+            if ($line -match '^\s*DATA_ROOT\s*=\s*(.+?)\s*$') {
+                $value = $matches[1].Trim('"').Trim("'")
+                if ($value) {
+                    $files += @("-f", "docker-compose.storage.yml")
+                    Say "Files and backups go to $value" "DarkGray"
+
+                    # Docker will create a missing folder, but as root - and
+                    # then it cannot be opened in Explorer without a fight.
+                    # Better to make it here, or say so plainly.
+                    if (-not (Test-Path $value)) {
+                        try {
+                            New-Item -ItemType Directory -Path $value -Force | Out-Null
+                            Say "  Created it." "DarkGray"
+                        } catch {
+                            Say "  That folder does not exist and could not be created." "Yellow"
+                            Say "  Create it yourself, or change DATA_ROOT in .env." "Yellow"
+                        }
+                    }
+                }
+                break
+            }
+        }
+    }
+    return ,$files
+}
+
 if (-not (Test-Path (Join-Path $Root "docker-compose.yml"))) {
     Fail "This does not look like the project folder."
 }
+
+$script:ComposeFiles = Get-ComposeFiles @("docker-compose.yml", "docker-compose.prod.yml")
 if (-not (Test-Path (Join-Path $Root ".env"))) {
     Fail "No settings file yet. Run setup.ps1 first."
 }
@@ -186,7 +234,7 @@ Write-Host ""
 Say "Building. The first time takes several minutes; after that it is quick." "White"
 Write-Host ""
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose @script:ComposeFiles up -d --build
 if ($LASTEXITCODE -ne 0) { Fail "It did not start." -WithApiLog }
 
 Say "Waiting for it to be ready..."

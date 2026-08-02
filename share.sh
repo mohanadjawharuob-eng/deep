@@ -23,6 +23,37 @@ fail() { echo; echo "${RED}${*}${OFF}"; echo; exit 1; }
 
 # The backend's own log, when it is the backend that went wrong.
 #
+# Which compose files to use.
+#
+# docker-compose.storage.yml puts the uploaded photographs and the backups in a
+# folder you choose rather than inside Docker's own area. It is opt-in, and the
+# way you opt in is by setting DATA_ROOT in .env — which is no use at all if the
+# launcher never passes the file.
+#
+# Read from .env rather than from the environment: a variable set in .env is not
+# set in this shell. Compose reads that file itself, but by then it is too late
+# to decide which files Compose should be reading.
+compose_files() {
+    local files=()
+    local name
+    for name in "$@"; do files+=(-f "$name"); done
+
+    if [ -f .env ]; then
+        local value
+        value="$(sed -n 's/^[[:space:]]*DATA_ROOT[[:space:]]*=[[:space:]]*//p' .env | head -n1 | tr -d '"'"'"'\r')"
+        if [ -n "$value" ]; then
+            files+=(-f docker-compose.storage.yml)
+            # To stderr: stdout is the list of arguments the caller reads back.
+            echo "Files and backups go to $value" >&2
+            # Docker will create a missing folder, but as root, and then it
+            # cannot be opened without a fight. Better to make it here.
+            [ -d "$value" ] || mkdir -p "$value" 2>/dev/null \
+                || echo "  That folder does not exist and could not be created." >&2
+        fi
+    fi
+    printf '%s\n' "${files[@]}"
+}
+
 # Docker Compose only ever says "container archeo-api is unhealthy", which is a
 # symptom and never a reason. The reason is always in the container's log, and
 # telling somebody to go and run `docker compose logs api` themselves is asking
@@ -31,8 +62,7 @@ show_api_log() {
     echo
     echo "${YELLOW}What the backend itself said:${OFF}"
     echo "${YELLOW}-------------------------------------------------------${OFF}"
-    docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-        logs --tail 60 --no-color api 2>&1 || echo "(could not read the log)"
+    docker compose "${COMPOSE[@]}" logs --tail 60 --no-color api 2>&1 || echo "(could not read the log)"
     echo "${YELLOW}-------------------------------------------------------${OFF}"
     echo
     echo "The last few lines are the ones that matter. If it is not obvious,"
@@ -47,6 +77,8 @@ echo "${BOLD}Stratum — share on this network${OFF}"
 echo
 
 [ -f docker-compose.yml ] || fail "This does not look like the project folder."
+
+mapfile -t COMPOSE < <(compose_files docker-compose.yml docker-compose.prod.yml)
 [ -f .env ] || fail "No settings file yet. Run 'bash setup.sh' first."
 
 # --------------------------------------------------------------------------
@@ -132,7 +164,7 @@ echo
 echo "${BOLD}Building. The first time takes several minutes; after that it is quick.${OFF}"
 echo
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build \
+docker compose "${COMPOSE[@]}" up -d --build \
     || fail_with_log "It did not start."
 
 echo "Waiting for it to be ready..."

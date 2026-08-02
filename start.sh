@@ -28,6 +28,37 @@ ok()   { echo "${GREEN}${*}${OFF}"; }
 warn() { echo "${YELLOW}${*}${OFF}"; }
 fail() { echo; echo "${RED}${*}${OFF}"; echo; exit 1; }
 
+# Which compose files to use.
+#
+# docker-compose.storage.yml puts the uploaded photographs and the backups in a
+# folder you choose rather than inside Docker's own area. It is opt-in, and the
+# way you opt in is by setting DATA_ROOT in .env — which is no use at all if the
+# launcher never passes the file.
+#
+# Read from .env rather than from the environment: a variable set in .env is not
+# set in this shell. Compose reads that file itself, but by then it is too late
+# to decide which files Compose should be reading.
+compose_files() {
+    local files=()
+    local name
+    for name in "$@"; do files+=(-f "$name"); done
+
+    if [ -f .env ]; then
+        local value
+        value="$(sed -n 's/^[[:space:]]*DATA_ROOT[[:space:]]*=[[:space:]]*//p' .env | head -n1 | tr -d '"'"'"'\r')"
+        if [ -n "$value" ]; then
+            files+=(-f docker-compose.storage.yml)
+            # To stderr: stdout is the list of arguments the caller reads back.
+            echo "Files and backups go to $value" >&2
+            # Docker will create a missing folder, but as root, and then it
+            # cannot be opened without a fight. Better to make it here.
+            [ -d "$value" ] || mkdir -p "$value" 2>/dev/null \
+                || echo "  That folder does not exist and could not be created." >&2
+        fi
+    fi
+    printf '%s\n' "${files[@]}"
+}
+
 # The backend's own log, when it is the backend that went wrong.
 #
 # Docker Compose only ever says the container is unhealthy, which is a symptom
@@ -38,7 +69,7 @@ show_api_log() {
     echo
     echo "${YELLOW}What the backend itself said:${OFF}"
     echo "${YELLOW}-------------------------------------------------------${OFF}"
-    docker compose logs --tail 60 --no-color api 2>&1 || echo "(could not read the log)"
+    docker compose "${COMPOSE[@]}" logs --tail 60 --no-color api 2>&1 || echo "(could not read the log)"
     echo "${YELLOW}-------------------------------------------------------${OFF}"
     echo
     echo "The last few lines are the ones that matter. If it is not obvious,"
@@ -57,6 +88,11 @@ echo
 # 1. Settings
 # --------------------------------------------------------------------------
 [ -f docker-compose.yml ] || fail "This does not look like the project folder."
+
+# Decided once, used by every command below — including the one that prints the
+# log when something fails, which has to read the same containers that were
+# started or it reports on nothing.
+mapfile -t COMPOSE < <(compose_files docker-compose.yml)
 
 if [ ! -f .env ]; then
     fail "No settings file yet. Run 'bash setup.sh' first — it creates .env and shows you the password to sign in with."
@@ -125,7 +161,7 @@ echo "${BOLD}Starting the backend. The first run after an update takes a few min
 # --build every time. Rebuilding is nearly instant when nothing has changed —
 # Docker reuses its cached layers — and skipping it is the single most common
 # way to end up running last week's code against this week's database.
-docker compose up --build -d || fail_with_log "The backend did not start."
+docker compose "${COMPOSE[@]}" up --build -d || fail_with_log "The backend did not start."
 
 # Up is not the same as ready: the container still has migrations to run.
 say "Waiting for the backend to be ready..."
