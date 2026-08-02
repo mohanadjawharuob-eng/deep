@@ -99,19 +99,10 @@ export function ImportUpload() {
   );
 
   const upload = useAction(async (chosen: File) => {
-    const body = new FormData();
-    body.append("file", chosen);
-    body.append("record_type", "museum_object");
-    body.append("header_row", String(headerRow));
-
-    // FormData, so this one call cannot go through the JSON client.
-    const response = await fetch("/api/v1/imports", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("archeo.access") ?? ""}` },
-      body,
+    const data = await api.upload<{ id: string }>("/imports", chosen, {
+      record_type: "museum_object",
+      header_row: headerRow,
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail ?? "The file could not be read");
     navigate(`/museum/import/${data.id}`);
   });
 

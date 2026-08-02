@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, CurrentUserOptional, DbSession
@@ -14,6 +14,7 @@ from app.models.artifact import Artifact
 from app.models.context import ContextRelationship, ExcavationContext
 from app.models.enums import (
     INVERSE_RELATION,
+    ActivityAction,
     ContextType,
     ResourceType,
     ReviewStatus,
@@ -26,10 +27,12 @@ from app.schemas.context import (
     ContextDetail,
     ContextSummary,
     ContextUpdate,
+    MatrixPlan,
+    MatrixResult,
     RelationshipCreate,
     RelationshipTarget,
 )
-from app.services import records
+from app.services import activity, matrix, records, spreadsheets
 
 router = APIRouter(prefix="/contexts", tags=["Excavation contexts"])
 
@@ -436,3 +439,140 @@ def remove_relationship(
         session.delete(mirrored)
 
     return Message(detail="Relationship removed")
+
+
+# --------------------------------------------------------------------------
+# Building the matrix from a spreadsheet
+# --------------------------------------------------------------------------
+@router.post(
+    "/sites/{site_id}/stratigraphy/preview",
+    response_model=MatrixPlan,
+    summary="Check a stratigraphy spreadsheet before importing it",
+    description=(
+        "Reads a sheet of relationships and says what it *would* do. Nothing "
+        "is written.\n\n"
+        "The sheet needs three columns — the context, the relationship, and "
+        "the related context — under any of the usual headings. Certainty and "
+        "notes are taken if they are there.\n\n"
+        "Relationships are read as words: *above*, *below*, *cuts*, *cut by*, "
+        "*fills*, *filled by*, *same as*, *abuts*, and the obvious synonyms, "
+        "so a sheet written for people does not have to be rewritten for a "
+        "computer.\n\n"
+        "**An impossible sequence stops the import.** If the sheet says 1001 "
+        "is above 1002, 1002 above 1003 and 1003 above 1001, no stratigraphy "
+        "could produce that — it is nearly always two columns the wrong way "
+        "round. The loop is reported in full so the wrong link can be found."
+    ),
+)
+async def preview_stratigraphy(
+    site_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+    file: Annotated[UploadFile, File(description="An .xlsx or .csv of relationships")],
+    sheet_name: Annotated[str | None, Form()] = None,
+) -> MatrixPlan:
+    site = _site_for_matrix(session, site_id, user)
+    sheet = _read_sheet(await file.read(), file.filename or "upload.xlsx", sheet_name)
+    columns = matrix.match_columns(sheet.columns)
+    return _as_plan(matrix.plan(session, site.id, sheet.rows, columns), sheet)
+
+
+@router.post(
+    "/sites/{site_id}/stratigraphy/import",
+    response_model=MatrixResult,
+    summary="Build the matrix from a spreadsheet",
+    description=(
+        "The same reading as the preview, then it writes. Both directions of "
+        "each relationship are stored, so the matrix reads correctly from "
+        "either context.\n\n"
+        "Rows already in the database are skipped rather than duplicated — "
+        "re-importing a corrected sheet is the normal way to use this."
+    ),
+)
+async def import_stratigraphy(
+    site_id: uuid.UUID,
+    session: DbSession,
+    request: Request,
+    user: CurrentUser,
+    file: Annotated[UploadFile, File()],
+    sheet_name: Annotated[str | None, Form()] = None,
+) -> MatrixResult:
+    site = _site_for_matrix(session, site_id, user, writing=True)
+    sheet = _read_sheet(await file.read(), file.filename or "upload.xlsx", sheet_name)
+    columns = matrix.match_columns(sheet.columns)
+    planned = matrix.plan(session, site.id, sheet.rows, columns)
+
+    if planned.contradictions:
+        loops = "; ".join(" → ".join(loop) for loop in planned.contradictions[:3])
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "This sheet describes a sequence that cannot exist, so nothing "
+                f"was imported. {loops}. Two columns the wrong way round is the "
+                "usual cause."
+            ),
+        )
+    if not planned.edges:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No usable relationships were found in that sheet.",
+        )
+
+    written = matrix.apply(session, site.id, planned)
+    activity.log(
+        session,
+        action=ActivityAction.CREATE,
+        user=user,
+        resource_type=ResourceType.SITE,
+        resource_id=site.id,
+        resource_label=site.name,
+        summary=f"Imported {written} stratigraphic relationships for {site.name}",
+        request=request,
+    )
+    session.flush()
+
+    result = MatrixResult.model_validate(_as_plan(planned, sheet).model_dump())
+    result.written = written
+    return result
+
+
+def _site_for_matrix(
+    session: DbSession, site_id: uuid.UUID, user: User, *, writing: bool = False
+) -> Site:
+    site = records.get_or_404(session, Site, site_id, "Site")
+    if not can_view(session, user, site, ResourceType.SITE):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Site not found")
+    if writing and not can_edit(session, user, site, ResourceType.SITE):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="You may not change this site's stratigraphy"
+        )
+    return site
+
+
+def _read_sheet(data: bytes, filename: str, sheet_name: str | None):
+    try:
+        return spreadsheets.read(data, filename=filename, sheet_name=sheet_name)
+    except spreadsheets.SpreadsheetError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+def _as_plan(planned: matrix.Plan, sheet) -> MatrixPlan:
+    return MatrixPlan(
+        sheet_name=sheet.name,
+        row_count=len(sheet.rows),
+        columns=planned.columns,
+        usable=len(planned.edges),
+        already_there=planned.already_there,
+        problems=[{"row": item.row, "message": item.message} for item in planned.problems],
+        contradictions=planned.contradictions,
+        can_apply=planned.can_apply,
+        relationships=[
+            {
+                "row": edge.row,
+                "context": edge.context_number,
+                "relation": edge.relation.value,
+                "related": edge.related_number,
+            }
+            for edge in planned.edges[:200]
+        ],
+    )

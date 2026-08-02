@@ -185,3 +185,39 @@ class RelationshipCreate(BaseModel):
         default=None, pattern="^(certain|probable|possible)$", max_length=30
     )
     notes: str | None = None
+
+
+# --------------------------------------------------------------------------
+# Building the matrix from a spreadsheet
+# --------------------------------------------------------------------------
+class MatrixProblem(BaseModel):
+    """A row that could not be used, and why."""
+
+    #: The row number in the file, counting the heading as row 1, so somebody
+    #: can go straight to it rather than search for the value.
+    row: int
+    message: str
+
+
+class MatrixPlan(BaseModel):
+    """What importing a stratigraphy sheet would do. Nothing is written."""
+
+    sheet_name: str
+    row_count: int
+    #: Which column was taken for which field, so a wrong guess is visible
+    #: before it becomes a wrong matrix rather than after.
+    columns: dict[str, str | None] = Field(default_factory=dict)
+    usable: int = 0
+    already_there: int = 0
+    problems: list[MatrixProblem] = Field(default_factory=list)
+    #: Loops in the sequence, each spelled out end to end. A Harris matrix is
+    #: acyclic by definition; a loop here is a sheet describing something that
+    #: could not have happened, and it stops the import.
+    contradictions: list[list[str]] = Field(default_factory=list)
+    can_apply: bool = False
+    #: The first two hundred, for showing what is about to happen.
+    relationships: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class MatrixResult(MatrixPlan):
+    written: int = 0

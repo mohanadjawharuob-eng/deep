@@ -202,6 +202,45 @@ export const api = {
     request<T>(path, { method: "DELETE", signal }),
 
   /**
+   * Send a file.
+   *
+   * Multipart, so the body must *not* be JSON and the Content-Type header must
+   * be left alone — the browser sets it, including the boundary, and a
+   * hand-written one produces a request the server cannot parse. Everything
+   * else is the same as any other call, and that is the point: an upload
+   * written with a bare `fetch` carries no token refresh, so a form left open
+   * over lunch fails with an unexplained 401.
+   */
+  async upload<T>(
+    path: string,
+    file: File,
+    fields: Record<string, string | number | undefined> = {},
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const body = new FormData();
+    body.append("file", file);
+    for (const [key, value] of Object.entries(fields)) {
+      if (value !== undefined && value !== null && value !== "") body.append(key, String(value));
+    }
+
+    const send = async () => {
+      const headers: Record<string, string> = {};
+      const access = tokens.access();
+      if (access) headers.Authorization = `Bearer ${access}`;
+      return fetch(`${API}${path}`, { method: "POST", headers, body, signal });
+    };
+
+    let response = await send();
+    if (response.status === 401 && tokens.refresh()) {
+      if (await refreshSession()) response = await send();
+      else endSession();
+    }
+    if (response.status === 401) endSession();
+    if (!response.ok) throw await readError(response);
+    return (await response.json()) as T;
+  },
+
+  /**
    * Save a file the platform generates.
    *
    * A plain `<a href="/api/…">` would be simpler, but a link carries no
@@ -709,6 +748,27 @@ export type CalendarEvent = {
    *  which blocks are the reader's to move. */
   can_edit: boolean;
 };
+
+/* --- Building a Harris matrix from a spreadsheet -------------------------- */
+export type MatrixProblem = { row: number; message: string };
+
+export type MatrixPlan = {
+  sheet_name: string;
+  row_count: number;
+  /** Which column was taken for which field, so a wrong guess is visible
+   *  before it becomes a wrong matrix. */
+  columns: Record<string, string | null>;
+  usable: number;
+  already_there: number;
+  problems: MatrixProblem[];
+  /** Loops in the sequence. A Harris matrix is acyclic by definition, so any
+   *  entry here is a sheet describing something that could not have happened. */
+  contradictions: string[][];
+  can_apply: boolean;
+  relationships: { row: number; context: string; relation: string; related: string }[];
+};
+
+export type MatrixResult = MatrixPlan & { written: number };
 
 /* --- The activity hub ----------------------------------------------------- */
 /**

@@ -6,11 +6,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   api,
   type Artifact,
+  type MatrixPlan,
+  type MatrixResult,
   type Page,
   type Project,
   type Site,
 } from "../lib/api";
-import { useDebounced, useQuery } from "../lib/hooks";
+import { useAction, useDebounced, useQuery } from "../lib/hooks";
 import {
   Badge,
   DeleteRecord,
@@ -236,6 +238,7 @@ export function ProjectDetail() {
           </div>
         )}
       </div>
+
     </>
   );
 }
@@ -437,6 +440,10 @@ export function SiteDetail() {
           </div>
         )}
       </div>
+
+      {/* Only for somebody who could act on it. Offering an upload that
+          ends in "you may not" wastes the one click they were sure about. */}
+      <MatrixImport siteId={record.id} />
     </>
   );
 }
@@ -587,5 +594,167 @@ export function ArtifactDetail() {
         </div>
       </div>
     </>
+  );
+}
+
+/* --------------------------------------------------------------------------
+ * Building the Harris matrix from a spreadsheet
+ * ----------------------------------------------------------------------- */
+
+/**
+ * Upload a sheet of relationships, see what it would do, then do it.
+ *
+ * Two steps, always, because the alternative is somebody discovering that
+ * their column headings were the wrong way round *after* four hundred
+ * relationships have been written. The preview says what it matched, what it
+ * could not, and — the one that stops everything — whether the sheet
+ * describes a sequence that could not have happened.
+ */
+function MatrixImport({ siteId }: { siteId: string }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [plan, setPlan] = useState<MatrixPlan | null>(null);
+  const [done, setDone] = useState<MatrixResult | null>(null);
+
+  const preview = useAction(async (chosen: File) => {
+    setDone(null);
+    setPlan(await api.upload<MatrixPlan>(`/contexts/sites/${siteId}/stratigraphy/preview`, chosen));
+  });
+
+  const apply = useAction(async () => {
+    if (!file) return;
+    const result = await api.upload<MatrixResult>(
+      `/contexts/sites/${siteId}/stratigraphy/import`,
+      file,
+    );
+    setDone(result);
+    setPlan(null);
+    setFile(null);
+    // Deliberately no reload of the site query. The site screen does not draw
+    // the matrix, so there is nothing to refresh — and reloading unmounts this
+    // panel while it shows the loading state, which threw the confirmation
+    // away the instant it appeared. Found by watching it happen.
+  });
+
+  return (
+    <section className="card" style={{ marginTop: "var(--space-4)" }}>
+      <div className="card-header">
+        <span className="card-title">Build the matrix from a spreadsheet</span>
+      </div>
+      <div className="card-body">
+        <p className="small muted">
+          A sheet with three columns: the context, the relationship, and the related context.
+          Certainty and notes are taken if they are there. Relationships are read as words —
+          above, below, cuts, cut by, fills, filled by, same as — so a sheet written for people
+          does not have to be rewritten for a computer.
+        </p>
+
+        <input
+          className="input"
+          type="file"
+          accept=".xlsx,.xlsm,.csv,.tsv"
+          onChange={(event) => {
+            const chosen = event.target.files?.[0] ?? null;
+            setFile(chosen);
+            setPlan(null);
+            setDone(null);
+            if (chosen) void preview.run(chosen);
+          }}
+        />
+
+        {preview.error && <ErrorNote message={preview.error} />}
+        {apply.error && <ErrorNote message={apply.error} />}
+        {preview.running && <Loading rows={2} label="Reading the sheet" />}
+
+        {done && (
+          <div className="alert alert-info" style={{ marginTop: "var(--space-4)" }}>
+            <div>
+              <span className="strong">
+                {done.written} relationship{done.written === 1 ? "" : "s"} added.
+              </span>
+              {done.already_there > 0 && (
+                <span className="small"> {done.already_there} were already there.</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {plan && (
+          <div style={{ marginTop: "var(--space-4)" }}>
+            {plan.contradictions.length > 0 && (
+              <div className="alert alert-danger">
+                <div>
+                  <div className="strong">This sheet describes a sequence that cannot exist.</div>
+                  <p className="small" style={{ margin: "4px 0" }}>
+                    A context cannot end up above itself. Two columns the wrong way round is the
+                    usual cause. Nothing will be imported until this is fixed.
+                  </p>
+                  <ul className="small" style={{ margin: 0, paddingLeft: "1.2em" }}>
+                    {plan.contradictions.map((loop) => (
+                      <li key={loop.join(">")} className="mono">
+                        {loop.join(" → ")}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            <DetailGrid>
+              <Detail label="Sheet" value={plan.sheet_name} />
+              <Detail label="Rows read" value={plan.row_count} />
+              <Detail label="Usable" value={plan.usable} />
+              <Detail
+                label="Already there"
+                value={plan.already_there || null}
+              />
+            </DetailGrid>
+
+            <p className="small muted">
+              Columns taken:{" "}
+              {Object.entries(plan.columns)
+                .filter(([, column]) => column)
+                .map(([field, column]) => `${field} = "${column}"`)
+                .join(", ") || "none"}
+            </p>
+
+            {plan.problems.length > 0 && (
+              <div className="alert alert-warning">
+                <div>
+                  <div className="strong">
+                    {plan.problems.length} row{plan.problems.length === 1 ? "" : "s"} cannot be
+                    used
+                  </div>
+                  <ul className="small" style={{ margin: "4px 0 0", paddingLeft: "1.2em" }}>
+                    {plan.problems.slice(0, 12).map((problem) => (
+                      <li key={`${problem.row}-${problem.message}`}>
+                        Row {problem.row}: {problem.message}
+                      </li>
+                    ))}
+                  </ul>
+                  {plan.problems.length > 12 && (
+                    <p className="small" style={{ margin: "4px 0 0" }}>
+                      …and {plan.problems.length - 12} more.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="row-tight">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!plan.can_apply || apply.running}
+                onClick={() => void apply.run()}
+              >
+                {apply.running
+                  ? "Importing…"
+                  : `Import ${plan.usable} relationship${plan.usable === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
