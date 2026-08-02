@@ -82,15 +82,33 @@ if (-not $ip) {
 Say "This computer is $ip on the network." "Green"
 
 # --------------------------------------------------------------------------
+# A name that survives the address changing
+# --------------------------------------------------------------------------
+
+# The router hands out addresses on a lease, so this machine's number can
+# change after a reboot or overnight — and then every bookmark and every
+# printed QR code points at nothing.
+#
+# The computer's *name* does not change. Windows answers to it on a local
+# network, and so do Macs, iPhones and Androids via the `.local` form. Using
+# the name as the platform's address means an address change costs nobody
+# anything, which is a better answer than restarting on a timer and hoping.
+$computerName = $env:COMPUTERNAME
+$nameUrl = "http://$computerName"
+$dotLocal = "http://$computerName.local"
+
+# --------------------------------------------------------------------------
 # Record it in the settings
 # --------------------------------------------------------------------------
 
 # The platform prints its own address into QR codes and e-mails, so it has to
 # be told the one people actually type — not localhost, which would send
 # somebody scanning a label to their own machine.
+#
+# The *name* goes in, not the number, so a printed label outlives the lease.
 $envPath = Join-Path $Root ".env"
 $lines = Get-Content $envPath
-$wanted = @{ "SITE_ADDRESS" = ":80"; "PUBLIC_URL" = "http://$ip" }
+$wanted = @{ "SITE_ADDRESS" = ":80"; "PUBLIC_URL" = $nameUrl }
 
 foreach ($key in $wanted.Keys) {
     $value = "$key=$($wanted[$key])"
@@ -161,9 +179,17 @@ Write-Host ""
 Say "-------------------------------------------------------" "White"
 Say "  Anyone on this WiFi can now open:" "White"
 Write-Host ""
-Say "      http://$ip" "Green"
+Say "      $nameUrl" "Green"
+Write-Host ""
+Say "  or, if that does not work for them:" "Gray"
+Say "      $dotLocal" "Gray"
+Say "      http://$ip" "Gray"
 Write-Host ""
 Say "-------------------------------------------------------" "White"
+Write-Host ""
+Say "Give out the first one." "White"
+Say "The number can change when the router restarts; the name"
+Say "does not. That is why labels and links use the name."
 Write-Host ""
 Say "They install nothing. They just type that address."
 Say "Everyone shares one database, so a record added on one"
@@ -182,5 +208,5 @@ Say "It keeps running after you close this window."
 Say "'Stop Stratum.cmd' shuts it down."
 Write-Host ""
 
-Start-Process "http://$ip"
+Start-Process $nameUrl
 Read-Host "Press Enter to close this window"

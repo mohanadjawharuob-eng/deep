@@ -76,8 +76,17 @@ set_env() {
     fi
 }
 
+# The router hands out addresses on a lease, so this machine's number can
+# change after a reboot — and then every bookmark and every printed QR code
+# points at nothing. The computer's *name* does not change, and Macs, iPhones
+# and Androids all resolve the `.local` form on a local network. Using the
+# name means an address change costs nobody anything, which is a better answer
+# than restarting on a timer and hoping.
+HOSTNAME_LOCAL="$(hostname -s 2>/dev/null || hostname).local"
+NAME_URL="http://$HOSTNAME_LOCAL"
+
 set_env SITE_ADDRESS ":80"
-set_env PUBLIC_URL "http://$IP"
+set_env PUBLIC_URL "$NAME_URL"
 
 # --------------------------------------------------------------------------
 # Docker
@@ -117,9 +126,16 @@ cat <<EOF
 ${BOLD}-------------------------------------------------------${OFF}
   Anyone on this network can now open:
 
-      ${GREEN}http://$IP${OFF}
+      ${GREEN}${NAME_URL}${OFF}
+
+  or, if that does not work for them:
+      http://$IP
 
 ${BOLD}-------------------------------------------------------${OFF}
+
+Give out the first one. The number can change when the
+router restarts; the name does not. That is why labels
+and links use the name.
 
 They install nothing. They just type that address.
 Everyone shares one database, so a record added on one

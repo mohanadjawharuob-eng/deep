@@ -154,6 +154,76 @@ For it to work, the domain must already point at the server and ports 80 and
 
 ---
 
+## Putting the files on a bigger disk
+
+By default Docker keeps everything in its own area, which on Windows is a
+virtual disk inside WSL that sits on `C:` however much you would rather it did
+not. A single season of drone imagery is enough to make that the wrong place.
+
+**What moves:** the original uploaded files — photographs, drone imagery, 3D
+models, documents, imported spreadsheets, floor plan scans — and the nightly
+backups. These are stored exactly as they were uploaded; nothing is re-encoded
+or thrown away.
+
+**What does not:** the database itself. PostgreSQL wants a real filesystem with
+real locking, and a bind mount from Windows into a Linux container is neither —
+it is markedly slower and has been known to corrupt a database under load. The
+database is small anyway: fifty thousand catalogued objects is a few hundred
+megabytes, against several hundred gigabytes of photographs. It is the
+photographs that need the room.
+
+### Setting it up
+
+Make the folder first — Docker will create it otherwise, but owned by root,
+and then Explorer will not let you open it without a fight.
+
+Then in `.env`:
+
+```
+DATA_ROOT=D:/stratum-data
+```
+
+Forward slashes, even on Windows. Then add the file to the command:
+
+```bash
+cd ~/deep
+docker compose -f docker-compose.yml -f docker-compose.storage.yml up -d
+```
+
+Sharing on the network as well? All three stack:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.storage.yml up -d --build
+```
+
+### Moving files that are already there
+
+If you have already uploaded things, they are in Docker's area and the command
+above will start from an empty folder. Copy them across first:
+
+```bash
+cd ~/deep
+docker compose down
+docker run --rm -v archeo_uploads:/from -v D:/stratum-data/uploads:/to alpine sh -c "cp -a /from/. /to/"
+docker run --rm -v archeo_backups:/from -v D:/stratum-data/backups:/to alpine sh -c "cp -a /from/. /to/"
+```
+
+Then start with `-f docker-compose.storage.yml` added. Check a photograph
+loads in the platform before deleting anything — `docker volume rm
+archeo_uploads` is not reversible.
+
+### Everyone's uploads land here too
+
+There is one server, so this is where *everybody's* files go — not just yours.
+A colleague uploading a season of photographs fills this disk, not theirs.
+
+That is usually what you want: one copy, backed up together, findable by
+everyone. It does mean the free space on this machine is the platform's real
+limit, and a terabyte is a season or two of drone imagery rather than a
+lifetime. Worth watching.
+
+---
+
 ## How people get accounts
 
 Two ways, and the difference matters.

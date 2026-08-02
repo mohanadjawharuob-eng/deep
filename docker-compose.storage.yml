@@ -1,0 +1,58 @@
+# Put the uploaded files and the backups on a disk you choose.
+#
+#     docker compose -f docker-compose.yml -f docker-compose.storage.yml up -d
+#
+# Add it to any other command the same way — it stacks with
+# docker-compose.prod.yml.
+#
+# Why this exists: by default Docker keeps everything in its own area. On
+# Windows that is a virtual disk inside WSL which grows on demand, sits on
+# C: whatever else you do, and is awkward to point at a second drive or to
+# copy somewhere safe. The moment a season of drone imagery arrives, that is
+# the wrong place for it.
+#
+# What moves, and what does not:
+#
+#   uploads   → your folder.  Photographs, drone imagery, 3D models,
+#               documents, spreadsheets people import, floor plan scans.
+#               This is the part that grows to hundreds of gigabytes, and the
+#               part you would be most upset to lose. These are the original
+#               files exactly as they were uploaded — nothing is re-encoded.
+#   backups   → your folder.  Nightly database dumps. On the big disk so a
+#               month of history costs nothing.
+#   database  → left alone, deliberately. See the note at the bottom.
+#
+# Set DATA_ROOT in .env, for example:
+#
+#   DATA_ROOT=D:/stratum-data          (Windows, forward slashes)
+#   DATA_ROOT=/Volumes/Archive/stratum (macOS)
+#
+# Create the folder yourself first. Docker will happily create it, but as
+# root, and then you cannot open it in Explorer without a fight.
+
+services:
+  api:
+    volumes: !override
+      - ${DATA_ROOT:?DATA_ROOT must be set in .env}/uploads:/data/uploads
+      - ${DATA_ROOT}/backups:/data/backups
+
+  backup:
+    volumes: !override
+      - ${DATA_ROOT}/backups:/backups
+      - ./docker/backup.sh:/usr/local/bin/backup.sh:ro
+
+# A note on the database, since the obvious next thought is to move it too.
+#
+# PostgreSQL wants a real filesystem with real locking. On Windows and macOS a
+# bind mount into a Linux container is neither: it goes through a translation
+# layer that is markedly slower and, worse, has been known to corrupt a
+# database under load. Docker's own volume is on the same physical disk you
+# are trying to protect against filling — but it is small. A catalogue of
+# fifty thousand objects is a few hundred megabytes of database and several
+# hundred gigabytes of photographs, and it is the photographs that are moving
+# here.
+#
+# If the database itself must live elsewhere — a genuinely separate physical
+# disk, say — the right way is a second PostgreSQL data directory configured
+# on a Linux host, not a bind mount from Windows. Worth doing when there is a
+# real reason; not worth the risk by default.
