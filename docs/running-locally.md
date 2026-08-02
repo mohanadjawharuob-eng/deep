@@ -55,6 +55,35 @@ your machine.
 
 ---
 
+## Getting a newer version
+
+**You never need to download the project again.** `git pull` brings the changes
+into the folder you already have.
+
+```bash
+cd ~/deep
+git pull origin claude/archaeology-platform-backend-xq6xw9
+```
+
+Then start it with `--build` added, **once**, after any pull:
+
+```bash
+cd ~/deep
+docker compose up --build
+```
+
+`--build` rebuilds the backend image. Without it, Docker keeps running the
+image it built the first time, so new features that need a new Python package
+— the spreadsheet importer needs one — fail with a message about support not
+being installed on the server.
+
+Database changes are applied for you when the container starts; there is no
+migration command to run by hand.
+
+Your data is kept. Nothing above deletes it.
+
+---
+
 ## Every time you want to use it
 
 ### Step 1 — start the backend
@@ -63,6 +92,8 @@ your machine.
 cd ~/deep
 docker compose up
 ```
+
+*(Add `--build` if you have just pulled new code — see the section above.)*
 
 Leave this window open. It will print a lot; that is normal. Wait until you see
 a line containing `Application startup complete`.
