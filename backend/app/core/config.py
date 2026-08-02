@@ -97,6 +97,11 @@ class Settings(BaseSettings):
     #: "local" today; the storage service is an interface so S3/GCS can drop in.
     STORAGE_BACKEND: Literal["local"] = "local"
     STORAGE_ROOT: Path = Path("/data/uploads")
+    #: Where a copy of every deleted record is written, as JSON, before the row
+    #: goes. Under the backups directory on purpose: that volume is already
+    #: mounted, already on whatever disk ``BACKUP_ROOT`` points at, and already
+    #: the place people think to look. See :mod:`app.services.deletions`.
+    DELETED_ROOT: Path = Path("/data/backups/deleted")
     MAX_UPLOAD_SIZE_MB: int = 200
     THUMBNAIL_SIZES: Annotated[list[int], NoDecode] = [200, 800]
 

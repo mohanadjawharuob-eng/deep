@@ -35,6 +35,7 @@ import {
 import { useAction, useDebounced, useQuery } from "../lib/hooks";
 import {
   Badge,
+  DeleteRecord,
   Detail,
   DetailGrid,
   Empty,
@@ -501,6 +502,7 @@ export function NewActivity() {
  * ======================================================================= */
 export function ActivityScreen() {
   const { activityId } = useParams();
+  const navigate = useNavigate();
   const activity = useQuery<HubActivityDetail>(
     (signal) => api.get(`/activities/${activityId}`, undefined, signal),
     [activityId],
@@ -523,6 +525,14 @@ export function ActivityScreen() {
           <>
             <BriefButtons activity={record} />
             {record.can_edit && <RepeatButton activity={record} />}
+            <DeleteRecord
+              name={record.title}
+              title="Delete this activity?"
+              takesWithIt="its kit list, permits, preparations and costings"
+              can={record.can_delete}
+              onDelete={() => api.delete(`/activities/${record.id}`)}
+              onDeleted={() => navigate("/activities")}
+            />
           </>
         }
       />

@@ -27,6 +27,13 @@ os.environ.setdefault("BCRYPT_ROUNDS", "4")
 # at, which is their real uploads directory.
 os.environ.setdefault("STORAGE_ROOT", str(Path(tempfile.gettempdir()) / "archeo-test-uploads"))
 
+# Deletions write a JSON copy of every record to disk before the row goes. Left
+# at its default that is /data/backups/deleted, which on a developer's machine
+# is either a permission error or, worse, their real archive filling up with
+# fixtures. Same reasoning as STORAGE_ROOT above, and same requirement to be
+# set before the settings are read.
+os.environ.setdefault("DELETED_ROOT", str(Path(tempfile.gettempdir()) / "archeo-test-deleted"))
+
 from collections.abc import Iterator
 
 import pytest
@@ -62,10 +69,13 @@ def storage_root() -> Iterator[Path]:
     written could pass without anything having been written.
     """
     root = Path(os.environ["STORAGE_ROOT"])
-    shutil.rmtree(root, ignore_errors=True)
-    root.mkdir(parents=True, exist_ok=True)
+    deleted = Path(os.environ["DELETED_ROOT"])
+    for folder in (root, deleted):
+        shutil.rmtree(folder, ignore_errors=True)
+        folder.mkdir(parents=True, exist_ok=True)
     yield root
-    shutil.rmtree(root, ignore_errors=True)
+    for folder in (root, deleted):
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")

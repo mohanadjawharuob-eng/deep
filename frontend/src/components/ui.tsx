@@ -1,6 +1,6 @@
 /** Small presentational pieces shared across screens. */
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 /* --------------------------------------------------------------------------
@@ -536,5 +536,95 @@ export function ConfirmDelete({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The delete button, and everything that has to happen around one.
+ *
+ * Deleting is the one action nobody can undo by clicking again, so the same
+ * three things are true everywhere and are done here once rather than in every
+ * screen that offers it:
+ *
+ * - **It asks first**, naming the record, so a mis-click on a list costs a
+ *   glance rather than a season.
+ * - **It says what else goes.** Deleting a site takes its contexts and its
+ *   finds with it, and somebody who did not know that is somebody about to
+ *   find out the hard way.
+ * - **It says a copy is kept.** The server writes the record and everything
+ *   under it to a file before the row goes. That is the difference between a
+ *   frightening button and a safe one, and it is worth saying at the moment
+ *   the fear is felt rather than in documentation nobody opens.
+ *
+ * Nothing is rendered at all when `can` is false — an offer to delete that
+ * ends in "you may not" wastes the one click somebody was sure about.
+ */
+export function DeleteRecord({
+  name,
+  label = "Delete",
+  title,
+  takesWithIt,
+  can = true,
+  onDelete,
+  onDeleted,
+}: {
+  /** What the record is called. Shown in the dialog and on the button. */
+  name: string;
+  label?: string;
+  title?: string;
+  /** What else goes with it: "its contexts and its finds". */
+  takesWithIt?: string;
+  can?: boolean;
+  onDelete: () => Promise<unknown>;
+  onDeleted?: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  if (!can) return null;
+
+  async function confirm() {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await onDelete();
+      setAsking(false);
+      onDeleted?.();
+    } catch (cause) {
+      setFailed(cause instanceof Error ? cause.message : "It could not be deleted.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className="btn btn-danger" onClick={() => setAsking(true)}>
+        {label}
+      </button>
+
+      {asking && (
+        <ConfirmDelete
+          name={name}
+          title={title ?? "Delete this record?"}
+          busy={busy}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => void confirm()}
+          consequences={
+            <>
+              {takesWithIt ? `This also deletes ${takesWithIt}. ` : ""}
+              A copy of it — and everything under it — is written to a file on
+              this computer first, so it can be recovered from there.
+              {failed && (
+                <span className="strong" style={{ display: "block", marginTop: 8 }}>
+                  {failed}
+                </span>
+              )}
+            </>
+          }
+        />
+      )}
+    </>
   );
 }

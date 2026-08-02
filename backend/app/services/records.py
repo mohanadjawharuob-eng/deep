@@ -201,8 +201,20 @@ def on_deleted(
     The final version outlives the row: ``revisions`` has no foreign key to the
     record, deliberately, so a deleted excavation record can still be inspected
     and — with the id — reconstructed.
+
+    A copy also goes to disk, outside the database. The revision covers "I
+    deleted the wrong row, put it back"; the file covers the case the revision
+    cannot, which is losing the database. See :mod:`app.services.deletions`.
+
+    This is the one place every module's delete passes through, which is why
+    the archive lives here rather than in ten endpoints that would drift.
     """
+    from app.services import deletions
+
     project_id = resolve_project_id(session, record)
+    # Before the snapshot and before the row goes: the children have to still
+    # be loadable for the archive to be worth anything.
+    deletions.archive(session, record, resource_type, user=user, label=label)
     revisions.snapshot(
         session, record, resource_type, user=user, summary="Deleted", changed_fields=None
     )

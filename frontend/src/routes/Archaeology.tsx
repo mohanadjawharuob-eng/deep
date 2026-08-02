@@ -1,7 +1,7 @@
 /** Projects, sites and finds — list and detail. */
 
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
   api,
@@ -13,6 +13,7 @@ import {
 import { useDebounced, useQuery } from "../lib/hooks";
 import {
   Badge,
+  DeleteRecord,
   Detail,
   DetailGrid,
   Empty,
@@ -141,6 +142,7 @@ export function ProjectDetail() {
   // screen then shows "Validation failed", which reads like the record is
   // broken rather than the link to it.
   const { projectId: id } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
 
   const project = useQuery<Project>((signal) => api.get(`/projects/${id}`, undefined, signal), [id]);
   const sites = useQuery<Page<Site>>(
@@ -160,7 +162,18 @@ export function ProjectDetail() {
         breadcrumb={[{ label: "Projects", to: "/projects" }, { label: record.code }]}
         title={record.name}
         subtitle={[record.institution, record.region, record.country].filter(Boolean).join(" · ")}
-        actions={<Badge value={record.status} kind="status" />}
+        actions={
+          <>
+            <Badge value={record.status} kind="status" />
+            <DeleteRecord
+              name={record.code}
+              title="Delete this project?"
+              takesWithIt="its sites, their contexts and their finds"
+              onDelete={() => api.delete(`/projects/${record.id}`)}
+              onDeleted={() => navigate("/projects")}
+            />
+          </>
+        }
       />
 
       <div className="card" style={{ marginBottom: "var(--space-4)" }}>
@@ -314,6 +327,7 @@ export function Sites() {
 
 export function SiteDetail() {
   const { siteId: id } = useParams<{ siteId: string }>();
+  const navigate = useNavigate();
 
   const site = useQuery<Site & Record<string, unknown>>(
     (signal) => api.get(`/sites/${id}`, undefined, signal),
@@ -338,7 +352,18 @@ export function SiteDetail() {
         subtitle={[record.site_type && humanise(record.site_type), record.country]
           .filter(Boolean)
           .join(" · ")}
-        actions={<Badge value={record.review_status} kind="review" />}
+        actions={
+          <>
+            <Badge value={record.review_status} kind="review" />
+            <DeleteRecord
+              name={record.code ?? record.name}
+              title="Delete this site?"
+              takesWithIt="its excavation contexts and its finds"
+              onDelete={() => api.delete(`/sites/${record.id}`)}
+              onDeleted={() => navigate("/sites")}
+            />
+          </>
+        }
       />
 
       {record.location_restricted && (
@@ -489,6 +514,7 @@ export function Artifacts() {
 
 export function ArtifactDetail() {
   const { artifactId: id } = useParams<{ artifactId: string }>();
+  const navigate = useNavigate();
 
   const artifact = useQuery<Artifact & Record<string, unknown>>(
     (signal) => api.get(`/artifacts/${id}`, undefined, signal),
@@ -523,6 +549,13 @@ export function ArtifactDetail() {
             >
               QR label
             </a>
+            <DeleteRecord
+              name={record.inventory_number}
+              title="Delete this find?"
+              takesWithIt="its photographs and its storage history"
+              onDelete={() => api.delete(`/artifacts/${record.id}`)}
+              onDeleted={() => navigate("/artifacts")}
+            />
           </>
         }
       />
