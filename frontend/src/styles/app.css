@@ -1395,3 +1395,77 @@
   .board { grid-template-columns: minmax(0, 1fr); }
   .agenda li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
+
+/* --------------------------------------------------------------------------
+ * Outreach
+ * ----------------------------------------------------------------------- */
+
+/* An alert that is also a button. Used for the location warning on the
+   repository screen, where the warning and the way to act on it are the same
+   thing — a banner that only tells you a number, and leaves you to find the
+   filter yourself, is a banner people stop reading. */
+.alert-action {
+  display: flex;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  margin-bottom: var(--space-5);
+}
+.alert-action:hover { border-color: var(--warn); }
+.underline { text-decoration: underline; }
+
+/* Inline "this one" marker in a list. Dashed, like everything provisional in
+   this platform, and it carries a word as well as a symbol — a bare ⚠ says
+   something is wrong without saying what. */
+.warn-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: var(--space-3);
+  padding: 0 6px;
+  border: 1px dashed var(--warn);
+  border-radius: var(--radius-pill);
+  color: var(--warn);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Images used in a post --------------------------------------------- */
+.asset-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+.asset { margin: 0; min-width: 0; }
+.asset img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface-2);
+  display: block;
+}
+.asset figcaption {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+/* The image carrying a geotag. Ringed as well as marked, because in a strip of
+   nine the caption is not where the eye lands first. */
+.asset.flagged img { border-color: var(--warn); border-width: 2px; }
+
+/* A stat tile that is also a button — same shape, same everything, so a row of
+   them does not look like two different components. */
+button.stat {
+  font: inherit;
+  cursor: pointer;
+  width: 100%;
+}

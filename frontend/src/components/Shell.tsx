@@ -166,6 +166,24 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    heading: "Outreach",
+    items: [
+      {
+        to: "/social",
+        label: "Posts",
+        module: "social_media",
+        end: true,
+        icon: icon("M4 4h12v9H8l-4 3.5zM7 7h6M7 10h4"),
+      },
+      {
+        to: "/social/accounts",
+        label: "Channels",
+        module: "social_media",
+        icon: icon("M10 3v14M3.5 10h13M5 5.5a9 9 0 0 0 0 9M15 5.5a9 9 0 0 1 0 9"),
+      },
+    ],
+  },
+  {
     heading: "Store",
     items: [
       {

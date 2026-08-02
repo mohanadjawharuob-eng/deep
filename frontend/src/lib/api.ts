@@ -701,3 +701,120 @@ export type CalendarEvent = {
   project_name?: string | null;
   created_at: string;
 };
+
+/* --- Social media -------------------------------------------------------- */
+export type SocialAccount = {
+  id: string;
+  platform: string;
+  handle: string;
+  display_name?: string | null;
+  url?: string | null;
+  description?: string | null;
+  manager_label?: string | null;
+  follower_count?: number | null;
+  is_active: boolean;
+  is_public: boolean;
+  created_at: string;
+  post_count: number;
+  published_count: number;
+  awaiting_approval: number;
+};
+
+export type LocationFinding = {
+  kind: string;
+  detail: string;
+  photograph_id?: string | null;
+};
+
+export type LocationCheckResult = {
+  clear: boolean;
+  findings: LocationFinding[];
+  summary?: string | null;
+};
+
+export type PostAsset = {
+  id: string;
+  photograph_id: string;
+  position: number;
+  alt_text?: string | null;
+  credit?: string | null;
+  filename?: string | null;
+  thumbnail_url?: string | null;
+  /** True when this image still carries the coordinates the camera wrote. */
+  has_gps: boolean;
+};
+
+export type PostMetric = {
+  id: string;
+  post_id: string;
+  recorded_at: string;
+  impressions?: number | null;
+  reach?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  saves?: number | null;
+  clicks?: number | null;
+  source?: string | null;
+};
+
+export type Engagement = {
+  recorded_at?: string | null;
+  impressions?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  interactions?: number | null;
+  change?: number | null;
+  readings: number;
+};
+
+export type SocialPost = {
+  id: string;
+  account_id: string;
+  title: string;
+  body?: string | null;
+  hashtags?: string[] | null;
+  kind: string;
+  status: string;
+  scheduled_for?: string | null;
+  published_at?: string | null;
+  external_url?: string | null;
+  language?: string | null;
+  project_id?: string | null;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  reveals_location: boolean;
+  location_warning?: string | null;
+  is_public: boolean;
+  created_at: string;
+  platform?: string | null;
+  handle?: string | null;
+  asset_count: number;
+  engagement?: Engagement | null;
+};
+
+export type SocialPostDetail = SocialPost & {
+  approved_by_id?: string | null;
+  approved_at?: string | null;
+  approval_note?: string | null;
+  notes?: string | null;
+  assets: PostAsset[];
+  metrics: PostMetric[];
+  project_name?: string | null;
+  subject_label?: string | null;
+  approved_by_label?: string | null;
+  location_check?: LocationCheckResult | null;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_approve: boolean;
+};
+
+export type OutreachSummary = {
+  accounts: number;
+  published: number;
+  scheduled: number;
+  awaiting_approval: number;
+  with_location_warnings: number;
+  by_platform: Record<string, number>;
+};

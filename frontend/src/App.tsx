@@ -50,6 +50,7 @@ import {
   Expenses,
   Tasks,
 } from "./routes/Management";
+import { Channels, Outreach, PostScreen } from "./routes/Social";
 import { ImportBatch, ImportUpload } from "./routes/Import";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
 import { Empty, Loading } from "./components/ui";
@@ -117,6 +118,10 @@ export function App() {
         <Route path="management/expenses" element={<Expenses />} />
         <Route path="management/tasks" element={<Tasks />} />
         <Route path="management/calendar" element={<Calendar />} />
+
+        <Route path="social" element={<Outreach />} />
+        <Route path="social/accounts" element={<Channels />} />
+        <Route path="social/posts/:postId" element={<PostScreen />} />
 
         <Route path="storage" element={<Storage />} />
         <Route path="floorplans" element={<FloorPlansForLocation />} />

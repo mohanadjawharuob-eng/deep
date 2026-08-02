@@ -71,6 +71,10 @@ from app.models import (
     ObjectStatus,
     Period,
     Photograph,
+    PostAsset,
+    PostKind,
+    PostMetric,
+    PostStatus,
     Project,
     ProjectMembership,
     ProjectRole,
@@ -79,6 +83,9 @@ from app.models import (
     ResourceType,
     Site,
     SiteType,
+    SocialAccount,
+    SocialPlatform,
+    SocialPost,
     StockReason,
     StorageKind,
     StorageLocation,
@@ -91,7 +98,7 @@ from app.models import (
     User,
     UserRole,
 )
-from app.services import access, accession, geo, images, inventory
+from app.services import access, accession, geo, images, inventory, outreach
 from app.services import documents as document_service
 from app.services import storage_locations as storage_tree
 from app.services.storage import (
@@ -1145,6 +1152,128 @@ def seed_sample_management(session: Session, *, project: Project, user: User) ->
     )
 
 
+def seed_sample_social(
+    session: Session, *, project: Project, artifact: Artifact, user: User
+) -> None:
+    """Two channels, a few posts, and one post that would give away a findspot.
+
+    The last of those is the point. A demonstration where the location check
+    always comes back clear shows nothing about what the check is for.
+    """
+    if session.scalar(select(SocialAccount).where(SocialAccount.handle == "telldemo_dig")):
+        logger.info("Sample social media already present; skipping")
+        return
+
+    now = datetime.now(UTC)
+
+    instagram = SocialAccount(
+        platform=SocialPlatform.INSTAGRAM,
+        handle="telldemo_dig",
+        display_name="Tell el-Demo Excavation",
+        url="https://example.org/telldemo_dig",
+        description="Field updates from the Tell el-Demo Regional Survey.",
+        manager_id=user.id,
+        manager_label=user.full_name,
+        follower_count=2840,
+        owner_id=user.id,
+    )
+    site_page = SocialAccount(
+        platform=SocialPlatform.WEBSITE,
+        handle="telldemo.example.org",
+        display_name="Project website",
+        description="The only channel the institution controls outright.",
+        manager_id=user.id,
+        manager_label=user.full_name,
+        owner_id=user.id,
+    )
+    session.add_all([instagram, site_page])
+    session.flush()
+
+    published = SocialPost(
+        account_id=instagram.id,
+        title="The bronze fibula",
+        body=(
+            "A copper-alloy fibula from the 2024 season, now conserved and "
+            "catalogued. Roman, probably second century."
+        ),
+        hashtags=["archaeology", "conservation", "smallfinds"],
+        language="en",
+        kind=PostKind.POST,
+        status=PostStatus.PUBLISHED,
+        published_at=now - timedelta(days=21),
+        external_url="https://example.org/telldemo_dig/p/fibula",
+        project_id=project.id,
+        resource_type=ResourceType.ARTIFACT,
+        resource_id=artifact.id,
+        approved_by_id=user.id,
+        approved_at=now - timedelta(days=22),
+        approval_note="Cleared with the permit office.",
+        owner_id=user.id,
+    )
+    scheduled = SocialPost(
+        account_id=instagram.id,
+        title="Season 2 is starting",
+        body="We are back on site next month. Follow along here.",
+        hashtags=["fieldwork"],
+        language="en",
+        kind=PostKind.POST,
+        status=PostStatus.SCHEDULED,
+        scheduled_for=now + timedelta(days=12),
+        project_id=project.id,
+        owner_id=user.id,
+    )
+    waiting = SocialPost(
+        account_id=instagram.id,
+        title="Trench 4 at the end of the season",
+        body="The final state of Trench 4 before backfilling.",
+        kind=PostKind.POST,
+        status=PostStatus.NEEDS_APPROVAL,
+        project_id=project.id,
+        owner_id=user.id,
+    )
+    session.add_all([published, scheduled, waiting])
+    session.flush()
+
+    # Engagement as a series, so the screen can show whether it kept moving.
+    for days_ago, likes, comments, shares, impressions in (
+        (20, 180, 11, 4, 3100),
+        (14, 402, 26, 19, 7400),
+        (2, 471, 31, 24, 8900),
+    ):
+        session.add(
+            PostMetric(
+                post_id=published.id,
+                recorded_at=now - timedelta(days=days_ago),
+                likes=likes,
+                comments=comments,
+                shares=shares,
+                impressions=impressions,
+                source="Instagram insights",
+            )
+        )
+
+    # A photograph that still carries the coordinates the camera wrote. This is
+    # what the check exists to find, and a demonstration without one shows
+    # nothing.
+    geotagged = session.scalar(
+        select(Photograph).where(Photograph.latitude.is_not(None)).order_by(Photograph.created_at)
+    )
+    if geotagged is not None:
+        session.add(
+            PostAsset(
+                post_id=waiting.id,
+                photograph_id=geotagged.id,
+                position=0,
+                alt_text="A rectangular trench with exposed stone walling.",
+                credit="Tell el-Demo Regional Survey",
+            )
+        )
+        session.flush()
+        outreach.record_location_check(session, waiting)
+
+    logger.info("Sample social media created: 2 channels, 3 posts, 3 engagement readings")
+
+
 def _resume_samples(session: Session, project: Project) -> None:
     """Run the sample sections a partly-seeded database is missing."""
     site = session.scalar(select(Site).where(Site.project_id == project.id))
@@ -1168,6 +1297,7 @@ def _resume_samples(session: Session, project: Project) -> None:
     seed_sample_museum(session, artifacts=artifacts, user=user)
     seed_sample_inventory(session, user=user)
     seed_sample_management(session, project=project, user=user)
+    seed_sample_social(session, project=project, artifact=artifacts[0], user=user)
 
 
 def seed_samples(session: Session, admin: User) -> None:
@@ -1489,6 +1619,7 @@ def seed_samples(session: Session, admin: User) -> None:
     seed_sample_museum(session, artifacts=artifacts, user=researcher)
     seed_sample_inventory(session, user=researcher)
     seed_sample_management(session, project=project, user=researcher)
+    seed_sample_social(session, project=project, artifact=artifacts[0], user=researcher)
 
     now = datetime.now(UTC)
     for offset, (label, action) in enumerate(
