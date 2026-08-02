@@ -980,40 +980,83 @@ export function Tasks() {
  * and the entry then links back to everything that season needed.
  */
 export function Calendar() {
-  const now = new Date();
-  const [months, setMonths] = useState(6);
-  const [adding, setAdding] = useState(false);
+  const today = new Date();
+  const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [adding, setAdding] = useState<string | null>(null);
+
+  // The whole month, plus the days either side that fill the first and last
+  // weeks. A grid with ragged ends is harder to read than one with a few grey
+  // days on it.
+  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(1 - ((first.getDay() + 6) % 7)); // weeks begin on Monday
+  const cells = Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    return day;
+  });
+  // Always 42 cells, so this is never undefined; TypeScript cannot know that.
+  const last = cells[cells.length - 1] as Date;
 
   const events = useQuery<Page<CalendarEvent>>(
     (signal) =>
       api.get(
         "/management/events",
-        {
-          since: now.toISOString(),
-          until: new Date(now.getFullYear(), now.getMonth() + months, now.getDate()).toISOString(),
-        },
+        { since: start.toISOString(), until: last.toISOString(), limit: 500 },
         signal,
       ),
-    [months],
+    [start.toISOString(), last.toISOString()],
   );
+
+  const iso = (day: Date) =>
+    `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(
+      day.getDate(),
+    ).padStart(2, "0")}`;
+
+  // An event that runs June to August belongs on every day in between, not
+  // only on the first. Anything else is a calendar that hides a field season.
+  const byDay = new Map<string, CalendarEvent[]>();
+  for (const event of events.data?.items ?? []) {
+    const from = new Date(event.starts_at);
+    const to = event.ends_at ? new Date(event.ends_at) : from;
+    for (const day of cells) {
+      const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59);
+      const until = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      if (from <= at && to >= until) {
+        const key = iso(day);
+        byDay.set(key, [...(byDay.get(key) ?? []), event]);
+      }
+    }
+  }
+
+  const monthName = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const shift = (months: number) =>
+    setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + months, 1));
 
   return (
     <>
       <PageHeader
         title="Calendar"
-        subtitle="Everybody's — seasons, deadlines, visits and days off"
+        subtitle="Everybody's - seasons, deadlines, visits and days off"
         actions={
           <>
-            <select
-              className="input input-sm filter-select"
-              value={months}
-              onChange={(event) => setMonths(Number(event.target.value))}
+            <button type="button" className="btn btn-sm" onClick={() => shift(-1)} aria-label="Previous month">
+              ‹
+            </button>
+            <span className="strong" style={{ minWidth: 150, textAlign: "center" }}>
+              {monthName}
+            </span>
+            <button type="button" className="btn btn-sm" onClick={() => shift(1)} aria-label="Next month">
+              ›
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setCursor(new Date(today.getFullYear(), today.getMonth(), 1))}
             >
-              <option value={3}>Next 3 months</option>
-              <option value={6}>Next 6 months</option>
-              <option value={12}>Next year</option>
-            </select>
-            <button className="btn btn-primary" onClick={() => setAdding(true)}>
+              Today
+            </button>
+            <button className="btn btn-primary" onClick={() => setAdding(iso(today))}>
               Add a day
             </button>
           </>
@@ -1022,63 +1065,83 @@ export function Calendar() {
 
       {adding && (
         <AddDay
-          onClose={() => setAdding(false)}
+          date={adding}
+          onClose={() => setAdding(null)}
           onAdded={() => {
-            setAdding(false);
+            setAdding(null);
             events.reload();
           }}
         />
       )}
 
-      {events.loading ? (
-        <Loading />
-      ) : events.error ? (
-        <ErrorNote message={events.error} onRetry={events.reload} />
-      ) : events.data && events.data.items.length === 0 ? (
-        <Empty title="Nothing coming up">
-          Add a field season, a reporting deadline, a visit — or the day somebody is away. Anyone
-          signed in can add to this, and everybody sees it.
-        </Empty>
-      ) : (
-        <section className="card">
-          <div className="card-body">
-            <ul className="agenda">
-              {events.data?.items.map((event) => (
-                <li key={event.id}>
-                  <div className="agenda-when">
-                    <span className="strong">{formatDate(event.starts_at)}</span>
-                    {event.ends_at && (
-                      <span className="small muted">to {formatDate(event.ends_at)}</span>
-                    )}
-                  </div>
-                  <div className="agenda-what">
-                    <span className="strong">{event.title}</span>
-                    <span className="small muted">
-                      {[event.kind && humanise(event.kind), event.location, event.project_name]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                    {event.activity_id && (
-                      <Link className="small" to={`/activities/${event.activity_id}`}>
-                        Part of {event.activity_title} — what it takes
-                      </Link>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+      {events.error && <ErrorNote message={events.error} onRetry={events.reload} />}
+
+      <section className="card">
+        <div className="card-body">
+          <div className="month">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((name) => (
+              <div key={name} className="month-heading">
+                {name}
+              </div>
+            ))}
+            {cells.map((day) => {
+              const key = iso(day);
+              const outside = day.getMonth() !== cursor.getMonth();
+              const isToday = key === iso(today);
+              const onThisDay = byDay.get(key) ?? [];
+              return (
+                <div
+                  key={key}
+                  className={`month-day${outside ? " month-day-outside" : ""}${
+                    isToday ? " month-day-today" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="month-number"
+                    title="Add something on this day"
+                    onClick={() => setAdding(key)}
+                  >
+                    {day.getDate()}
+                  </button>
+                  {onThisDay.map((event) => (
+                    <div key={event.id + key} className="month-event" title={event.title}>
+                      {event.activity_id ? (
+                        <Link to={`/activities/${event.activity_id}`}>{event.title}</Link>
+                      ) : (
+                        <span>{event.title}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
-        </section>
-      )}
+        </div>
+      </section>
+
+      <p className="small muted" style={{ marginTop: "var(--space-3)" }}>
+        Anyone signed in can add a day, and everybody sees it. Click a date to
+        put something on it.
+      </p>
     </>
   );
 }
 
-function AddDay({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+function AddDay({
+  date,
+  onClose,
+  onAdded,
+}: {
+  /** The day that was clicked, so the form opens on it rather than on nothing. */
+  date: string;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
   const [form, setForm] = useState({
     title: "",
     activity_id: "",
-    starts_at: "",
+    starts_at: `${date}T09:00`,
     ends_at: "",
     kind: "",
     location: "",
@@ -1212,5 +1275,110 @@ function AddDay({ onClose, onAdded }: { onClose: () => void; onAdded: () => void
         </form>
       </div>
     </div>
+  );
+}
+
+/**
+ * One person's own work.
+ *
+ * Separate from the board because the board is a *management* screen — it
+ * shows everybody's work and sits behind module access most people do not
+ * have. This shows only the reader's own, needs nothing but an account, and is
+ * the screen somebody actually opens in the morning.
+ */
+export function MyTasks() {
+  const [includeDone, setIncludeDone] = useState(false);
+
+  const tasks = useQuery<Page<Task>>(
+    (signal) =>
+      api.get("/management/tasks/mine", { include_done: includeDone || undefined }, signal),
+    [includeDone],
+  );
+
+  const move = useAction(async (id: string, status: string) => {
+    await api.patch(`/management/tasks/${id}`, { status });
+    tasks.reload();
+  });
+
+  const overdue = (tasks.data?.items ?? []).filter((task) => task.days_overdue).length;
+
+  return (
+    <>
+      <PageHeader
+        title="My work"
+        subtitle={
+          overdue ? `${overdue} overdue` : "What has been asked of you"
+        }
+        actions={
+          <button
+            type="button"
+            className={`btn${includeDone ? " btn-primary" : ""}`}
+            onClick={() => setIncludeDone((on) => !on)}
+          >
+            Show finished
+          </button>
+        }
+      />
+
+      {move.error && <ErrorNote message={move.error} />}
+
+      {tasks.loading ? (
+        <Loading />
+      ) : tasks.error ? (
+        <ErrorNote message={tasks.error} onRetry={tasks.reload} />
+      ) : tasks.data && tasks.data.items.length === 0 ? (
+        <Empty title="Nothing on your list">
+          When somebody assigns you a task it appears here, and on your
+          dashboard. You will be told at the time.
+        </Empty>
+      ) : (
+        <section className="card">
+          <div className="card-body">
+            <ul className="checklist">
+              {tasks.data?.items.map((task) => {
+                const done = task.status === "done";
+                return (
+                  <li key={task.id} className={task.days_overdue ? "provisional" : undefined}>
+                    <label className="row-tight wrap">
+                      <input
+                        className="checkbox"
+                        type="checkbox"
+                        checked={done}
+                        disabled={move.running}
+                        onChange={(event) =>
+                          void move.run(task.id, event.target.checked ? "done" : "todo")
+                        }
+                      />
+                      <span className={done ? "muted" : "strong"}>{task.title}</span>
+                      {task.days_overdue ? (
+                        <Badge
+                          value="missing"
+                          kind="status"
+                          label={`${task.days_overdue} ${
+                            task.days_overdue === 1 ? "day" : "days"
+                          } late`}
+                        />
+                      ) : null}
+                      {task.priority !== "normal" && (
+                        <Badge value={task.priority} kind="status" label={humanise(task.priority)} />
+                      )}
+                    </label>
+                    <div className="small muted">
+                      {[
+                        task.due_on ? `Due ${formatDate(task.due_on)}` : null,
+                        task.project_name,
+                        task.description,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+      )}
+    </>
   );
 }

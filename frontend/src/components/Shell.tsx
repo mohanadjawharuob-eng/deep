@@ -19,6 +19,8 @@ type NavItem = {
   label: string;
   icon: ReactNode;
   module?: ModuleName;
+  /** Shown only to the platform administrator. */
+  adminOnly?: boolean;
   end?: boolean;
 };
 
@@ -146,6 +148,14 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
     heading: "What we do",
     items: [
       {
+        // Not gated on a module. Work is assigned to people who have no
+        // management access — that is the ordinary case — and a link they
+        // cannot see is work they will not do.
+        to: "/my-work",
+        label: "My work",
+        icon: icon("M4 6.5h12M4 10h12M4 13.5h7M2.5 6.5 3 7l1-1.2"),
+      },
+      {
         to: "/activities",
         label: "Activity hub",
         module: "activities",
@@ -196,6 +206,19 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         label: "Channels",
         module: "social_media",
         icon: icon("M10 3v14M3.5 10h13M5 5.5a9 9 0 0 0 0 9M15 5.5a9 9 0 0 1 0 9"),
+      },
+    ],
+  },
+  {
+    heading: "Administration",
+    items: [
+      {
+        to: "/admin/users",
+        label: "People",
+        // Only the platform administrator sees this: it is the one screen that
+        // can hand somebody the keys to every other one.
+        adminOnly: true,
+        icon: icon("M7 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5M2.5 16c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4M13 8.5a2 2 0 1 0 0-4M14 12c2 0 3.5 1.3 3.5 3.5"),
       },
     ],
   },
@@ -262,7 +285,11 @@ export function Shell() {
 
   const visible = SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => !item.module || levelIn(item.module)),
+    items: section.items.filter(
+      (item) =>
+        (!item.module || levelIn(item.module)) &&
+        (!item.adminOnly || user?.role === "admin"),
+    ),
   })).filter((section) => section.items.length > 0);
 
   const initials = (user?.full_name ?? user?.username ?? "?")

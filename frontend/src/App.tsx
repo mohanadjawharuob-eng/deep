@@ -31,6 +31,12 @@ import {
 } from "./routes/Museum";
 import { CatalogueGrid } from "./routes/Grid";
 import {
+  NewArtifact,
+  NewContext,
+  NewProject,
+  NewSite,
+} from "./routes/NewRecords";
+import {
   EquipmentDetailScreen,
   EquipmentList,
   KitScreen,
@@ -48,8 +54,10 @@ import {
   Budgets,
   Calendar,
   Expenses,
+  MyTasks,
   Tasks,
 } from "./routes/Management";
+import { AdminUsers } from "./routes/Admin";
 import { Channels, Outreach, PostScreen } from "./routes/Social";
 import {
   Activities,
@@ -90,10 +98,15 @@ export function App() {
         <Route path="map" element={<MapView />} />
 
         <Route path="projects" element={<Projects />} />
+        {/* Before the :projectId route, or "new" is read as an id. */}
+        <Route path="projects/new" element={<NewProject />} />
         <Route path="projects/:projectId" element={<ProjectDetail />} />
         <Route path="sites" element={<Sites />} />
+        <Route path="sites/new" element={<NewSite />} />
         <Route path="sites/:siteId" element={<SiteDetail />} />
+        <Route path="contexts/new" element={<NewContext />} />
         <Route path="artifacts" element={<Artifacts />} />
+        <Route path="artifacts/new" element={<NewArtifact />} />
         <Route path="artifacts/:artifactId" element={<ArtifactDetail />} />
 
         <Route path="museum" element={<Catalogue />} />
@@ -122,6 +135,7 @@ export function App() {
         <Route path="management/budgets" element={<Budgets />} />
         <Route path="management/budgets/:budgetId" element={<BudgetScreen />} />
         <Route path="management/expenses" element={<Expenses />} />
+        <Route path="my-work" element={<MyTasks />} />
         <Route path="management/tasks" element={<Tasks />} />
         <Route path="management/calendar" element={<Calendar />} />
 
@@ -138,6 +152,8 @@ export function App() {
         <Route path="storage" element={<Storage />} />
         <Route path="floorplans" element={<FloorPlansForLocation />} />
         <Route path="floorplans/:planId" element={<FloorPlanScreen />} />
+
+        <Route path="admin/users" element={<AdminUsers />} />
 
         <Route path="404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />

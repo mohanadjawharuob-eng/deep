@@ -1519,3 +1519,71 @@ tr.provisional > td:first-child {
 .checklist > li:last-child { border-bottom: none; }
 .checklist > li.provisional { padding-left: var(--space-3); }
 .checklist label { cursor: pointer; }
+
+/* --------------------------------------------------------------------------
+ * The calendar, as a month
+ * ----------------------------------------------------------------------- */
+
+/* A grid, not a list. An agenda answers "what is next"; a month answers "is
+   the second week clear", which is the question somebody scheduling a season
+   actually has, and the one a list cannot answer at a glance. */
+.month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: var(--border-width) solid var(--border);
+}
+.month-heading {
+  background: var(--surface-2);
+  padding: 6px var(--space-3);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+.month-day {
+  background: var(--surface);
+  min-height: 104px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* The days either side of the month. Present so the grid is rectangular,
+   dimmed so they are plainly not this month. */
+.month-day-outside { background: var(--surface-2); }
+.month-day-outside .month-number { color: var(--text-3); }
+.month-day-today { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.month-number {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.month-number:hover { background: var(--info-weak); color: var(--text-1); }
+
+.month-event {
+  font-size: var(--text-md);
+  line-height: 1.25;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--info-weak);
+  border-left: 3px solid var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.month-event a { text-decoration: none; color: inherit; }
+.month-event a:hover { text-decoration: underline; }
+
+@media (max-width: 760px) {
+  .month-day { min-height: 72px; }
+  .month-event { font-size: 11px; }
+}

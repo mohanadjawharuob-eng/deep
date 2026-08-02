@@ -12,7 +12,7 @@ import {
   type Project,
   type Site,
 } from "../lib/api";
-import { useAction, useDebounced, useQuery } from "../lib/hooks";
+import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import {
   Badge,
   DeleteRecord,
@@ -36,6 +36,7 @@ const PAGE = 25;
  * Projects
  * ----------------------------------------------------------------------- */
 export function Projects() {
+  const { can } = useSession();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [offset, setOffset] = useState(0);
@@ -48,7 +49,17 @@ export function Projects() {
 
   return (
     <>
-      <PageHeader title="Projects" subtitle="Excavations and surveys." />
+      <PageHeader
+        title="Projects"
+        subtitle="Excavations and surveys."
+        actions={
+          can("archaeology", "supervisor") ? (
+            <Link className="btn btn-primary" to="/projects/new">
+              New project
+            </Link>
+          ) : null
+        }
+      />
 
       <div className="toolbar">
         <SearchInput
@@ -168,6 +179,9 @@ export function ProjectDetail() {
         actions={
           <>
             <Badge value={record.status} kind="status" />
+            <Link className="btn" to={`/sites/new?project_id=${record.id}`}>
+              Add a site
+            </Link>
             <ExportButton
               path={`/exports/projects/${record.id}.xlsx`}
               label="Export everything"
@@ -247,6 +261,7 @@ export function ProjectDetail() {
  * Sites
  * ----------------------------------------------------------------------- */
 export function Sites() {
+  const { can } = useSession();
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const query = useDebounced(search);
@@ -258,7 +273,17 @@ export function Sites() {
 
   return (
     <>
-      <PageHeader title="Sites" subtitle="Places where work has been recorded." />
+      <PageHeader
+        title="Sites"
+        subtitle="Places where work has been recorded."
+        actions={
+          can("archaeology", "contributor") ? (
+            <Link className="btn btn-primary" to="/sites/new">
+              New site
+            </Link>
+          ) : null
+        }
+      />
 
       <div className="toolbar">
         <SearchInput
@@ -363,6 +388,12 @@ export function SiteDetail() {
         actions={
           <>
             <Badge value={record.review_status} kind="review" />
+            <Link className="btn" to={`/contexts/new?site_id=${record.id}`}>
+              Add a context
+            </Link>
+            <Link className="btn" to={`/artifacts/new?site_id=${record.id}`}>
+              Add a find
+            </Link>
             <ExportButton path={`/exports/sites/${record.id}.xlsx`} label="Export everything" />
             <DeleteRecord
               name={record.code ?? record.name}
@@ -452,6 +483,7 @@ export function SiteDetail() {
  * Finds
  * ----------------------------------------------------------------------- */
 export function Artifacts() {
+  const { can } = useSession();
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const query = useDebounced(search);
@@ -463,7 +495,17 @@ export function Artifacts() {
 
   return (
     <>
-      <PageHeader title="Finds" subtitle="Artifacts as excavated." />
+      <PageHeader
+        title="Finds"
+        subtitle="Artifacts as excavated."
+        actions={
+          can("archaeology", "contributor") ? (
+            <Link className="btn btn-primary" to="/artifacts/new">
+              New find
+            </Link>
+          ) : null
+        }
+      />
 
       <div className="toolbar">
         <SearchInput
