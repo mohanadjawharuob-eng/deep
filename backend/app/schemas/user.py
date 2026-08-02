@@ -6,7 +6,7 @@ import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
 from app.core.security import PasswordPolicyError, validate_password
 from app.models.enums import Module, ModuleLevel, UserRole
@@ -158,6 +158,17 @@ class UserPublic(ORMModel):
     position: str | None = None
     orcid: str | None = None
     avatar_path: str | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def has_avatar(self) -> bool:
+        """Whether to ask for the photograph at all.
+
+        Saves a request per person on a list of forty, and — more to the point
+        — saves forty 404s in the browser console, which is how a page teaches
+        somebody to ignore its console.
+        """
+        return self.avatar_path is not None
 
 
 class UserRead(UserPublic):

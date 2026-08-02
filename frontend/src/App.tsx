@@ -58,6 +58,7 @@ import {
   Tasks,
 } from "./routes/Management";
 import { AdminUsers } from "./routes/Admin";
+import { Appearance, MyProfile } from "./routes/Appearance";
 import { Channels, Outreach, PostScreen } from "./routes/Social";
 import {
   Activities,
@@ -154,6 +155,8 @@ export function App() {
         <Route path="floorplans/:planId" element={<FloorPlanScreen />} />
 
         <Route path="admin/users" element={<AdminUsers />} />
+        <Route path="admin/appearance" element={<Appearance />} />
+        <Route path="profile" element={<MyProfile />} />
 
         <Route path="404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />

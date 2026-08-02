@@ -320,6 +320,9 @@ export type CurrentUser = {
   role: string;
   institution?: string | null;
   position?: string | null;
+  /** Whether they have uploaded a photograph, so a list of forty people does
+      not make forty requests that all 404. */
+  has_avatar?: boolean;
 };
 
 export type ModuleName =

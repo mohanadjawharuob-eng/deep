@@ -11,8 +11,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import type { ModuleName } from "../lib/api";
-import { useSession, useTheme } from "../lib/hooks";
-import { humanise } from "./ui";
+import { useBranding, useSession, useTheme } from "../lib/hooks";
+import { Avatar, humanise } from "./ui";
 
 type NavItem = {
   to: string;
@@ -41,6 +41,36 @@ export const BrandMark = ({ size = 20 }: { size?: number }) => (
     <path d="M8 3v18M16 3v18" opacity=".35" />
   </svg>
 );
+
+/**
+ * Whose installation this is, at the top of the sidebar.
+ *
+ * An institution that has put its collection into this platform should see its
+ * own mark on the page it works in all day. Where nothing has been uploaded,
+ * the platform's own mark is drawn — a blank space would look like a page that
+ * failed to load.
+ */
+export function Brand({ compact = false }: { compact?: boolean }) {
+  const { branding } = useBranding();
+
+  return (
+    <div className="sidebar-brand">
+      <span className="brand-mark">
+        {branding.logo_url ? (
+          <img className="brand-logo" src={branding.logo_url} alt="" />
+        ) : (
+          <BrandMark />
+        )}
+      </span>
+      {!compact && (
+        <span className="brand-text">
+          <strong className="truncate">{branding.display_name}</strong>
+          {branding.tagline && <span className="small truncate">{branding.tagline}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
 
 const icon = (path: string) => (
   <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true">
@@ -220,6 +250,19 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         adminOnly: true,
         icon: icon("M7 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5M2.5 16c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4M13 8.5a2 2 0 1 0 0-4M14 12c2 0 3.5 1.3 3.5 3.5"),
       },
+      {
+        to: "/admin/appearance",
+        label: "Appearance",
+        // The name and mark at the top of every page. Not a preference, so
+        // not in the user menu.
+        adminOnly: true,
+        icon: icon("M4 16.5 10 3.5l6 13M6.5 12h7"),
+      },
+      {
+        to: "/profile",
+        label: "My profile",
+        icon: icon("M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6M4 17c0-3 2.7-5 6-5s6 2 6 5"),
+      },
     ],
   },
   {
@@ -292,23 +335,12 @@ export function Shell() {
     ),
   })).filter((section) => section.items.length > 0);
 
-  const initials = (user?.full_name ?? user?.username ?? "?")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
+  const who = user?.full_name ?? user?.username ?? null;
 
   return (
     <div className={`shell ${navOpen ? "nav-open" : ""}`}>
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <span className="brand-mark">
-            <BrandMark />
-          </span>
-          <span className="brand-text">
-            <strong>Stratum</strong>
-          </span>
-        </div>
+        <Brand />
 
         <nav className="sidebar-nav">
           {visible.map((section) => (
@@ -330,7 +362,7 @@ export function Shell() {
         </nav>
 
         <div className="sidebar-foot">
-          <span className="avatar">{initials}</span>
+          <Avatar userId={user?.id} name={who} hasPhoto={user?.has_avatar ?? true} />
           <span style={{ flex: 1, minWidth: 0 }}>
             <span className="user-name truncate" style={{ display: "block" }}>
               {user?.full_name}
@@ -426,7 +458,7 @@ export function Shell() {
               aria-expanded={menuOpen}
               aria-label="Account and module access"
             >
-              <span className="avatar">{initials}</span>
+              <Avatar userId={user?.id} name={who} hasPhoto={user?.has_avatar ?? true} />
             </button>
 
             {menuOpen && (

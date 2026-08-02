@@ -278,6 +278,71 @@ export function Badge({
  * error: the institution's own number is the object's identity, and a
  * platform that hid or refused it would be a platform they stayed out of.
  */
+/**
+ * Somebody's photograph, or their initials.
+ *
+ * Initials are the fallback rather than a silhouette because they identify the
+ * person; a generic head does not, and a list of eight generic heads is a list
+ * of nothing. The image is fetched with the session's token, so it cannot be a
+ * plain `<img src>` — that would be a request with no Authorization header,
+ * answered as if nobody were signed in.
+ */
+export function Avatar({
+  userId,
+  name,
+  hasPhoto = true,
+  size = 28,
+}: {
+  userId?: string | null;
+  name?: string | null;
+  /** False when the record says there is no photograph, to save the request. */
+  hasPhoto?: boolean;
+  size?: number;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId || !hasPhoto) {
+      setUrl(null);
+      return;
+    }
+    let created: string | null = null;
+    let live = true;
+
+    api
+      .imageUrl(`/users/${userId}/avatar`)
+      .then((made) => {
+        created = made;
+        if (live) setUrl(made);
+        else URL.revokeObjectURL(made);
+      })
+      // A 404 is the ordinary case — most people never upload one — so it is
+      // not worth surfacing. Initials are drawn instead.
+      .catch(() => undefined);
+
+    return () => {
+      live = false;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [userId, hasPhoto]);
+
+  const initials = (name ?? "?")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return (
+    <span
+      className="avatar"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
+      title={name ?? undefined}
+    >
+      {url ? <img src={url} alt="" width={size} height={size} /> : initials}
+    </span>
+  );
+}
+
 export function LegacyMark() {
   return (
     <span

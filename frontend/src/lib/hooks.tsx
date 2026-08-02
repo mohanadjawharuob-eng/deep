@@ -82,6 +82,9 @@ type Session = {
   loading: boolean;
   signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Fetch the account again. Called after changing something the session
+      carries a copy of — a photograph, a module grant. */
+  reload: () => Promise<void>;
   /** The level held in a module, or null. Administrators hold every module. */
   levelIn: (module: ModuleName) => string | null;
   can: (module: ModuleName, minimum: string) => boolean;
@@ -95,6 +98,7 @@ const SessionContext = createContext<Session>({
   loading: true,
   signIn: async () => {},
   signOut: async () => {},
+  reload: async () => {},
   levelIn: () => null,
   can: () => false,
 });
@@ -170,14 +174,76 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ user, access, loading, signIn, signOut, levelIn, can }),
-    [user, access, loading, signIn, signOut, levelIn, can],
+    () => ({ user, access, loading, signIn, signOut, reload: load, levelIn, can }),
+    [user, access, loading, signIn, signOut, load, levelIn, can],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 export const useSession = () => useContext(SessionContext);
+
+/* --------------------------------------------------------------------------
+ * Branding
+ *
+ * Whose installation this is. Loaded once and shared, because the sidebar, the
+ * sign-in page and the browser tab all want it and none of them should each be
+ * making the request.
+ *
+ * Above `SessionProvider` on purpose: the sign-in page has nobody signed in
+ * and still has to draw the mark, so this must not depend on a session.
+ * ----------------------------------------------------------------------- */
+export type Branding = {
+  organisation_name: string | null;
+  tagline: string | null;
+  footer_note: string | null;
+  logo_url: string | null;
+  display_name: string;
+};
+
+const FALLBACK: Branding = {
+  organisation_name: null,
+  tagline: null,
+  footer_note: null,
+  logo_url: null,
+  display_name: "Stratum",
+};
+
+const BrandingContext = createContext<{
+  branding: Branding;
+  /** Called by the administration screen after changing it, so every page
+      updates without a reload. */
+  refresh: () => Promise<void>;
+}>({ branding: FALLBACK, refresh: async () => {} });
+
+export function BrandingProvider({ children }: { children: ReactNode }) {
+  const [branding, setBranding] = useState<Branding>(FALLBACK);
+
+  const refresh = useCallback(async () => {
+    try {
+      setBranding(await api.get<Branding>("/branding"));
+    } catch {
+      // An installation that has set nothing, or an API not up yet. The
+      // platform's own name is a perfectly good answer, and a failure here
+      // must never keep the sign-in page off the screen.
+      setBranding(FALLBACK);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // The tab, too. Somebody with nine tabs open needs to know which is theirs.
+  useEffect(() => {
+    document.title = branding.display_name;
+  }, [branding.display_name]);
+
+  const value = useMemo(() => ({ branding, refresh }), [branding, refresh]);
+  return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
+}
+
+export const useBranding = () => useContext(BrandingContext);
 
 /* --------------------------------------------------------------------------
  * Data

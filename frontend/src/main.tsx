@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./App";
-import { SessionProvider, ThemeProvider } from "./lib/hooks";
+import { BrandingProvider, SessionProvider, ThemeProvider } from "./lib/hooks";
 
 import "./styles/tokens.css";
 import "./styles/base.css";
@@ -15,11 +15,15 @@ if (!root) throw new Error("No #root element — index.html is not what it shoul
 createRoot(root).render(
   <StrictMode>
     <ThemeProvider>
-      <BrowserRouter>
-        <SessionProvider>
-          <App />
-        </SessionProvider>
-      </BrowserRouter>
+      {/* Outside the session on purpose: the sign-in page has nobody signed
+          in and still has to draw the institution's mark. */}
+      <BrandingProvider>
+        <BrowserRouter>
+          <SessionProvider>
+            <App />
+          </SessionProvider>
+        </BrowserRouter>
+      </BrandingProvider>
     </ThemeProvider>
   </StrictMode>,
 );

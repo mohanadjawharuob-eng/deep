@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
 
 import { BrandMark } from "../components/Shell";
-import { useAction, useSession, useTheme } from "../lib/hooks";
+import { useAction, useBranding, useSession, useTheme } from "../lib/hooks";
 
 export function SignIn() {
   const { signIn } = useSession();
+  const { branding } = useBranding();
   const { theme, setTheme } = useTheme();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -22,15 +23,19 @@ export function SignIn() {
             the wordmark is where you are. */}
         <div className="auth-brand">
           <span className="brand-mark">
-            <BrandMark size={26} />
+            {branding.logo_url ? (
+              <img className="brand-logo brand-logo-lg" src={branding.logo_url} alt="" />
+            ) : (
+              <BrandMark size={26} />
+            )}
           </span>
-          <span className="wordmark">Stratum</span>
+          <span className="wordmark">{branding.display_name}</span>
         </div>
 
         <form className="auth-card" onSubmit={submit}>
           <h1 style={{ fontSize: 21, marginBottom: 4 }}>Sign in</h1>
           <p className="small muted" style={{ marginBottom: 22 }}>
-            Research and collections platform.
+            {branding.tagline ?? "Research and collections platform."}
           </p>
 
           <div className="col">
