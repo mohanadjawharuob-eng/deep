@@ -181,9 +181,11 @@ Then in `.env`:
 
 ```
 DATA_ROOT=D:/stratum-data
+BACKUP_ROOT=E:/stratum-backups
 ```
 
-Forward slashes, even on Windows. Then add the file to the command:
+Forward slashes, even on Windows. `BACKUP_ROOT` is optional and worth setting
+— see [below](#the-part-worth-arguing-with). Then add the file to the command:
 
 ```bash
 cd ~/deep
@@ -221,6 +223,67 @@ That is usually what you want: one copy, backed up together, findable by
 everyone. It does mean the free space on this machine is the platform's real
 limit, and a terabyte is a season or two of drone imagery rather than a
 lifetime. Worth watching.
+
+---
+
+## The part worth arguing with
+
+Setting aside a terabyte on the laptop and pointing the platform at it is the
+right *shape*. Docker's own area is the wrong place for excavation
+photographs, and one shared copy beats five people each keeping their own.
+Three things about it deserve saying plainly, because they are the ones that
+bite later rather than now.
+
+### One disk holding the only copy is not an archive
+
+This is the important one. Before, a dead laptop cost you a laptop. After, the
+laptop *is* the archive — for the whole team, including the photographs of
+contexts that no longer exist because they were excavated. Excavation records
+are not reproducible. You cannot go back and re-photograph a removed layer.
+
+So: a terabyte of storage is a place to *work from*, not a place to *keep*
+things. Something has to hold a second copy.
+
+- **If the terabyte is a partition of the laptop's own drive**, it buys
+  capacity and no safety at all. Same disk, same failure, same theft, same
+  spilled coffee. This is worth being clear-eyed about — partitioning feels
+  like separation and is not.
+- **If it is an external drive**, capacity is solved and the platform now
+  breaks whenever it is unplugged. Docker on Windows handles a vanished bind
+  mount badly. Leave it plugged in, or expect to restart the platform after
+  every disconnection.
+- **Either way, a copy needs to leave the building.** A second external drive
+  swapped monthly and kept somewhere else is unglamorous and works. Cloud sync
+  on the uploads folder also works, and is easier to forget to check.
+
+### Backups on the same disk are copies, not backups
+
+Unset, `BACKUP_ROOT` puts the nightly database dumps beside the photographs
+they describe. That covers "somebody deleted a record". It does not cover the
+disk failing, which takes the photographs and the catalogue describing them in
+the same instant — and a photograph with no record of which context it came
+from is not much better than a lost one.
+
+Set `BACKUP_ROOT` to any second disk. The dumps are small: they hold the
+records, not the images, so a month of them is a few gigabytes.
+
+### A terabyte is two or three seasons, not a career
+
+Rough arithmetic, because "a terabyte" sounds larger than it behaves here:
+
+| | Typical |
+| --- | --- |
+| One photogrammetry survey of one trench | 20–60 GB of raw frames |
+| A season's finds photography, DSLR, RAW + JPEG | 40–100 GB |
+| A processed 3D model, with its textures | 1–5 GB each |
+| The database, at 50,000 catalogued objects | a few hundred MB |
+
+Two or three field seasons with regular drone flights will fill it. That is
+fine — it just means the plan needs a next step before it happens rather than
+after, because a full disk stops uploads working with no warning.
+
+Check the free space when a season ends. It is a better moment than the middle
+of one.
 
 ---
 

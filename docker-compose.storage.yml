@@ -18,8 +18,8 @@
 #               This is the part that grows to hundreds of gigabytes, and the
 #               part you would be most upset to lose. These are the original
 #               files exactly as they were uploaded — nothing is re-encoded.
-#   backups   → your folder.  Nightly database dumps. On the big disk so a
-#               month of history costs nothing.
+#   backups   → BACKUP_ROOT if you set one, and DATA_ROOT/backups if you do
+#               not. Set one. See the note below.
 #   database  → left alone, deliberately. See the note at the bottom.
 #
 # Set DATA_ROOT in .env, for example:
@@ -29,16 +29,34 @@
 #
 # Create the folder yourself first. Docker will happily create it, but as
 # root, and then you cannot open it in Explorer without a fight.
+#
+# ---------------------------------------------------------------------------
+# BACKUP_ROOT, and why it is worth setting
+# ---------------------------------------------------------------------------
+# Left unset, the nightly database dumps land next to the photographs they
+# describe, on the same physical disk. That protects against somebody deleting
+# a record. It does not protect against the disk failing — which takes the
+# originals and every backup of the catalogue describing them, in one go.
+#
+# A backup on the same disk as the thing it backs up is a copy, not a backup.
+# Point this somewhere else — a second drive, a USB disk left plugged in, a
+# network share:
+#
+#   BACKUP_ROOT=E:/stratum-backups
+#
+# Any second disk beats none. It does not have to be large: the dumps are a
+# few hundred megabytes even for a substantial catalogue, because they hold
+# the records and not the photographs.
 
 services:
   api:
     volumes: !override
       - ${DATA_ROOT:?DATA_ROOT must be set in .env}/uploads:/data/uploads
-      - ${DATA_ROOT}/backups:/data/backups
+      - ${BACKUP_ROOT:-${DATA_ROOT}/backups}:/data/backups
 
   backup:
     volumes: !override
-      - ${DATA_ROOT}/backups:/backups
+      - ${BACKUP_ROOT:-${DATA_ROOT}/backups}:/backups
       - ./docker/backup.sh:/usr/local/bin/backup.sh:ro
 
 # A note on the database, since the obvious next thought is to move it too.
