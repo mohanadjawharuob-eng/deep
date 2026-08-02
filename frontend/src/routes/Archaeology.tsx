@@ -13,6 +13,7 @@ import {
   type Site,
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
+import { PrintLabelButton } from "../components/labels";
 import {
   Badge,
   DeleteRecord,
@@ -596,14 +597,19 @@ export function ArtifactDetail() {
           <>
             <Badge value={record.condition} kind="condition" />
             <Badge value={record.review_status} kind="review" />
-            <a
-              className="btn btn-sm"
-              href={`/api/v1/artifacts/${record.id}/qr.png`}
-              target="_blank"
-              rel="noreferrer"
+            {/* Not a plain link to the PNG: a link carries no token, so the
+                API answers as if nobody were signed in and every find that is
+                not public opens a blank tab. */}
+            <PrintLabelButton
+              details={{
+                number: record.inventory_number,
+                name: record.name,
+                context: location.data?.display_path ?? location.data?.legacy_location,
+                qrPath: `/artifacts/${record.id}/qr.png`,
+              }}
             >
               QR label
-            </a>
+            </PrintLabelButton>
             <DeleteRecord
               name={record.inventory_number}
               title="Delete this find?"

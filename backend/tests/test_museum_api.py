@@ -10,6 +10,7 @@ ones.
 from __future__ import annotations
 
 import io
+import uuid
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -1264,6 +1265,41 @@ class TestGridEndpoint:
         assert "Lamp" not in exported
 
 
+    def test_a_row_the_schema_cannot_describe_names_itself(
+        self, client: TestClient, curator: User, db: Session, collection: dict
+    ) -> None:
+        """One bad row must not turn the whole page into "Internal Server Error".
+
+        The grid asks for every field of every record on the page, so it is the
+        first screen to meet a record the schema cannot describe. The columns
+        the database itself constrains cannot go wrong; the JSON one can, because
+        JSONB accepts any JSON document and the schema wants an object. A list
+        arrives there from a migration, a script, or a hand-written UPDATE.
+
+        Unguarded, that raises inside the response model and the page fails with
+        nothing to act on — no row, no field, and the ninety-nine sound records
+        on the page are unreachable too.
+        """
+        catalogue(client, collection["id"], title="Sound record")
+        broken = catalogue(client, collection["id"], title="Broken record").json()
+
+        stored = db.get(MuseumObject, uuid.UUID(broken["id"]))
+        assert stored is not None
+        stored.metadata_json = ["not", "an", "object"]  # type: ignore[assignment]
+        db.flush()
+
+        response = client.get(
+            "/api/v1/museum/objects/grid", headers=auth_headers(client, "curator")
+        )
+
+        assert response.status_code == 500
+        detail = response.json()["detail"]
+        # Which record, and which field. Both, or the message is no better
+        # than the one it replaced.
+        assert stored.accession_number in detail
+        assert "metadata_json" in detail
+
+
 class TestCsvExport:
     """Downloading the catalogue as a spreadsheet.
 
@@ -1310,7 +1346,7 @@ class TestCsvExport:
         )
         header = response.content.decode("utf-8-sig").splitlines()[0]
 
-        assert header == "Object name,Accession no."
+        assert header == "Object name,Inventory no."
 
     def test_values_come_out_as_labels_not_identifiers(
         self, client: TestClient, curator: User, collection: dict

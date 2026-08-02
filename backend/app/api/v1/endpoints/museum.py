@@ -18,6 +18,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import ValidationError
 from sqlalchemy import Numeric, Select, cast, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -681,11 +682,43 @@ def list_objects_for_grid(
 
     rows, total = records.paginate(session, statement, limit, offset)
     return Page[MuseumObjectRead](
-        items=[MuseumObjectRead.model_validate(row) for row in rows],
+        items=[_grid_row(row) for row in rows],
         total=total,
         limit=limit,
         offset=offset,
     )
+
+
+def _grid_row(row: MuseumObject) -> MuseumObjectRead:
+    """One record, or a refusal that says which record and which field.
+
+    The grid asks for every field of every record on the page, which makes it
+    the first screen to meet a row the schema cannot describe — a value left
+    empty by an old import, a column added by a migration that did not backfill,
+    an enum whose member was renamed. Unguarded, one such row raises inside the
+    response model and the whole page becomes "Internal Server Error": no row
+    number, no field name, nothing to act on, and the ninety-nine sound records
+    on the page are unreachable too.
+
+    So the failure names itself. It is still an error — quietly dropping the row
+    would leave somebody scrolling for an object that is in the collection and
+    not on the screen, which is worse than a page that refuses and says why.
+    """
+    try:
+        return MuseumObjectRead.model_validate(row)
+    except ValidationError as error:
+        faults = "; ".join(
+            f"{'.'.join(str(part) for part in problem['loc'])}: {problem['msg']}"
+            for problem in error.errors()
+        )
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                f"Object {row.accession_number!r} cannot be shown in the grid "
+                f"because its stored record is incomplete ({faults}). Open the "
+                f"object's own record card to correct it."
+            ),
+        ) from error
 
 
 @router.get(

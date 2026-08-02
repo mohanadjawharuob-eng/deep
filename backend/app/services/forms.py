@@ -155,7 +155,7 @@ def museum_object_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="accession_number",
-                                label="Accession no.",
+                                label="Inventory no.",
                                 required=True,
                                 max_length=120,
                                 width=4,

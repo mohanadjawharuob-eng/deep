@@ -568,7 +568,7 @@ def export_project(
 # --------------------------------------------------------------------------
 def _object_columns(show_value: bool, words: Vocabulary) -> list[Column]:
     columns = [
-        Column("Accession number", attribute="accession_number"),
+        Column("Inventory number", attribute="accession_number"),
         Column("Former number", attribute="former_number"),
         Column("Name", attribute="name"),
         Column("Object type", attribute="object_type"),

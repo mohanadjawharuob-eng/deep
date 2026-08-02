@@ -269,6 +269,23 @@ export const api = {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   },
 
+  /**
+   * Fetch an image the API generates, as a URL an `<img>` can use.
+   *
+   * The same problem as `download`, and it bites harder because it is silent:
+   * `<img src="/api/v1/…/qr.png">` is a request the browser makes on its own,
+   * with no Authorization header. The server answers as if nobody were signed
+   * in, so every QR code for a record that is not public comes back 404 and the
+   * image renders as a broken box — or, with an `onError` handler, as nothing
+   * at all. Which is exactly what a label looks like when it fails to print.
+   *
+   * The caller owns the returned URL and should revoke it when done.
+   */
+  async imageUrl(path: string, query?: Record<string, unknown>): Promise<string> {
+    const response = await sendWithSession(path, { query });
+    return URL.createObjectURL(await response.blob());
+  },
+
   async login(identifier: string, password: string) {
     const data = await request<{ access_token: string; refresh_token: string }>(
       "/auth/login",
@@ -383,6 +400,9 @@ export type MuseumObject = {
   artifact_id?: string | null;
   is_public: boolean;
   review_status: string;
+  //: Resolved by the detail endpoint only, so a card need not ask twice.
+  collection_name?: string | null;
+  storage_path?: string | null;
   [key: string]: unknown;
 };
 

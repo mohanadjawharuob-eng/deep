@@ -18,6 +18,7 @@ import {
   type Page,
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
+import { PrintLabelButton, QrThumbnail } from "../components/labels";
 import {
   RecordCard,
   RecordTabs,
@@ -145,7 +146,7 @@ export function Catalogue() {
         <SearchInput
           value={term}
           onChange={setTerm}
-          placeholder="Accession number, title, maker, culture…"
+          placeholder="Inventory number, title, maker, culture…"
         />
         <select
           className="input input-sm"
@@ -248,7 +249,7 @@ export function Catalogue() {
             <table className="table table-dense">
               <thead>
                 <tr>
-                  <th style={{ width: "16ch" }}>Accession no.</th>
+                  <th style={{ width: "16ch" }}>Inventory no.</th>
                   <th>Title</th>
                   <th>Collection</th>
                   <th>Type</th>
@@ -557,24 +558,17 @@ export function ObjectDetail() {
                 Label &amp; QR
               </div>
               <div className="row-tight">
-                <img
-                  src={`/api/v1/museum/objects/${objectId}/qr.png?size=6`}
-                  alt=""
-                  width={52}
-                  height={52}
-                  style={{ borderRadius: "var(--radius-sm)", background: "var(--surface-3)" }}
-                  onError={(event) => {
-                    event.currentTarget.style.visibility = "hidden";
+                <QrThumbnail path={`/museum/objects/${objectId}/qr.png`} />
+                <PrintLabelButton
+                  className="btn btn-sm label-print-btn"
+                  details={{
+                    number: object.accession_number,
+                    name: object.title,
+                    context: object.collection_name,
+                    note: object.storage_path,
+                    qrPath: `/museum/objects/${objectId}/qr.png`,
                   }}
                 />
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{ flex: 1 }}
-                  onClick={() => window.print()}
-                >
-                  Print label
-                </button>
               </div>
             </div>
           </div>
@@ -744,7 +738,7 @@ export function NewObject() {
       <PageHeader
         breadcrumb={[{ label: "Catalogue", to: "/museum" }, { label: "New object" }]}
         title="New object"
-        subtitle="Leave the accession number blank to take the next one in the collection."
+        subtitle="Leave the inventory number blank to take the next one in the collection."
         actions={
           <>
             <button type="button" className="btn" onClick={() => navigate("/museum")}>

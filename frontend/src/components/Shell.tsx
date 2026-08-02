@@ -376,7 +376,7 @@ export function Shell() {
           </button>
 
           {/* Search lives in the header rather than behind an icon: on a
-              platform whose records are found by accession number, the box a
+              platform whose records are found by inventory number, the box a
               number is typed into should always be visible. */}
           <form
             className="search"
@@ -395,7 +395,7 @@ export function Shell() {
               className="input"
               type="search"
               value={query}
-              placeholder="Search records, sites, accession numbers…"
+              placeholder="Search records, sites, inventory numbers…"
               aria-label="Search"
               onChange={(event) => setQuery(event.target.value)}
             />
