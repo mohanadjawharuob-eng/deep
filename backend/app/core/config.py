@@ -150,9 +150,41 @@ class Settings(BaseSettings):
     def _check_production_secrets(self) -> Settings:
         if self.ENVIRONMENT == "production":
             if not self.DATABASE_URL and self.POSTGRES_PASSWORD in {"archeo", "postgres", ""}:
-                raise ValueError("POSTGRES_PASSWORD must be changed in production")
+                # The instructions are in the message on purpose. This fires at
+                # the moment somebody first shares the platform with other
+                # people, which is exactly when they are least able to go and
+                # read something — and the fix has a trap in it: the database
+                # keeps the password it was created with, so changing .env
+                # alone swaps one refusal for a connection failure.
+                raise ValueError(
+                    "POSTGRES_PASSWORD is still the example one, and sharing "
+                    "the platform on a network refuses to run on that.\n"
+                    "\n"
+                    "Changing it takes two steps, because the database kept "
+                    "the password it was built with:\n"
+                    "\n"
+                    "  1. Tell the database its new password (keeps your data):\n"
+                    "     docker compose exec db psql -U archeo -d archeo "
+                    "-c \"ALTER USER archeo WITH PASSWORD 'your-new-password';\"\n"
+                    "\n"
+                    "  2. Put the same password in .env:\n"
+                    "     POSTGRES_PASSWORD=your-new-password\n"
+                    "\n"
+                    "Then start it again. Use a long random one; nobody has to "
+                    "type it. If POSTGRES_USER in your .env is not 'archeo', "
+                    "use that name in step 1 instead."
+                )
             if self.FIRST_ADMIN_PASSWORD == "ChangeMe!2024":
-                raise ValueError("FIRST_ADMIN_PASSWORD must be changed in production")
+                raise ValueError(
+                    "FIRST_ADMIN_PASSWORD is still the example one, and "
+                    "sharing the platform on a network refuses to run on "
+                    "that. Change it in .env.\n"
+                    "\n"
+                    "Note that this only sets the password for an "
+                    "administrator account that does not exist yet. If you "
+                    "have already signed in once, yours is unchanged — change "
+                    "that from the account menu."
+                )
 
         # Both at once is not belt and braces: STARTTLS upgrades a plain
         # connection, implicit TLS wraps it from the first byte, and a client
