@@ -76,6 +76,24 @@ website; the backend keeps running in Docker. **`Stop Stratum.cmd`** (or
 If you have edited a file in the project folder, the launcher says so and does
 **not** update — your work is never overwritten.
 
+### Letting colleagues use it too
+
+**`Share on WiFi.cmd`** (or `bash share.sh`) instead of the start button.
+
+It prints an address like `http://192.168.1.50`. Anyone on the same WiFi types
+that into a browser — **they install nothing at all**, and everyone shares one
+database, so a record catalogued on one machine is on every other one as soon
+as it refreshes.
+
+Two things follow from that:
+
+- **This computer must stay on and awake.** When it sleeps, everyone else is
+  disconnected. Worth checking the power settings.
+- **Give each person their own account.** The platform records who changed
+  what, and that is worth nothing if everybody signs in as you.
+
+See [Letting other people use it](deploying.md) for the detail.
+
 ### Put it on the desktop
 
 Right-click `Start Stratum.cmd` → **Show more options** → **Send to** →

@@ -58,6 +58,20 @@ around €12 a year.
 
 ## Option 1 — one computer in the office
 
+### The one-click way
+
+**Windows** — double-click **`Share on WiFi.cmd`**.
+**macOS or Linux** — run `bash share.sh`.
+
+It works out this machine's address on the network, records it in the
+settings, builds the interface properly, starts everything, and prints the
+address in large letters for you to pass on. Nobody else installs anything.
+
+That is the whole procedure. The rest of this section is the same thing by
+hand, for when you want to know what it did.
+
+### By hand
+
 **On the machine that will host it:**
 
 ```bash
