@@ -143,6 +143,29 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    heading: "Management",
+    items: [
+      {
+        to: "/management/budgets",
+        label: "Funds",
+        module: "management",
+        icon: icon("M3 6.5h14v9H3zM10 8.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M5.5 6.5v9M14.5 6.5v9"),
+      },
+      {
+        to: "/management/tasks",
+        label: "Tasks",
+        module: "management",
+        icon: icon("M4 5.5h12M4 10h12M4 14.5h7"),
+      },
+      {
+        to: "/management/calendar",
+        label: "Calendar",
+        module: "management",
+        icon: icon("M3.5 5h13v12h-13zM3.5 8.5h13M7 3v3.5M13 3v3.5"),
+      },
+    ],
+  },
+  {
     heading: "Store",
     items: [
       {

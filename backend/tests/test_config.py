@@ -138,3 +138,40 @@ class TestProductionGuards:
 
         settings = Settings()
         assert settings.ENVIRONMENT == "production"
+
+
+class TestModelExports:
+    """`app.models.__all__` and what the module actually exports.
+
+    A name in `__all__` that is never imported makes `from app.models import
+    X` fail — at the point some other file needs it, with a traceback that
+    points at the importer rather than at the omission. Cheap to assert, and
+    it has already caught one.
+    """
+
+    def test_every_name_in_all_is_importable(self) -> None:
+        import app.models as models
+
+        missing = [name for name in models.__all__ if not hasattr(models, name)]
+
+        assert not missing, f"listed in __all__ but never imported: {missing}"
+
+    def test_every_model_and_enum_is_listed(self) -> None:
+        """The other direction. A model absent from `__all__` still imports,
+        but nothing tells the next person it is part of the surface."""
+        import enum
+
+        import app.models as models
+        from app.db.base import Base
+
+        exported = set(models.__all__)
+        public = {
+            name
+            for name, value in vars(models).items()
+            if not name.startswith("_")
+            and isinstance(value, type)
+            and (issubclass(value, Base) or issubclass(value, enum.Enum))
+            and value is not Base
+        }
+
+        assert not (public - exported), f"exported but not in __all__: {sorted(public - exported)}"

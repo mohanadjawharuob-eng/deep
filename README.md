@@ -515,7 +515,7 @@ office & storage inventory — with a digital archive to follow.
 | **6b — done** | React frontend: sign-in, dashboard, archaeology, museum record card, storage tree, map, search, light/dark |
 | **6c — done** | Spreadsheet import with per-column verification; floor plans of the store |
 | **7 — done** | Inventory module: equipment, stock with a ledger behind it, calibration, and the excavation kit builder |
-| 8 | Management module: budgets, grants, staff, tasks, calendar |
+| **8 — done** | Management module: funds with a paid/committed/available balance, spending by category, tasks and the calendar |
 | 9 | Social media repository; the [data-request system](docs/data-requests.md) and its upload links |
 | **10 — done** | The Stratum design applied; the [design brief](docs/design-brief.md) and its appendix |
 | 11 | Admin panel; the digital archive module |

@@ -1264,3 +1264,134 @@
   .grid-wrap { max-height: calc(100vh - 300px); }
   .grid td { max-width: 180px; }
 }
+
+/* --------------------------------------------------------------------------
+ * Management: money and work
+ * ----------------------------------------------------------------------- */
+
+/* The balance bar draws two quantities, not one.
+ *
+ * Paid is solid, committed is hatched. Never colour alone — the two are also
+ * different textures and both are labelled underneath, so somebody who cannot
+ * tell the shades apart still gets the answer. Planned spending is nowhere on
+ * this bar on purpose: it is a forecast, and drawing it as though it were
+ * spent turns "we might need a second total station" into "we cannot afford
+ * one".
+ */
+.balance {
+  display: flex;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+  border: var(--border-width) solid var(--border);
+}
+.balance-paid { background: var(--accent); }
+.balance-committed {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent-line),
+    var(--accent-line) 3px,
+    var(--accent-weak) 3px,
+    var(--accent-weak) 6px
+  );
+}
+/* Over the award: the whole bar reads as a warning, not just the overflow,
+   because there is no room left in it to draw the overflow honestly. */
+.balance.over { border-color: var(--danger); }
+.balance.over .balance-paid { background: var(--danger); }
+
+.balance-key {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: 5px;
+  color: var(--text-3);
+}
+.balance-key i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: baseline;
+}
+.key-paid { background: var(--accent); }
+.key-committed {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent-line),
+    var(--accent-line) 2px,
+    var(--accent-weak) 2px,
+    var(--accent-weak) 4px
+  );
+}
+
+/* A share of the total, inline in a table cell. */
+.share {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.share-fill { display: block; height: 100%; background: var(--accent-line); }
+
+/* --- The task board ---------------------------------------------------- */
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.board-column {
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  min-height: 120px;
+}
+
+.board-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  padding: 0 2px;
+}
+
+.board-card {
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  margin-bottom: var(--space-3);
+  box-shadow: var(--sh);
+}
+.board-card:last-child { margin-bottom: 0; }
+
+.board-empty { padding: var(--space-3) 2px; margin: 0; }
+
+/* --- The agenda -------------------------------------------------------- */
+.agenda { list-style: none; margin: 0; padding: 0; }
+.agenda li {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: 11px var(--space-4);
+  border-bottom: var(--border-width) solid var(--border);
+}
+.agenda li:last-child { border-bottom: none; }
+.agenda-when,
+.agenda-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+@media (max-width: 1000px) {
+  .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .board { grid-template-columns: minmax(0, 1fr); }
+  .agenda li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}

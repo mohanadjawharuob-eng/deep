@@ -43,6 +43,13 @@ import {
   StockDetail,
   StockList,
 } from "./routes/Inventory";
+import {
+  BudgetScreen,
+  Budgets,
+  Calendar,
+  Expenses,
+  Tasks,
+} from "./routes/Management";
 import { ImportBatch, ImportUpload } from "./routes/Import";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
 import { Empty, Loading } from "./components/ui";
@@ -104,6 +111,12 @@ export function App() {
         <Route path="inventory/kit-templates/:templateId" element={<KitTemplateScreen />} />
         <Route path="inventory/kits" element={<Kits />} />
         <Route path="inventory/kits/:kitId" element={<KitScreen />} />
+
+        <Route path="management/budgets" element={<Budgets />} />
+        <Route path="management/budgets/:budgetId" element={<BudgetScreen />} />
+        <Route path="management/expenses" element={<Expenses />} />
+        <Route path="management/tasks" element={<Tasks />} />
+        <Route path="management/calendar" element={<Calendar />} />
 
         <Route path="storage" element={<Storage />} />
         <Route path="floorplans" element={<FloorPlansForLocation />} />

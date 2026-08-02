@@ -41,6 +41,8 @@ from app.models import (
     ActivityAction,
     ActivityLog,
     Artifact,
+    Budget,
+    CalendarEvent,
     CalibrationResult,
     Collection,
     ConditionState,
@@ -53,6 +55,9 @@ from app.models import (
     DocumentType,
     Equipment,
     ExcavationContext,
+    Expense,
+    ExpenseCategory,
+    ExpenseStatus,
     GeometryKind,
     GisFeature,
     GisLayer,
@@ -79,6 +84,9 @@ from app.models import (
     StorageLocation,
     StratigraphicRelation,
     SystemSetting,
+    Task,
+    TaskPriority,
+    TaskStatus,
     TreatmentType,
     User,
     UserRole,
@@ -1014,6 +1022,129 @@ def seed_sample_inventory(session: Session, *, user: User) -> None:
     )
 
 
+def seed_sample_management(session: Session, *, project: Project, user: User) -> None:
+    """A grant with real spending against it, and a few things to do.
+
+    The point is to show the three numbers that matter at once: money paid,
+    money committed but not yet paid, and what is genuinely left. A budget with
+    nothing against it shows none of that.
+    """
+    if session.scalar(select(Budget).where(Budget.code == "DEMO-GR-01")):
+        logger.info("Sample management data already present; skipping")
+        return
+
+    today = date.today()
+    grant = Budget(
+        code="DEMO-GR-01",
+        name="Tell el-Demo survey and excavation",
+        funder="National Heritage Research Council",
+        grant_reference="NHRC/2024/118",
+        amount=Decimal("85000.00"),
+        currency="USD",
+        starts_on=today - timedelta(days=300),
+        ends_on=today + timedelta(days=120),
+        project_id=project.id,
+        manager_id=user.id,
+        manager_label=user.full_name,
+        description="Three seasons of survey, excavation and post-excavation.",
+        owner_id=user.id,
+    )
+    session.add(grant)
+    session.flush()
+
+    # Paid, committed and planned all present, so the balance on screen is
+    # doing the thing the module exists for rather than a single total.
+    spending = [
+        ("Field team salaries, season 1", 18500, ExpenseCategory.SALARIES, ExpenseStatus.PAID, 250),
+        ("Flights, specialist team", 4200, ExpenseCategory.TRAVEL, ExpenseStatus.PAID, 245),
+        ("Dig house, ten weeks", 9800, ExpenseCategory.ACCOMMODATION, ExpenseStatus.PAID, 240),
+        ("Total station service", 640, ExpenseCategory.EQUIPMENT, ExpenseStatus.PAID, 180),
+        ("Finds bags and labels", 380, ExpenseCategory.CONSUMABLES, ExpenseStatus.PAID, 175),
+        ("Excavation permit", 1200, ExpenseCategory.PERMITS, ExpenseStatus.PAID, 290),
+        (
+            "Radiocarbon dating, 12 samples",
+            5400,
+            ExpenseCategory.ANALYSIS,
+            ExpenseStatus.COMMITTED,
+            40,
+        ),
+        (
+            "Conservation of the bronze fibula",
+            2200,
+            ExpenseCategory.CONSERVATION,
+            ExpenseStatus.COMMITTED,
+            25,
+        ),
+        ("Season 2 salaries", 19000, ExpenseCategory.SALARIES, ExpenseStatus.PLANNED, -60),
+        ("Monograph typesetting", 3500, ExpenseCategory.PUBLICATION, ExpenseStatus.PLANNED, -150),
+    ]
+    for description, amount, category, state, days_ago in spending:
+        spent_on = today - timedelta(days=days_ago)
+        session.add(
+            Expense(
+                budget_id=grant.id,
+                description=description,
+                amount=Decimal(str(amount)),
+                currency="USD",
+                category=category,
+                status=state,
+                spent_on=spent_on,
+                paid_on=spent_on + timedelta(days=14) if state is ExpenseStatus.PAID else None,
+                project_id=project.id,
+                owner_id=user.id,
+            )
+        )
+
+    tasks = [
+        ("Finish the season 1 context sheets", TaskStatus.IN_PROGRESS, TaskPriority.HIGH, 14),
+        ("Send radiocarbon samples to the laboratory", TaskStatus.TODO, TaskPriority.URGENT, 3),
+        ("Draw the north section of Trench 4", TaskStatus.TODO, TaskPriority.NORMAL, 30),
+        ("Photograph the ceramic assemblage", TaskStatus.BLOCKED, TaskPriority.NORMAL, 21),
+        ("Renew the excavation permit", TaskStatus.DONE, TaskPriority.HIGH, -20),
+        ("Book the dig house for season 2", TaskStatus.TODO, TaskPriority.HIGH, -5),
+    ]
+    for position, (title, state, priority, due_in) in enumerate(tasks):
+        session.add(
+            Task(
+                title=title,
+                status=state,
+                priority=priority,
+                due_on=today + timedelta(days=due_in),
+                project_id=project.id,
+                assignee_id=user.id,
+                assignee_label=user.full_name,
+                completed_at=datetime.now(UTC) if state is TaskStatus.DONE else None,
+                position=position,
+                owner_id=user.id,
+            )
+        )
+
+    events = [
+        ("Season 2 fieldwork", "field season", 45, 105, True),
+        ("Interim report due to the funder", "deadline", 60, None, True),
+        ("Ministry inspection", "visit", 20, None, False),
+    ]
+    for title, kind, starts_in, ends_in, all_day in events:
+        session.add(
+            CalendarEvent(
+                title=title,
+                kind=kind,
+                starts_at=datetime.now(UTC) + timedelta(days=starts_in),
+                ends_at=datetime.now(UTC) + timedelta(days=ends_in) if ends_in else None,
+                all_day=all_day,
+                project_id=project.id,
+                owner_id=user.id,
+            )
+        )
+
+    logger.info(
+        "Sample management data created: 1 grant, %d expenses, %d tasks, %d events",
+        len(spending),
+        len(tasks),
+        len(events),
+    )
+
+
 def _resume_samples(session: Session, project: Project) -> None:
     """Run the sample sections a partly-seeded database is missing."""
     site = session.scalar(select(Site).where(Site.project_id == project.id))
@@ -1036,6 +1167,7 @@ def _resume_samples(session: Session, project: Project) -> None:
     seed_sample_gis(session, project=project, site=site, user=user)
     seed_sample_museum(session, artifacts=artifacts, user=user)
     seed_sample_inventory(session, user=user)
+    seed_sample_management(session, project=project, user=user)
 
 
 def seed_samples(session: Session, admin: User) -> None:
@@ -1356,6 +1488,7 @@ def seed_samples(session: Session, admin: User) -> None:
     seed_sample_gis(session, project=project, site=site, user=researcher)
     seed_sample_museum(session, artifacts=artifacts, user=researcher)
     seed_sample_inventory(session, user=researcher)
+    seed_sample_management(session, project=project, user=researcher)
 
     now = datetime.now(UTC)
     for offset, (label, action) in enumerate(

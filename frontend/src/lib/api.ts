@@ -581,3 +581,123 @@ export type KitDetail = Kit & {
   can_edit: boolean;
   can_delete: boolean;
 };
+
+/* --- Management ---------------------------------------------------------- */
+export type Budget = {
+  id: string;
+  code: string;
+  name: string;
+  funder?: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  starts_on?: string | null;
+  ends_on?: string | null;
+  project_id?: string | null;
+  is_public: boolean;
+  created_at: string;
+
+  /** Summed from the expenses on the server. Never sent back. */
+  paid: number;
+  committed: number;
+  /** A forecast. Deliberately outside `available`. */
+  planned: number;
+  spent: number;
+  available: number;
+  used_percent: number;
+  overspent: boolean;
+  [key: string]: unknown;
+};
+
+export type CategoryLine = {
+  category: string;
+  label: string;
+  amount: number;
+  count: number;
+  percent: number;
+};
+
+export type BudgetDetail = Budget & {
+  description?: string | null;
+  grant_reference?: string | null;
+  manager_label?: string | null;
+  notes?: string | null;
+  project_name?: string | null;
+  by_category: CategoryLine[];
+  expense_count: number;
+  expired_with_funds: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+export type BudgetTotals = {
+  total: number;
+  spent: number;
+  available: number;
+  budget_count: number;
+  by_currency: Record<string, number>;
+  needing_attention: string[];
+};
+
+export type Expense = {
+  id: string;
+  budget_id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string;
+  status: string;
+  spent_on: string;
+  paid_on?: string | null;
+  supplier?: string | null;
+  reference?: string | null;
+  paid_by_label?: string | null;
+  project_id?: string | null;
+  notes?: string | null;
+  created_at: string;
+  budget_code?: string | null;
+  budget_name?: string | null;
+  /** Set on creation when the line took the fund over. Never a refusal. */
+  overspent_by?: number | null;
+  budget_available_after?: number;
+};
+
+export type Task = {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  assignee_id?: string | null;
+  assignee_label?: string | null;
+  project_id?: string | null;
+  project_name?: string | null;
+  due_on?: string | null;
+  completed_at?: string | null;
+  position: number;
+  notes?: string | null;
+  days_overdue?: number | null;
+  created_at: string;
+};
+
+export type TaskBoard = {
+  todo: Task[];
+  in_progress: Task[];
+  blocked: Task[];
+  done: Task[];
+  overdue_count: number;
+};
+
+export type CalendarEvent = {
+  id: string;
+  title: string;
+  description?: string | null;
+  kind?: string | null;
+  starts_at: string;
+  ends_at?: string | null;
+  all_day: boolean;
+  location?: string | null;
+  project_id?: string | null;
+  project_name?: string | null;
+  created_at: string;
+};
