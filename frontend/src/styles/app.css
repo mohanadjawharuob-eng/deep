@@ -270,7 +270,9 @@
   font-weight: 600;
   cursor: pointer;
 }
-.filter-select { min-width: 8rem; }
+/* `.input` is full-width by default, which is right in a form and wrong in a
+   toolbar — a collection dropdown has no reason to span the window. */
+.filter-select { width: auto; min-width: 8rem; max-width: 18rem; }
 
 /* --------------------------------------------------------------------------
  * Details and pagination
@@ -1126,4 +1128,139 @@
 
 @media (max-width: 900px) {
   .plan-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --------------------------------------------------------------------------
+ * The catalogue grid
+ *
+ * A spreadsheet, so it is drawn like one: every cell ruled, the header and the
+ * row numbers pinned while the rest scrolls, and one cell visibly selected at
+ * a time. The row height is fixed rather than content-driven — a grid whose
+ * rows jump as you type is impossible to scan down.
+ * ----------------------------------------------------------------------- */
+.grid-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 260px);
+  padding: 0;
+}
+
+.grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+  font-size: var(--text-base);
+}
+
+.grid th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-2);
+  border-bottom: var(--border-width) solid var(--border-strong);
+  border-right: var(--border-width) solid var(--border);
+  padding: var(--space-3) 10px;
+  text-align: left;
+  white-space: nowrap;
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.grid td {
+  border-bottom: var(--border-width) solid var(--border);
+  border-right: var(--border-width) solid var(--border);
+  padding: 0 10px;
+  height: 30px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface);
+}
+
+/* Row numbers, pinned. They are the handle back to the full record card. */
+.grid-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 46px;
+  min-width: 46px;
+  text-align: right !important;
+  background: var(--surface-2) !important;
+  border-right: var(--border-width) solid var(--border-strong) !important;
+  user-select: none;
+}
+.grid th.grid-gutter { z-index: 3; }
+.grid-gutter a { text-decoration: none; }
+.grid-gutter a:hover { text-decoration: underline; }
+
+.grid-cell { cursor: cell; outline: none; }
+.grid-cell.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.grid-empty { color: var(--text-3); }
+
+/* The selected cell. A ring rather than a fill, so the value stays readable. */
+.grid-cell.active {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-weak);
+}
+
+/* Changed but not yet saved. Colour alone would say nothing to somebody who
+ * cannot see it, so the corner is folded as well. */
+.grid-cell.edited {
+  background: var(--warn-weak);
+  position: relative;
+  font-weight: 600;
+}
+.grid-cell.edited::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  border: 5px solid transparent;
+  border-top-color: var(--warn);
+  border-right-color: var(--warn);
+}
+
+/* Not editable here. Hatched, because a grey cell reads as "empty". */
+.grid-cell.locked {
+  cursor: default;
+  color: var(--text-2);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--surface),
+    var(--surface) 5px,
+    var(--surface-2) 5px,
+    var(--surface-2) 10px
+  );
+}
+.grid-lock { margin-left: 4px; opacity: 0.55; font-size: var(--text-xs); }
+
+/* The editor fills the cell exactly, so committing does not shift the row. */
+.grid-input {
+  width: 100%;
+  height: 28px;
+  border: none;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 0;
+  margin: 0 -2px;
+}
+
+.column-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+@media (max-width: 720px) {
+  .grid-wrap { max-height: calc(100vh - 300px); }
+  .grid td { max-width: 180px; }
 }

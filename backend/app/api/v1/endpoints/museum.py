@@ -11,12 +11,15 @@ access to the store's valuations.
 
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from sqlalchemy import Numeric, cast, func, or_, select
+from sqlalchemy import Numeric, Select, cast, func, or_, select
+from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, CurrentUserOptional, DbSession, require_module
 from app.core.permissions import (
@@ -70,6 +73,7 @@ from app.schemas.museum import (
     LoanUpdate,
     MuseumObjectCreate,
     MuseumObjectDetail,
+    MuseumObjectRead,
     MuseumObjectSummary,
     MuseumObjectUpdate,
     ReadingCreate,
@@ -483,34 +487,30 @@ def _check_artifact_link(
         )
 
 
-@router.get("/objects", response_model=Page[MuseumObjectSummary], summary="Search the collection")
-def list_objects(
-    session: DbSession,
-    user: CurrentUserOptional,
-    q: Annotated[
-        str | None, Query(description="Match accession number, title, description or maker")
-    ] = None,
-    collection_id: Annotated[uuid.UUID | None, Query()] = None,
-    object_status: Annotated[ObjectStatus | None, Query(alias="status")] = None,
-    condition: Annotated[ConditionState | None, Query()] = None,
-    period_id: Annotated[uuid.UUID | None, Query()] = None,
-    category_id: Annotated[uuid.UUID | None, Query()] = None,
-    material: Annotated[str | None, Query()] = None,
-    storage_location_id: Annotated[uuid.UUID | None, Query()] = None,
-    within_location: Annotated[
-        uuid.UUID | None, Query(description="Anywhere beneath this storage location")
-    ] = None,
-    has_artifact: Annotated[
-        bool | None, Query(description="Only objects with (or without) an excavation record")
-    ] = None,
-    acquired_after: Annotated[date | None, Query()] = None,
-    acquired_before: Annotated[date | None, Query()] = None,
-    sort: Annotated[
-        str, Query(pattern="^-?(accession_number|title|created_at|acquisition_date)$")
-    ] = "accession_number",
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> Page[MuseumObjectSummary]:
+def _object_search(
+    session: Session,
+    user: User | None,
+    *,
+    q: str | None = None,
+    collection_id: uuid.UUID | None = None,
+    object_status: ObjectStatus | None = None,
+    condition: ConditionState | None = None,
+    period_id: uuid.UUID | None = None,
+    category_id: uuid.UUID | None = None,
+    material: str | None = None,
+    storage_location_id: uuid.UUID | None = None,
+    within_location: uuid.UUID | None = None,
+    has_artifact: bool | None = None,
+    acquired_after: date | None = None,
+    acquired_before: date | None = None,
+    sort: str = "accession_number",
+) -> Select[tuple[MuseumObject]]:
+    """The catalogue search, as a statement.
+
+    Shared rather than repeated: the list, the grid and the export have to
+    agree about what a filter means, or the same search gives three different
+    answers depending on which screen asked.
+    """
     statement = select(MuseumObject).where(_visible_filter(user, MuseumObject))
 
     if q:
@@ -556,7 +556,67 @@ def list_objects(
 
     descending = sort.startswith("-")
     column = getattr(MuseumObject, sort.lstrip("-"))
-    statement = statement.order_by(column.desc() if descending else column.asc(), MuseumObject.id)
+    return statement.order_by(column.desc() if descending else column.asc(), MuseumObject.id)
+
+
+# Every filter both list-shaped endpoints accept, named once. Two endpoints
+# search the same catalogue; declaring the query twice is how they drift.
+QSearch = Annotated[
+    str | None, Query(description="Match accession number, title, description or maker")
+]
+QCollection = Annotated[uuid.UUID | None, Query()]
+QStatus = Annotated[ObjectStatus | None, Query(alias="status")]
+QCondition = Annotated[ConditionState | None, Query()]
+QPeriod = Annotated[uuid.UUID | None, Query()]
+QCategory = Annotated[uuid.UUID | None, Query()]
+QMaterial = Annotated[str | None, Query()]
+QLocation = Annotated[uuid.UUID | None, Query()]
+QWithin = Annotated[uuid.UUID | None, Query(description="Anywhere beneath this storage location")]
+QHasArtifact = Annotated[
+    bool | None, Query(description="Only objects with (or without) an excavation record")
+]
+QAcquiredAfter = Annotated[date | None, Query()]
+QAcquiredBefore = Annotated[date | None, Query()]
+QSort = Annotated[str, Query(pattern="^-?(accession_number|title|created_at|acquisition_date)$")]
+
+
+@router.get("/objects", response_model=Page[MuseumObjectSummary], summary="Search the collection")
+def list_objects(
+    session: DbSession,
+    user: CurrentUserOptional,
+    q: QSearch = None,
+    collection_id: QCollection = None,
+    object_status: QStatus = None,
+    condition: QCondition = None,
+    period_id: QPeriod = None,
+    category_id: QCategory = None,
+    material: QMaterial = None,
+    storage_location_id: QLocation = None,
+    within_location: QWithin = None,
+    has_artifact: QHasArtifact = None,
+    acquired_after: QAcquiredAfter = None,
+    acquired_before: QAcquiredBefore = None,
+    sort: QSort = "accession_number",
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[MuseumObjectSummary]:
+    statement = _object_search(
+        session,
+        user,
+        q=q,
+        collection_id=collection_id,
+        object_status=object_status,
+        condition=condition,
+        period_id=period_id,
+        category_id=category_id,
+        material=material,
+        storage_location_id=storage_location_id,
+        within_location=within_location,
+        has_artifact=has_artifact,
+        acquired_after=acquired_after,
+        acquired_before=acquired_before,
+        sort=sort,
+    )
 
     rows, total = records.paginate(session, statement, limit, offset)
     return Page[MuseumObjectSummary](
@@ -564,6 +624,177 @@ def list_objects(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get(
+    "/objects/grid",
+    response_model=Page[MuseumObjectRead],
+    summary="Search the collection, whole records",
+    description=(
+        "The same search as `/objects`, returning every field rather than the "
+        "handful the list view shows.\n\n"
+        "The grid lets a cataloguer put any of the record's fields on screen "
+        "as a column. Served from the summary, a column the summary happens "
+        "not to carry would be a column of blanks — indistinguishable from a "
+        "field nobody has filled in, and quietly wrong."
+    ),
+)
+def list_objects_for_grid(
+    session: DbSession,
+    user: CurrentUserOptional,
+    q: QSearch = None,
+    collection_id: QCollection = None,
+    object_status: QStatus = None,
+    condition: QCondition = None,
+    period_id: QPeriod = None,
+    category_id: QCategory = None,
+    material: QMaterial = None,
+    storage_location_id: QLocation = None,
+    within_location: QWithin = None,
+    has_artifact: QHasArtifact = None,
+    acquired_after: QAcquiredAfter = None,
+    acquired_before: QAcquiredBefore = None,
+    sort: QSort = "accession_number",
+    # Lower than the list's ceiling on purpose: a grid row is the whole record,
+    # so two hundred of them is a payload nobody asked for.
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[MuseumObjectRead]:
+    statement = _object_search(
+        session,
+        user,
+        q=q,
+        collection_id=collection_id,
+        object_status=object_status,
+        condition=condition,
+        period_id=period_id,
+        category_id=category_id,
+        material=material,
+        storage_location_id=storage_location_id,
+        within_location=within_location,
+        has_artifact=has_artifact,
+        acquired_after=acquired_after,
+        acquired_before=acquired_before,
+        sort=sort,
+    )
+
+    rows, total = records.paginate(session, statement, limit, offset)
+    return Page[MuseumObjectRead](
+        items=[MuseumObjectRead.model_validate(row) for row in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
+    "/objects/export.csv",
+    summary="Download the catalogue as a spreadsheet",
+    description=(
+        "The same records the grid shows, as CSV — openable in Excel, "
+        "LibreOffice or Numbers.\n\n"
+        "`columns` selects which fields to include, comma-separated, in the "
+        "order given. Omit it for the whole record.\n\n"
+        "The file is written with a byte-order mark, because Excel on Windows "
+        "otherwise reads UTF-8 as its own legacy encoding and turns every "
+        "diacritic in a site name into mojibake — which is precisely the data "
+        "an archaeological catalogue is full of.\n\n"
+        "What comes out can be edited and imported back through "
+        "`/imports`, so a correction pass in a spreadsheet is a round trip "
+        "rather than a dead end."
+    ),
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}}, "description": "The catalogue"}},
+)
+def export_objects_csv(
+    session: DbSession,
+    user: CurrentUserOptional,
+    q: QSearch = None,
+    collection_id: QCollection = None,
+    object_status: QStatus = None,
+    condition: QCondition = None,
+    period_id: QPeriod = None,
+    category_id: QCategory = None,
+    material: QMaterial = None,
+    storage_location_id: QLocation = None,
+    within_location: QWithin = None,
+    has_artifact: QHasArtifact = None,
+    acquired_after: QAcquiredAfter = None,
+    acquired_before: QAcquiredBefore = None,
+    sort: QSort = "accession_number",
+    columns: Annotated[
+        str | None, Query(description="Field names, comma-separated, in order")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=20_000)] = 5_000,
+) -> Response:
+    from app.services import forms
+
+    layout = forms.get_layout("museum_object")
+    known = forms.field_index(layout) if layout else {}
+
+    chosen = [name.strip() for name in (columns or "").split(",") if name.strip()]
+    wanted = [name for name in chosen if name in known] or list(known)
+
+    # The same search the grid ran. Exporting "what I am looking at" is the
+    # whole point, and it fails the moment the two disagree about a filter.
+    statement = _object_search(
+        session,
+        user,
+        q=q,
+        collection_id=collection_id,
+        object_status=object_status,
+        condition=condition,
+        period_id=period_id,
+        category_id=category_id,
+        material=material,
+        storage_location_id=storage_location_id,
+        within_location=within_location,
+        has_artifact=has_artifact,
+        acquired_after=acquired_after,
+        acquired_before=acquired_before,
+        sort=sort,
+    ).limit(limit)
+
+    rows = session.scalars(statement).all()
+
+    # Value lists are resolved to their labels. A column of UUIDs is not a
+    # spreadsheet somebody can read, correct, and hand back.
+    lookups = forms.value_lists(session, layout.value_lists) if layout else {}
+    by_value = {
+        name: {option["value"]: option["label"] for option in options}
+        for name, options in lookups.items()
+    }
+
+    def as_text(field: forms.FormField, value: object) -> str:
+        """One value, written the way the grid shows it."""
+        if value is None:
+            return ""
+        if hasattr(value, "value"):  # an enum
+            value = value.value
+        # Multi-valued fields resolve item by item. Doing the join first is the
+        # obvious shortcut and the wrong one: a materials column then leaves a
+        # row of raw identifiers where the grid shows "Bronze, Bone", and the
+        # file is neither readable nor correctable.
+        if isinstance(value, list):
+            return "; ".join(as_text(field, item) for item in value)
+        if field.value_list:
+            return by_value.get(field.value_list, {}).get(str(value), str(value))
+        return str(value)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([known[name].label for name in wanted])
+
+    for row in rows:
+        writer.writerow([as_text(known[name], getattr(row, name, None)) for name in wanted])
+
+    # utf-8-sig, not utf-8. See the endpoint description.
+    payload = buffer.getvalue().encode("utf-8-sig")
+    return Response(
+        content=payload,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="catalogue.csv"'},
     )
 
 

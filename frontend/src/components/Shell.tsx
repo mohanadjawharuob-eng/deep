@@ -100,6 +100,12 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         icon: icon("M3 7.5 10 4l7 3.5M4 8v7m4-7v7m4-7v7m4-7v7M2.5 16.5h15"),
       },
       {
+        to: "/museum/grid",
+        label: "Grid",
+        module: "museum",
+        icon: icon("M3 3h14v14H3zM3 7.5h14M3 12.5h14M8 3v14m4.5-14v14"),
+      },
+      {
         to: "/museum/collections",
         label: "Collections",
         module: "museum",

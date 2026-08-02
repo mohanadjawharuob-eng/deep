@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models import Module, ModuleLevel, MuseumObject, User, UserRole
+from app.models import Material, Module, ModuleLevel, MuseumObject, User, UserRole
 from app.services import accession
 from tests.conftest import auth_headers, make_user
 
@@ -1190,3 +1190,190 @@ class TestObjectLabels:
         assert (
             client.get(f"/api/v1/scan/museum-objects/{detail['public_token']}").status_code == 404
         )
+
+
+class TestGridEndpoint:
+    """The whole-record search behind the spreadsheet view."""
+
+    def test_it_carries_the_fields_the_summary_leaves_out(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """The grid lets a cataloguer put any field on screen as a column.
+        Served from the summary, a field the summary omits would come back
+        absent and be drawn as an empty cell — indistinguishable from a field
+        nobody has filled in."""
+        catalogue(
+            client,
+            collection["id"],
+            title="Fibula",
+            maker="Unknown",
+            culture="Roman",
+            materials=["bronze"],
+        )
+
+        row = client.get(
+            "/api/v1/museum/objects/grid", headers=auth_headers(client, "curator")
+        ).json()["items"][0]
+
+        assert row["maker"] == "Unknown"
+        assert row["culture"] == "Roman"
+        assert row["materials"] == ["bronze"]
+
+    def test_it_is_not_read_as_an_object_id(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """`/objects/grid` and `/objects/{id}` share a prefix."""
+        response = client.get(
+            "/api/v1/museum/objects/grid", headers=auth_headers(client, "curator")
+        )
+
+        assert response.status_code == 200, response.text
+        assert "items" in response.json()
+
+    def test_it_filters_the_same_way_the_list_does(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """Both run the same search. Two catalogues that disagree about what a
+        filter means is two catalogues."""
+        catalogue(client, collection["id"], title="Bronze fibula", culture="Roman")
+        catalogue(client, collection["id"], title="Cooking pot", culture="Nabataean")
+
+        headers = auth_headers(client, "curator")
+        listed = client.get("/api/v1/museum/objects?q=Nabataean", headers=headers).json()
+        gridded = client.get("/api/v1/museum/objects/grid?q=Nabataean", headers=headers).json()
+
+        assert gridded["total"] == listed["total"] == 1
+        assert [row["id"] for row in gridded["items"]] == [row["id"] for row in listed["items"]]
+
+    def test_the_export_and_the_grid_agree_about_a_search(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """Exporting is "give me what I am looking at", which stops being true
+        the moment the export runs a narrower search than the screen."""
+        catalogue(client, collection["id"], title="Bowl", culture="Nabataean")
+        catalogue(client, collection["id"], title="Lamp", culture="Roman")
+
+        headers = auth_headers(client, "curator")
+        gridded = client.get("/api/v1/museum/objects/grid?q=Nabataean", headers=headers).json()
+        exported = client.get(
+            "/api/v1/museum/objects/export.csv?q=Nabataean&columns=title", headers=headers
+        ).content.decode("utf-8-sig")
+
+        assert gridded["total"] == 1
+        assert "Bowl" in exported
+        assert "Lamp" not in exported
+
+
+class TestCsvExport:
+    """Downloading the catalogue as a spreadsheet.
+
+    The round trip matters more than the download: what comes out should be
+    correctable in Excel and importable back through `/imports`, which means
+    it has to carry labels a person recognises rather than the identifiers the
+    database stores.
+    """
+
+    def test_the_export_is_not_swallowed_by_the_object_route(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """`/objects/export.csv` and `/objects/{id}` share a prefix, and FastAPI
+        matches in declaration order — so the literal path has to win."""
+        response = client.get(
+            "/api/v1/museum/objects/export.csv", headers=auth_headers(client, "curator")
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"].startswith("text/csv")
+
+    def test_excel_on_windows_can_read_the_diacritics(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """Without a byte-order mark Excel reads UTF-8 as its legacy encoding
+        and turns every site name into mojibake — which is most of them."""
+        catalogue(client, collection["id"], title="Ḥorvat ʿUza sherd")
+
+        response = client.get(
+            "/api/v1/museum/objects/export.csv", headers=auth_headers(client, "curator")
+        )
+
+        assert response.content.startswith(b"\xef\xbb\xbf")
+        assert "Ḥorvat ʿUza sherd" in response.content.decode("utf-8-sig")
+
+    def test_columns_are_chosen_and_ordered_by_the_caller(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        catalogue(client, collection["id"], title="Cooking pot", object_type="Pot")
+
+        response = client.get(
+            "/api/v1/museum/objects/export.csv?columns=title,accession_number",
+            headers=auth_headers(client, "curator"),
+        )
+        header = response.content.decode("utf-8-sig").splitlines()[0]
+
+        assert header == "Object name,Accession no."
+
+    def test_values_come_out_as_labels_not_identifiers(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """A column of UUIDs is not a spreadsheet anybody can correct."""
+        catalogue(client, collection["id"], title="Bowl")
+
+        response = client.get(
+            "/api/v1/museum/objects/export.csv?columns=collection_id,condition",
+            headers=auth_headers(client, "curator"),
+        )
+        rows = response.content.decode("utf-8-sig").splitlines()
+
+        assert "ARCH" in rows[1]
+        assert "-" not in rows[1].split(",")[0] or "ARCH" in rows[1]
+
+    def test_a_list_field_is_readable_and_re_importable(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        """`bronze; iron` is what the importer splits back apart."""
+        catalogue(client, collection["id"], title="Fibula", materials=["bronze", "iron"])
+
+        response = client.get(
+            "/api/v1/museum/objects/export.csv?columns=materials",
+            headers=auth_headers(client, "curator"),
+        )
+
+        assert "bronze; iron" in response.content.decode("utf-8-sig")
+
+    def test_a_list_of_identifiers_comes_out_as_names(
+        self, client: TestClient, db: Session, curator: User, collection: dict
+    ) -> None:
+        """The obvious implementation joins the list first and resolves after,
+        which leaves a materials column full of UUIDs — readable to nobody and
+        correctable by nobody."""
+        bronze = Material(name="Bronze", slug="bronze-x")
+        bone = Material(name="Bone", slug="bone-x")
+        db.add_all([bronze, bone])
+        db.commit()
+
+        catalogue(
+            client,
+            collection["id"],
+            title="Fibula",
+            materials=[str(bronze.id), str(bone.id)],
+        )
+
+        response = client.get(
+            "/api/v1/museum/objects/export.csv?columns=materials",
+            headers=auth_headers(client, "curator"),
+        )
+        body = response.content.decode("utf-8-sig")
+
+        assert "Bronze; Bone" in body
+        assert str(bronze.id) not in body
+
+    def test_the_export_shows_only_what_the_caller_may_read(
+        self, client: TestClient, db: Session, curator: User, collection: dict
+    ) -> None:
+        catalogue(client, collection["id"], title="In the store")
+        catalogue(client, collection["id"], title="On the website", is_public=True)
+
+        body = client.get("/api/v1/museum/objects/export.csv").content.decode("utf-8-sig")
+
+        assert "On the website" in body
+        assert "In the store" not in body

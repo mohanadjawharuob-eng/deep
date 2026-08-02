@@ -125,11 +125,18 @@ export function Catalogue() {
             : "Accessioned objects"
         }
         actions={
-          can("museum", "contributor") && (
-            <Link className="btn btn-primary" to="/museum/objects/new">
-              New object
+          <>
+            {/* The same records as a spreadsheet — for correcting one field
+                across many objects rather than reading one closely. */}
+            <Link className="btn" to="/museum/grid">
+              Grid view
             </Link>
-          )
+            {can("museum", "contributor") && (
+              <Link className="btn btn-primary" to="/museum/objects/new">
+                New object
+              </Link>
+            )}
+          </>
         }
       />
 

@@ -29,6 +29,7 @@ import {
   NewObject,
   ObjectDetail,
 } from "./routes/Museum";
+import { CatalogueGrid } from "./routes/Grid";
 import { ImportBatch, ImportUpload } from "./routes/Import";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
 import { Empty, Loading } from "./components/ui";
@@ -69,6 +70,7 @@ export function App() {
         <Route path="artifacts/:artifactId" element={<ArtifactDetail />} />
 
         <Route path="museum" element={<Catalogue />} />
+        <Route path="museum/grid" element={<CatalogueGrid />} />
         {/* Before the :objectId route, or "new" is read as an id. */}
         <Route path="museum/objects/new" element={<NewObject />} />
         <Route path="museum/objects/:objectId" element={<ObjectDetail />} />

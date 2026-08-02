@@ -141,7 +141,14 @@ function endSession() {
   window.dispatchEvent(new CustomEvent(SESSION_ENDED));
 }
 
-export async function request<T>(path: string, options: Options = {}): Promise<T> {
+/**
+ * One request, carrying the session, retried once if the token had expired.
+ *
+ * Kept separate from `request` because not everything the platform returns is
+ * JSON — a CSV export or a PDF of labels needs the same session handling and a
+ * completely different way of reading the body.
+ */
+async function sendWithSession(path: string, options: Options = {}): Promise<Response> {
   const { method = "GET", body, query, signal, raw } = options;
 
   const send = async () => {
@@ -170,6 +177,11 @@ export async function request<T>(path: string, options: Options = {}): Promise<T
 
   if (response.status === 401 && !raw) endSession();
   if (!response.ok) throw await readError(response);
+  return response;
+}
+
+export async function request<T>(path: string, options: Options = {}): Promise<T> {
+  const response = await sendWithSession(path, options);
   if (response.status === 204) return undefined as T;
 
   const type = response.headers.get("content-type") ?? "";
@@ -188,6 +200,35 @@ export const api = {
     request<T>(path, { method: "PUT", body, signal }),
   delete: <T>(path: string, signal?: AbortSignal) =>
     request<T>(path, { method: "DELETE", signal }),
+
+  /**
+   * Save a file the platform generates.
+   *
+   * A plain `<a href="/api/…">` would be simpler, but a link carries no
+   * Authorization header — so the server would answer as if nobody were signed
+   * in and hand back only the public records, with no error and no hint that
+   * anything was missing. A silently short export is worse than a failed one.
+   */
+  async download(path: string, query?: Record<string, unknown>, filename?: string) {
+    const response = await sendWithSession(path, { query });
+    const blob = await response.blob();
+
+    // The server names the file; `filename` is the fallback.
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    const name = named?.[1] ? decodeURIComponent(named[1]) : (filename ?? "download");
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = name;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+
+    // Safari needs the URL to outlive the click, so revoking waits a tick.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  },
 
   async login(identifier: string, password: string) {
     const data = await request<{ access_token: string; refresh_token: string }>(

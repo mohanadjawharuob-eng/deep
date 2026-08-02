@@ -122,7 +122,7 @@ _NUMBER = re.compile(r"-?\d+(?:[.,]\d+)?")
 def _to_number(value: Any, *, integer: bool) -> int | float:
     if isinstance(value, bool):
         raise CellError(f"{value!r} is not a number")
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return int(value) if integer else float(value)
 
     text = str(value).strip()
@@ -175,7 +175,7 @@ def _to_date(value: Any) -> date:
 
 def _to_year(value: Any) -> int:
     """A signed year, where negative is BCE — the platform's convention."""
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
+    if isinstance(value, int | float) and not isinstance(value, bool):
         return int(value)
 
     text = str(value).strip()
@@ -201,7 +201,7 @@ def _to_boolean(value: Any) -> bool:
 
 
 def _to_list(value: Any) -> list[str]:
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [str(item).strip() for item in value if str(item).strip()]
     parts = [part.strip() for part in LIST_SPLIT.split(str(value))]
     return [part for part in parts if part]
