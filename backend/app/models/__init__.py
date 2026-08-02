@@ -12,6 +12,7 @@ from app.models.context import ContextRelationship, ExcavationContext
 from app.models.enums import (
     AcquisitionMethod,
     ActivityAction,
+    BudgetStatus,
     CalibrationResult,
     ConditionState,
     ConservationStatus,
@@ -40,6 +41,8 @@ from app.models.enums import (
     StockReason,
     StorageKind,
     StratigraphicRelation,
+    TaskPriority,
+    TaskStatus,
     TreatmentType,
     UserRole,
 )
@@ -56,6 +59,7 @@ from app.models.inventory import (
     KitTemplateLine,
     StockMovement,
 )
+from app.models.management import Budget, CalendarEvent, Expense, Task
 from app.models.media import Document, Model3D, Photograph
 from app.models.museum import (
     Collection,
@@ -74,6 +78,15 @@ from app.models.taxonomy import Material, ObjectCategory, Period, Publication, S
 from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess
 
 __all__ = [
+    "Budget",
+    "BudgetStatus",
+    "CalendarEvent",
+    "Expense",
+    "ExpenseCategory",
+    "ExpenseStatus",
+    "Task",
+    "TaskPriority",
+    "TaskStatus",
     "Calibration",
     "CalibrationResult",
     "Checkout",

@@ -592,3 +592,84 @@ class StockReason(str, enum.Enum):
     #: is recorded as its own event rather than by quietly editing the total.
     STOCKTAKE = "stocktake"
     OTHER = "other"
+
+
+class BudgetStatus(str, enum.Enum):
+    """Where a fund stands.
+
+    Distinct from a project's status: a grant can be closed for spending while
+    the excavation it paid for is still being written up, and the reverse
+    happens too.
+    """
+
+    DRAFT = "draft"
+    ACTIVE = "active"
+    #: Spending has stopped, but the record stays for reporting. A funder asks
+    #: about a grant years after the last invoice.
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
+
+
+class ExpenseStatus(str, enum.Enum):
+    """How far along one piece of spending is.
+
+    The distinction between committed and paid is the whole point. Money
+    promised to a supplier is money that cannot be spent again, even though it
+    has not left the account — a budget that counts only what has been paid
+    tells a project director they have funds they have already spent.
+    """
+
+    #: Expected, but nothing has been agreed. Does not reduce what is
+    #: available; it is a forecast, not a commitment.
+    PLANNED = "planned"
+    #: Ordered, contracted or invoiced. Reduces what is available.
+    COMMITTED = "committed"
+    PAID = "paid"
+    #: Did not happen. Kept rather than deleted, because "why was this
+    #: cancelled" is a question an audit asks.
+    CANCELLED = "cancelled"
+
+
+class ExpenseCategory(str, enum.Enum):
+    """What a piece of spending was for.
+
+    A closed list, because the one report every funder asks for is a breakdown
+    by category, and free text does not add up. These are the headings that
+    appear on archaeological grant reports.
+    """
+
+    FIELDWORK = "fieldwork"
+    TRAVEL = "travel"
+    ACCOMMODATION = "accommodation"
+    SALARIES = "salaries"
+    EQUIPMENT = "equipment"
+    CONSUMABLES = "consumables"
+    ANALYSIS = "analysis"
+    CONSERVATION = "conservation"
+    PUBLICATION = "publication"
+    PERMITS = "permits"
+    OVERHEADS = "overheads"
+    OTHER = "other"
+
+
+class TaskStatus(str, enum.Enum):
+    """Where a piece of work stands."""
+
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    #: Waiting on somebody or something else. Distinct from "in progress"
+    #: because a list where everything is "in progress" hides the one thing
+    #: that has been stuck for a month.
+    BLOCKED = "blocked"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class TaskPriority(str, enum.Enum):
+    """How much it matters. Four levels, because five is a decision nobody
+    makes consistently and three cannot say "this is on fire"."""
+
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
