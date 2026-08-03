@@ -248,6 +248,11 @@ def coerce(
         return f"{_to_date(value).isoformat()}T00:00:00"
 
     if kind in ("select", "reference"):
+        if spec.resolved_late:
+            # Passed through as written. Nothing here knows enough to resolve
+            # it — see ``FormField.resolved_late`` — and guessing at this layer
+            # would mean matching a context number against every site.
+            return str(value).strip()
         table = lookups.get(spec.value_list or "", {})
         if not table:
             # A reference with no value list behind it (a storage location, an
@@ -351,7 +356,15 @@ def plan(
                 if name == "accession_number":
                     outcome.warnings.append("Will be given the next accession number")
                     continue
-                outcome.errors.append(f"{spec.label} is required and this row has none")
+                # Two ways to supply it, and the one people reach for is the
+                # second: a sheet of contexts almost never names its site,
+                # because whoever made it knew. Naming only the column leaves
+                # them editing the spreadsheet to add a column of one repeated
+                # value.
+                outcome.errors.append(
+                    f"{spec.label} is required and this row has none. Map a column "
+                    f"to it, or set one {spec.label.lower()} for every row in the file."
+                )
 
         outcome.values = values
         result.rows.append(outcome)

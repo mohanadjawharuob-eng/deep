@@ -63,6 +63,12 @@ class FormField:
     references: str | None = None
     #: A field the platform sets and a person does not type.
     read_only: bool = False
+    #: A reference the importer cannot resolve on its own, and that the record
+    #: it belongs to resolves instead. A find names its context by number —
+    #: "1042" — and that number is only unique within a site, so there is no
+    #: list of values to match against until the site is known. The importer
+    #: passes such a column through as written and leaves it to the creator.
+    resolved_late: bool = False
     #: How many columns of the row this field occupies, out of twelve.
     width: int = 6
     unit: str | None = None
@@ -804,10 +810,794 @@ def consumable_layout() -> FormLayout:
     )
 
 
+# --------------------------------------------------------------------------
+# The excavation layouts
+#
+# These exist first of all so that excavation data can be **imported**. The
+# importer builds its column mapping from a layout, so a record type with no
+# layout cannot be imported at all — which is why, until now, a museum could
+# migrate off its spreadsheets and an excavation could not.
+#
+# They are written from the shape of a real site archive rather than from the
+# database columns: a site sheet, a context sheet, a finds register. The order
+# is the order those sheets are filled in, because that is the order a
+# spreadsheet exported from one will be in.
+# --------------------------------------------------------------------------
+def site_layout() -> FormLayout:
+    """The site record: what it is, where it is, and what protects it."""
+    return FormLayout(
+        record_type="site",
+        title="Site",
+        title_field="name",
+        key_field="code",
+        value_lists=["period", "condition", "site_type", "protection_status", "project"],
+        tabs=[
+            FormTab(
+                key="identification",
+                label="Identification",
+                groups=[
+                    FormGroup(
+                        label="Names and numbers",
+                        help="The code is what everything else on the dig refers to.",
+                        fields=[
+                            FormField(
+                                name="code",
+                                label="Site code",
+                                required=True,
+                                max_length=60,
+                                width=4,
+                                help="Short, and the one printed on bags and labels.",
+                            ),
+                            FormField(
+                                name="name",
+                                label="Site name",
+                                required=True,
+                                max_length=300,
+                                width=4,
+                            ),
+                            FormField(
+                                name="project_id",
+                                label="Project",
+                                kind="reference",
+                                references="project",
+                                value_list="project",
+                                required=True,
+                                width=4,
+                            ),
+                            FormField(
+                                name="alternative_names",
+                                label="Also known as",
+                                kind="tags",
+                                width=6,
+                                help="Local names, older publications, transliterations.",
+                            ),
+                            FormField(
+                                name="national_register_id",
+                                label="National register no.",
+                                max_length=120,
+                                width=6,
+                            ),
+                            FormField(
+                                name="site_type",
+                                label="Type",
+                                kind="select",
+                                value_list="site_type",
+                                width=6,
+                            ),
+                            FormField(
+                                name="description", label="Description", kind="textarea", width=12
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="location",
+                label="Location",
+                groups=[
+                    FormGroup(
+                        label="Coordinates",
+                        help=(
+                            "Decimal degrees. Mark the site restricted if publishing "
+                            "its position would put it at risk — the platform then "
+                            "blurs it on the map, leaves it out of exports, and hides "
+                            "it from search for anyone who may not edit it."
+                        ),
+                        fields=[
+                            FormField(
+                                name="latitude", label="Latitude", kind="number", width=4, unit="°"
+                            ),
+                            FormField(
+                                name="longitude",
+                                label="Longitude",
+                                kind="number",
+                                width=4,
+                                unit="°",
+                            ),
+                            FormField(
+                                name="elevation",
+                                label="Elevation",
+                                kind="number",
+                                width=4,
+                                unit="m",
+                            ),
+                            FormField(
+                                name="location_accuracy_m",
+                                label="Accuracy",
+                                kind="number",
+                                width=4,
+                                unit="m",
+                            ),
+                            FormField(
+                                name="location_restricted",
+                                label="Position is restricted",
+                                kind="boolean",
+                                width=8,
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Where",
+                        fields=[
+                            FormField(name="country", label="Country", max_length=100, width=4),
+                            FormField(name="region", label="Region", max_length=200, width=4),
+                            FormField(name="district", label="District", max_length=200, width=4),
+                            FormField(
+                                name="municipality", label="Municipality", max_length=200, width=6
+                            ),
+                            FormField(name="address", label="Address", max_length=400, width=6),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="dating",
+                label="Dating & condition",
+                groups=[
+                    FormGroup(
+                        label="Date",
+                        help="Years are signed: -2900 means 2900 BCE.",
+                        fields=[
+                            FormField(
+                                name="period_id",
+                                label="Period",
+                                kind="reference",
+                                references="period",
+                                value_list="period",
+                                width=6,
+                            ),
+                            FormField(
+                                name="period_text",
+                                label="Period as written",
+                                max_length=300,
+                                width=6,
+                                help="Kept as recorded when it does not match a period in the list.",
+                            ),
+                            FormField(
+                                name="date_from", label="From (year)", kind="integer", width=4
+                            ),
+                            FormField(name="date_to", label="To (year)", kind="integer", width=4),
+                            FormField(
+                                name="dating_method", label="Dating method", max_length=200, width=4
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Condition and protection",
+                        fields=[
+                            FormField(
+                                name="condition",
+                                label="Condition",
+                                kind="select",
+                                value_list="condition",
+                                width=4,
+                            ),
+                            FormField(
+                                name="protection_status",
+                                label="Protection",
+                                kind="select",
+                                value_list="protection_status",
+                                width=4,
+                            ),
+                            FormField(name="threats", label="Threats", kind="tags", width=4),
+                            FormField(name="land_use", label="Land use", max_length=200, width=6),
+                            FormField(name="landowner", label="Landowner", max_length=300, width=6),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="work",
+                label="Work & notes",
+                groups=[
+                    FormGroup(
+                        label="Fieldwork",
+                        fields=[
+                            FormField(
+                                name="discovery_date", label="Discovered on", kind="date", width=4
+                            ),
+                            FormField(
+                                name="discovered_by", label="Discovered by", max_length=300, width=8
+                            ),
+                            FormField(
+                                name="excavation_start",
+                                label="Excavation from",
+                                kind="date",
+                                width=4,
+                            ),
+                            FormField(
+                                name="excavation_end", label="Excavation to", kind="date", width=4
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Other fields",
+                        help="Anything this project records that the form above does not.",
+                        fields=[
+                            FormField(
+                                name="references", label="References", kind="textarea", width=12
+                            ),
+                            FormField(name="notes", label="Notes", kind="textarea", width=12),
+                            FormField(name="keywords", label="Keywords", kind="tags", width=6),
+                            FormField(name="is_public", label="Public", kind="boolean", width=6),
+                            FormField(
+                                name="metadata_json", label="Extra fields", kind="json", width=12
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def context_layout() -> FormLayout:
+    """The context sheet.
+
+    Grouped the way the paper sheet is: number and type first, then where it
+    was dug, then what it was made of, then how it relates to everything else.
+    Stratigraphic relationships are not on here — they come from the matrix,
+    which has its own import because a relationship is between two records and
+    a row on a context sheet is about one.
+    """
+    return FormLayout(
+        record_type="excavation_context",
+        title="Context",
+        title_field="context_number",
+        key_field="context_number",
+        value_lists=["period", "context_type", "site"],
+        tabs=[
+            FormTab(
+                key="identification",
+                label="Identification",
+                groups=[
+                    FormGroup(
+                        label="The unit",
+                        fields=[
+                            FormField(
+                                name="context_number",
+                                label="Context no.",
+                                required=True,
+                                max_length=50,
+                                width=4,
+                            ),
+                            FormField(
+                                name="site_id",
+                                label="Site",
+                                kind="reference",
+                                references="site",
+                                value_list="site",
+                                required=True,
+                                width=4,
+                                help="Set once for the whole file unless the sheet covers several.",
+                            ),
+                            FormField(
+                                name="context_type",
+                                label="Type",
+                                kind="select",
+                                value_list="context_type",
+                                required=True,
+                                width=4,
+                                help="Layer, cut, fill, wall, and so on.",
+                            ),
+                            FormField(
+                                name="stratigraphic_unit",
+                                label="Stratigraphic unit",
+                                max_length=80,
+                                width=4,
+                            ),
+                            FormField(name="trench", label="Trench", max_length=80, width=4),
+                            FormField(name="area", label="Area", max_length=80, width=4),
+                            FormField(name="square", label="Square / grid", max_length=80, width=4),
+                            FormField(name="phase", label="Phase", max_length=80, width=4),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Description",
+                        fields=[
+                            FormField(
+                                name="description", label="Description", kind="textarea", width=12
+                            ),
+                            FormField(
+                                name="interpretation",
+                                label="Interpretation",
+                                kind="textarea",
+                                width=12,
+                                help="What it is taken to mean, kept separate from what was seen.",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="matrix",
+                label="Deposit",
+                groups=[
+                    FormGroup(
+                        label="What it is made of",
+                        fields=[
+                            FormField(
+                                name="munsell_color",
+                                label="Munsell",
+                                max_length=30,
+                                width=4,
+                                placeholder="10YR 5/3",
+                            ),
+                            FormField(
+                                name="composition", label="Composition", max_length=300, width=8
+                            ),
+                            FormField(
+                                name="compaction", label="Compaction", max_length=120, width=4
+                            ),
+                            FormField(
+                                name="inclusions", label="Inclusions", kind="textarea", width=8
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Measurements",
+                        fields=[
+                            FormField(
+                                name="length_cm", label="Length", kind="number", width=3, unit="cm"
+                            ),
+                            FormField(
+                                name="width_cm", label="Width", kind="number", width=3, unit="cm"
+                            ),
+                            FormField(
+                                name="depth_cm", label="Depth", kind="number", width=3, unit="cm"
+                            ),
+                            FormField(
+                                name="thickness_cm",
+                                label="Thickness",
+                                kind="number",
+                                width=3,
+                                unit="cm",
+                            ),
+                            FormField(
+                                name="top_elevation",
+                                label="Top elevation",
+                                kind="number",
+                                width=4,
+                                unit="m",
+                            ),
+                            FormField(
+                                name="bottom_elevation",
+                                label="Bottom elevation",
+                                kind="number",
+                                width=4,
+                                unit="m",
+                            ),
+                            FormField(
+                                name="latitude", label="Latitude", kind="number", width=4, unit="°"
+                            ),
+                            FormField(
+                                name="longitude",
+                                label="Longitude",
+                                kind="number",
+                                width=4,
+                                unit="°",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="record",
+                label="Recording & dating",
+                groups=[
+                    FormGroup(
+                        label="Who and when",
+                        fields=[
+                            FormField(
+                                name="excavation_date", label="Excavated on", kind="date", width=4
+                            ),
+                            FormField(
+                                name="excavated_by", label="Excavated by", max_length=300, width=4
+                            ),
+                            FormField(
+                                name="recorded_by", label="Recorded by", max_length=300, width=4
+                            ),
+                            FormField(name="samples_taken", label="Samples", kind="tags", width=12),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Date",
+                        help="Years are signed: -2900 means 2900 BCE.",
+                        fields=[
+                            FormField(
+                                name="period_id",
+                                label="Period",
+                                kind="reference",
+                                references="period",
+                                value_list="period",
+                                width=6,
+                            ),
+                            FormField(
+                                name="dating_evidence",
+                                label="Dating evidence",
+                                kind="textarea",
+                                width=6,
+                            ),
+                            FormField(
+                                name="date_from", label="From (year)", kind="integer", width=4
+                            ),
+                            FormField(name="date_to", label="To (year)", kind="integer", width=4),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Other fields",
+                        fields=[
+                            FormField(name="notes", label="Notes", kind="textarea", width=12),
+                            FormField(
+                                name="metadata_json", label="Extra fields", kind="json", width=12
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def artifact_layout() -> FormLayout:
+    """The finds register.
+
+    A finds register is one row per find, and the columns are always the same
+    six: number, what it is, where it came from, how big, what date, where it
+    is now. Everything else is a specialist's column added later.
+    """
+    return FormLayout(
+        record_type="artifact",
+        title="Find",
+        title_field="name",
+        key_field="inventory_number",
+        value_lists=[
+            "period",
+            "material",
+            "object_category",
+            "condition",
+            "conservation_status",
+            "site",
+        ],
+        tabs=[
+            FormTab(
+                key="identification",
+                label="Identification",
+                groups=[
+                    FormGroup(
+                        label="Numbers",
+                        help="The inventory number is the find's identity. It goes on the bag.",
+                        fields=[
+                            FormField(
+                                name="inventory_number",
+                                label="Inventory no.",
+                                required=True,
+                                max_length=100,
+                                width=4,
+                            ),
+                            FormField(
+                                name="field_number",
+                                label="Field no.",
+                                max_length=100,
+                                width=4,
+                                help="What it was called in the trench, before it was registered.",
+                            ),
+                            FormField(
+                                name="accession_number",
+                                label="Museum no.",
+                                max_length=100,
+                                width=4,
+                                help="If it has since been accessioned into a collection.",
+                            ),
+                            FormField(
+                                name="site_id",
+                                label="Site",
+                                kind="reference",
+                                references="site",
+                                value_list="site",
+                                required=True,
+                                width=4,
+                                help="Set once for the whole file unless the sheet covers several.",
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="What it is",
+                        fields=[
+                            FormField(name="name", label="Name", max_length=300, width=6),
+                            FormField(
+                                name="object_type", label="Object type", max_length=200, width=6
+                            ),
+                            FormField(
+                                name="category_id",
+                                label="Category",
+                                kind="reference",
+                                references="object_category",
+                                value_list="object_category",
+                                width=6,
+                            ),
+                            FormField(name="typology", label="Typology", max_length=200, width=6),
+                            FormField(
+                                name="description", label="Description", kind="textarea", width=12
+                            ),
+                            FormField(
+                                name="quantity",
+                                label="Quantity",
+                                kind="integer",
+                                width=4,
+                                help="More than one where a bag of sherds is registered as one find.",
+                            ),
+                            FormField(
+                                name="is_fragment", label="Fragment", kind="boolean", width=4
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="provenance",
+                label="Where it came from",
+                groups=[
+                    FormGroup(
+                        label="On the site",
+                        help=(
+                            "Context is what ties the find to the sequence. A find "
+                            "without one is a find that cannot be dated by anything "
+                            "but itself."
+                        ),
+                        fields=[
+                            FormField(
+                                name="context_id",
+                                label="Context",
+                                kind="reference",
+                                references="excavation_context",
+                                resolved_late=True,
+                                width=4,
+                                help="By context number, as the register writes it.",
+                            ),
+                            FormField(
+                                name="stratigraphic_unit",
+                                label="Stratigraphic unit",
+                                max_length=80,
+                                width=4,
+                            ),
+                            FormField(name="trench", label="Trench", max_length=80, width=4),
+                            FormField(name="square", label="Square / grid", max_length=80, width=4),
+                            FormField(
+                                name="depth_cm", label="Depth", kind="number", width=4, unit="cm"
+                            ),
+                            FormField(
+                                name="elevation",
+                                label="Elevation",
+                                kind="number",
+                                width=4,
+                                unit="m",
+                            ),
+                            FormField(
+                                name="latitude", label="Latitude", kind="number", width=4, unit="°"
+                            ),
+                            FormField(
+                                name="longitude",
+                                label="Longitude",
+                                kind="number",
+                                width=4,
+                                unit="°",
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Recovery",
+                        fields=[
+                            FormField(name="find_date", label="Found on", kind="date", width=4),
+                            FormField(name="found_by", label="Found by", max_length=300, width=4),
+                            FormField(
+                                name="recovery_method",
+                                label="Recovery method",
+                                max_length=120,
+                                width=4,
+                                help="Excavation, sieving, surface collection, flotation.",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="measurement",
+                label="Measurement & material",
+                groups=[
+                    FormGroup(
+                        label="Material",
+                        fields=[
+                            FormField(
+                                name="material_id",
+                                label="Material",
+                                kind="reference",
+                                references="material",
+                                value_list="material",
+                                width=4,
+                            ),
+                            FormField(
+                                name="material_text",
+                                label="Material as written",
+                                max_length=200,
+                                width=4,
+                                help="Kept as recorded when it does not match the list.",
+                            ),
+                            FormField(name="technique", label="Technique", max_length=200, width=4),
+                            FormField(
+                                name="decoration", label="Decoration", kind="textarea", width=6
+                            ),
+                            FormField(
+                                name="inscription", label="Inscription", kind="textarea", width=6
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Dimensions",
+                        fields=[
+                            FormField(
+                                name="length_mm", label="Length", kind="number", width=3, unit="mm"
+                            ),
+                            FormField(
+                                name="width_mm", label="Width", kind="number", width=3, unit="mm"
+                            ),
+                            FormField(
+                                name="height_mm", label="Height", kind="number", width=3, unit="mm"
+                            ),
+                            FormField(
+                                name="thickness_mm",
+                                label="Thickness",
+                                kind="number",
+                                width=3,
+                                unit="mm",
+                            ),
+                            FormField(
+                                name="diameter_mm",
+                                label="Diameter",
+                                kind="number",
+                                width=3,
+                                unit="mm",
+                            ),
+                            FormField(
+                                name="rim_diameter_mm",
+                                label="Rim diameter",
+                                kind="number",
+                                width=3,
+                                unit="mm",
+                            ),
+                            FormField(
+                                name="weight_g", label="Weight", kind="number", width=3, unit="g"
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Date",
+                        help="Years are signed: -2900 means 2900 BCE.",
+                        fields=[
+                            FormField(
+                                name="period_id",
+                                label="Period",
+                                kind="reference",
+                                references="period",
+                                value_list="period",
+                                width=4,
+                            ),
+                            FormField(
+                                name="period_text",
+                                label="Period as written",
+                                max_length=200,
+                                width=4,
+                            ),
+                            FormField(
+                                name="dating_method", label="Dating method", max_length=200, width=4
+                            ),
+                            FormField(
+                                name="date_from", label="From (year)", kind="integer", width=4
+                            ),
+                            FormField(name="date_to", label="To (year)", kind="integer", width=4),
+                        ],
+                    ),
+                ],
+            ),
+            FormTab(
+                key="condition",
+                label="Condition & location",
+                groups=[
+                    FormGroup(
+                        label="Condition",
+                        fields=[
+                            FormField(
+                                name="condition",
+                                label="Condition",
+                                kind="select",
+                                value_list="condition",
+                                width=4,
+                            ),
+                            FormField(
+                                name="conservation_status",
+                                label="Conservation",
+                                kind="select",
+                                value_list="conservation_status",
+                                width=4,
+                            ),
+                            FormField(
+                                name="conservation_notes",
+                                label="Conservation notes",
+                                kind="textarea",
+                                width=12,
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Where it is now",
+                        fields=[
+                            FormField(
+                                name="current_location",
+                                label="Location as written",
+                                max_length=300,
+                                width=6,
+                                help=(
+                                    "Free text, from before the store was a tree. New "
+                                    "records should be filed into a storage location "
+                                    "instead; this is kept because it is the only "
+                                    "record of where legacy material was said to be."
+                                ),
+                            ),
+                            FormField(name="storage_box", label="Box", max_length=120, width=3),
+                            FormField(
+                                name="is_on_display", label="On display", kind="boolean", width=3
+                            ),
+                        ],
+                    ),
+                    FormGroup(
+                        label="Other fields",
+                        fields=[
+                            FormField(
+                                name="research_notes",
+                                label="Research notes",
+                                kind="textarea",
+                                width=12,
+                            ),
+                            FormField(name="keywords", label="Keywords", kind="tags", width=6),
+                            FormField(name="is_public", label="Public", kind="boolean", width=6),
+                            FormField(
+                                name="metadata_json", label="Extra fields", kind="json", width=12
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
 LAYOUTS = {
     "museum_object": museum_object_layout,
     "equipment": equipment_layout,
     "consumable": consumable_layout,
+    "site": site_layout,
+    "excavation_context": context_layout,
+    "artifact": artifact_layout,
 }
 
 
@@ -837,15 +1627,20 @@ def value_lists(session: Session, names: list[str]) -> dict[str, list[dict[str, 
         CalibrationResult,
         ConditionState,
         ConservationStatus,
+        ContextType,
         EquipmentStatus,
         ExhibitionStatus,
         LoanDirection,
         LoanStatus,
         ObjectStatus,
+        ProtectionStatus,
+        SiteType,
         StockReason,
         TreatmentType,
     )
     from app.models.museum import Collection
+    from app.models.project import Project
+    from app.models.site import Site
     from app.models.taxonomy import Material, ObjectCategory, Period
 
     static: dict[str, Any] = {
@@ -860,6 +1655,9 @@ def value_lists(session: Session, names: list[str]) -> dict[str, list[dict[str, 
         "equipment_status": EquipmentStatus,
         "stock_reason": StockReason,
         "calibration_result": CalibrationResult,
+        "site_type": SiteType,
+        "protection_status": ProtectionStatus,
+        "context_type": ContextType,
     }
 
     # Every status *except* "checked out". A form that offers it produces an
@@ -890,6 +1688,18 @@ def value_lists(session: Session, names: list[str]) -> dict[str, list[dict[str, 
             resolved[name] = [
                 {"value": str(row.id), "label": f"{row.code} — {row.name}"}
                 for row in session.scalars(select(Collection).order_by(Collection.name)).all()
+            ]
+        elif name == "project":
+            resolved[name] = [
+                {"value": str(row.id), "label": f"{row.code} — {row.name}"}
+                for row in session.scalars(select(Project).order_by(Project.name)).all()
+            ]
+        elif name == "site":
+            # Code first: a finds register says "TED", not the site's full name,
+            # and the importer accepts either side of the dash.
+            resolved[name] = [
+                {"value": str(row.id), "label": f"{row.code} — {row.name}"}
+                for row in session.scalars(select(Site).order_by(Site.code)).all()
             ]
     return resolved
 

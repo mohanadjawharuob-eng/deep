@@ -115,7 +115,14 @@ export function App() {
         {/* Before the :objectId route, or "new" is read as an id. */}
         <Route path="museum/objects/new" element={<NewObject />} />
         <Route path="museum/objects/:objectId" element={<ObjectDetail />} />
-        <Route path="museum/import" element={<ImportUpload />} />
+        {/* One import screen for every kind of record. The old museum-only
+            paths still work: a bookmark from before should not 404. */}
+        <Route path="import" element={<ImportUpload />} />
+        <Route path="import/:batchId" element={<ImportBatch />} />
+        <Route
+          path="museum/import"
+          element={<Navigate to="/import?type=museum_object" replace />}
+        />
         <Route path="museum/import/:batchId" element={<ImportBatch />} />
         <Route path="museum/collections" element={<Collections />} />
         <Route path="museum/collections/:collectionId" element={<CollectionDetail />} />

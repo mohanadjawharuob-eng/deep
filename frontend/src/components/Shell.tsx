@@ -72,6 +72,22 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
+/**
+ * Whether a link that carries a query is the one we are actually on.
+ *
+ * React Router matches on the path alone, so "Import" under Archaeology and
+ * "Import" under Museum — the same screen with a different preset — both light
+ * up at once, and the sidebar claims you are in two places. Links with no query
+ * are unaffected.
+ */
+function queryMatches(to: string, search: string): boolean {
+  const [, query] = to.split("?");
+  if (!query) return true;
+  const wanted = new URLSearchParams(query);
+  const actual = new URLSearchParams(search);
+  return [...wanted].every(([key, value]) => actual.get(key) === value);
+}
+
 const icon = (path: string) => (
   <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true">
     <path
@@ -120,6 +136,12 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         module: "archaeology",
         icon: icon("M2.5 5.5 7 3.5l6 2 4.5-2v11l-4.5 2-6-2-4.5 2zM7 3.5v11m6-9v11"),
       },
+      {
+        to: "/import?type=excavation_context",
+        label: "Import",
+        module: "archaeology",
+        icon: icon("M10 12.5V3m0 0L6.5 6.5M10 3l3.5 3.5M3.5 13.5v2A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5v-2"),
+      },
     ],
   },
   {
@@ -144,7 +166,7 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         icon: icon("M4 6h12M4 10h12M4 14h12"),
       },
       {
-        to: "/museum/import",
+        to: "/import?type=museum_object",
         label: "Import",
         module: "museum",
         icon: icon("M10 12.5V3m0 0L6.5 6.5M10 3l3.5 3.5M3.5 13.5v2A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5v-2"),
@@ -351,7 +373,9 @@ export function Shell() {
                   key={item.to}
                   to={item.to}
                   end={item.end}
-                  className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+                  className={({ isActive }) =>
+                    `nav-item ${isActive && queryMatches(item.to, location.search) ? "active" : ""}`
+                  }
                 >
                   {item.icon}
                   <span>{item.label}</span>

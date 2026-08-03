@@ -29,7 +29,6 @@ from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
-    Depends,
     File,
     Form,
     HTTPException,
@@ -40,13 +39,17 @@ from fastapi import (
 )
 from sqlalchemy import select
 
-from app.api.deps import DbSession, require_module
+from app.api.deps import CurrentUser, DbSession
 from app.core.permissions import has_module_access
+from app.models.artifact import Artifact
 from app.models.audit import Revision
+from app.models.context import ExcavationContext
 from app.models.enums import ActivityAction, ImportStatus, Module, ResourceType
 from app.models.enums import ModuleLevel as Level
 from app.models.imports import ImportBatch
 from app.models.museum import Collection, MuseumObject
+from app.models.project import Project
+from app.models.site import Site
 from app.models.user import User
 from app.schemas.common import Message, Page
 from app.schemas.imports import (
@@ -62,16 +65,40 @@ from app.services.storage import storage
 
 router = APIRouter(prefix="/imports", tags=["Import"])
 
-#: Which record types can be imported, and what each needs.
+#: Which record types can be imported, and into which module.
 #:
 #: Importing writes records into a module, so it is permissioned by that
 #: module — not by a separate "may import" right, which would be a way around
-#: the module ceiling.
-SUPPORTED: dict[str, Module] = {"museum_object": Module.MUSEUM}
+#: the module ceiling. That is also why the permission is checked per batch
+#: rather than by one dependency on the router: a museum supervisor must not be
+#: able to write four thousand contexts into an excavation they have no access
+#: to, and a single ``require_module(Module.MUSEUM, …)`` on every endpoint
+#: would let them.
+SUPPORTED: dict[str, Module] = {
+    "museum_object": Module.MUSEUM,
+    "equipment": Module.INVENTORY,
+    "consumable": Module.INVENTORY,
+    "site": Module.ARCHAEOLOGY,
+    "excavation_context": Module.ARCHAEOLOGY,
+    "artifact": Module.ARCHAEOLOGY,
+}
 
-#: Importing creates records in bulk and is hard to undo by hand, so it is a
-#: supervisor's job rather than a contributor's.
-Importer = Annotated[User, Depends(require_module(Module.MUSEUM, Level.SUPERVISOR))]
+#: What each imported record needs before a row can become a record, and which
+#: field carries it. Set once for the whole file on the verification screen, or
+#: mapped from a column when the sheet covers several sites.
+PARENT_OF: dict[str, tuple[str, str]] = {
+    "site": ("project_id", "project"),
+    "excavation_context": ("site_id", "site"),
+    "artifact": ("site_id", "site"),
+    "museum_object": ("collection_id", "collection"),
+}
+
+#: Anybody signed in may hold an import batch; what they may *do* with it is
+#: decided per record type by :func:`_require_import_access`, which every
+#: endpoint calls. Gating the router on one module instead would either lock
+#: out somebody who legitimately imports into another, or let a supervisor in
+#: one module write into a second — and the second failure is silent.
+Importer = CurrentUser
 
 
 def _check_record_type(record_type: str) -> Module:
@@ -87,14 +114,33 @@ def _check_record_type(record_type: str) -> Module:
     return module
 
 
+def _require_import_access(user: User, record_type: str) -> Module:
+    """Supervisor in the module this file writes into.
+
+    Importing creates records in bulk and is hard to undo by hand, so it is a
+    supervisor's job rather than a contributor's — and it is the *destination*
+    module that decides, not whichever module the person happens to run.
+    """
+    module = _check_record_type(record_type)
+    if not has_module_access(user, module, Level.SUPERVISOR):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Importing {record_type.replace('_', ' ')} records needs supervisor "
+                f"access to the {module.value.replace('_', ' ')} module."
+            ),
+        )
+    return module
+
+
 def _get_batch(session: DbSession, batch_id: uuid.UUID, user: User) -> ImportBatch:
     batch = records.get_or_404(session, ImportBatch, batch_id, "Import")
     # An import batch holds a file somebody uploaded and a mapping they
     # approved; it is theirs, not the module's.
-    if batch.owner_id != user.id and not has_module_access(
-        user, Module.MUSEUM, Level.ADMINISTRATOR
-    ):
+    module = SUPPORTED.get(batch.record_type, Module.MUSEUM)
+    if batch.owner_id != user.id and not has_module_access(user, module, Level.ADMINISTRATOR):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Import not found")
+    _require_import_access(user, batch.record_type)
     return batch
 
 
@@ -185,7 +231,7 @@ async def create_batch(
     sheet_name: Annotated[str | None, Form()] = None,
     header_row: Annotated[int, Form()] = 1,
 ) -> ImportBatchDetail:
-    _check_record_type(record_type)
+    _require_import_access(user, record_type)
 
     data = await file.read()
     filename = file.filename or "upload.xlsx"
@@ -223,7 +269,7 @@ async def create_batch(
         session,
         action=ActivityAction.CREATE,
         user=user,
-        resource_type=ResourceType.MUSEUM_OBJECT,
+        resource_type=_MODELS[record_type][1],
         resource_id=batch.id,
         resource_label=filename,
         summary=f"Uploaded {filename} for import ({len(sheet.rows)} rows)",
@@ -466,7 +512,7 @@ def commit_batch(
         # while reporting success for the rows it had just destroyed.
         savepoint = session.begin_nested()
         try:
-            record = _create_museum_object(session, row.values, user=user)
+            record = _create_record(session, batch.record_type, row.values, user=user)
             savepoint.commit()
         except Exception as exc:  # noqa: BLE001 - the reason goes back to the user
             savepoint.rollback()
@@ -487,7 +533,7 @@ def commit_batch(
         session,
         action=ActivityAction.CREATE,
         user=user,
-        resource_type=ResourceType.MUSEUM_OBJECT,
+        resource_type=_MODELS[batch.record_type][1],
         resource_id=batch.id,
         resource_label=batch.filename,
         summary=(
@@ -498,6 +544,118 @@ def commit_batch(
     )
     session.flush()
     return _as_preview(plan, limit=200)
+
+
+def _create_record(session: DbSession, record_type: str, values: dict, *, user: User) -> Any:
+    """One row, as a record of whichever kind this file holds."""
+    builder = _CREATORS.get(record_type)
+    if builder is None:  # pragma: no cover - guarded by _check_record_type
+        raise ValueError(f"{record_type!r} cannot be imported")
+    return builder(session, values, user=user)
+
+
+def _parent(session: DbSession, values: dict, record_type: str, model: Any) -> Any:
+    """The record this row hangs off, or a message saying what is missing.
+
+    Every excavation record belongs to something — a context to a site, a site
+    to a project — and a spreadsheet of contexts almost never says which site,
+    because whoever made it knew. So the message has to name both ways of
+    supplying it, or the answer to "no site" is a shrug.
+    """
+    field, label = PARENT_OF[record_type]
+    identifier = values.get(field)
+    if not identifier:
+        raise ValueError(
+            f"No {label}. Map a column to {label.capitalize()}, or set one as a "
+            f"default for every row."
+        )
+    parent = session.get(model, uuid.UUID(str(identifier)))
+    if parent is None:
+        raise ValueError(f"No {label} with id {identifier}")
+    return parent
+
+
+def _fields_for(model: Any, values: dict, *, drop: set[str]) -> dict:
+    """The values this model can actually hold.
+
+    A column mapped to a field the model does not have is dropped rather than
+    raised on: the mapping is checked on the verification screen, and a row
+    that fails here fails three thousand rows in.
+    """
+    return {
+        key: value
+        for key, value in values.items()
+        if key not in drop and value is not None and hasattr(model, key)
+    }
+
+
+def _create_site(session: DbSession, values: dict, *, user: User) -> Site:
+    project = _parent(session, values, "site", Project)
+    record = Site(
+        project_id=project.id,
+        owner_id=user.id,
+        **_fields_for(Site, values, drop={"project_id"}),
+    )
+    session.add(record)
+    session.flush()
+    return record
+
+
+def _create_context(session: DbSession, values: dict, *, user: User) -> ExcavationContext:
+    site = _parent(session, values, "excavation_context", Site)
+    record = ExcavationContext(
+        site_id=site.id,
+        owner_id=user.id,
+        **_fields_for(ExcavationContext, values, drop={"site_id"}),
+    )
+    session.add(record)
+    session.flush()
+    return record
+
+
+def _create_artifact(session: DbSession, values: dict, *, user: User) -> Artifact:
+    site = _parent(session, values, "artifact", Site)
+
+    # A finds register names its context by number — "1042", not a UUID — and
+    # the number is only unique within a site, so this cannot be a value list
+    # like Period is. Resolved here, against the site the row belongs to.
+    context_id = _resolve_context(session, site, values.pop("context_id", None))
+
+    record = Artifact(
+        site_id=site.id,
+        context_id=context_id,
+        owner_id=user.id,
+        **_fields_for(Artifact, values, drop={"site_id", "context_id"}),
+    )
+    session.add(record)
+    session.flush()
+    return record
+
+
+def _resolve_context(session: DbSession, site: Site, raw: Any) -> uuid.UUID | None:
+    """A context number, as the context on this site with that number."""
+    if raw in (None, ""):
+        return None
+
+    text = str(raw).strip()
+    try:
+        # A file exported from this platform holds the identifier itself.
+        return records.get_or_404(session, ExcavationContext, uuid.UUID(text), "Context").id
+    except (ValueError, AttributeError, HTTPException):
+        pass
+
+    found = session.scalar(
+        select(ExcavationContext).where(
+            ExcavationContext.site_id == site.id,
+            ExcavationContext.context_number == text,
+        )
+    )
+    if found is None:
+        raise ValueError(
+            f"No context {text!r} on {site.code}. Import the contexts first, or "
+            f"leave the column unmapped."
+        )
+    return found.id
 
 
 def _create_museum_object(session: DbSession, values: dict, *, user: User) -> MuseumObject:
@@ -537,6 +695,25 @@ def _create_museum_object(session: DbSession, values: dict, *, user: User) -> Mu
     return record
 
 
+#: Record type to the function that turns one row into one record. A dictionary
+#: rather than a chain of ``if``s so that adding a type is adding a line.
+_CREATORS: dict[str, Any] = {
+    "museum_object": _create_museum_object,
+    "site": _create_site,
+    "excavation_context": _create_context,
+    "artifact": _create_artifact,
+}
+
+#: What ``DELETE /{id}/records`` deletes, and which revision rows say a record
+#: has been worked on since.
+_MODELS: dict[str, tuple[Any, ResourceType]] = {
+    "museum_object": (MuseumObject, ResourceType.MUSEUM_OBJECT),
+    "site": (Site, ResourceType.SITE),
+    "excavation_context": (ExcavationContext, ResourceType.CONTEXT),
+    "artifact": (Artifact, ResourceType.ARTIFACT),
+}
+
+
 @router.delete(
     "/{batch_id}/records",
     response_model=Message,
@@ -557,8 +734,9 @@ def revert_batch(
             status.HTTP_409_CONFLICT, detail="This import has not created any records."
         )
 
+    model, resource_type = _MODELS[batch.record_type]
     ids = [uuid.UUID(value) for value in batch.created_ids]
-    rows = session.scalars(select(MuseumObject).where(MuseumObject.id.in_(ids))).all()
+    rows = session.scalars(select(model).where(model.id.in_(ids))).all()
 
     # A record that has been edited has a revision; one that has not, has none.
     # That is a better test than comparing timestamps, because ``updated_at``
@@ -567,7 +745,7 @@ def revert_batch(
     edited = set(
         session.scalars(
             select(Revision.resource_id).where(
-                Revision.resource_type == ResourceType.MUSEUM_OBJECT,
+                Revision.resource_type == resource_type,
                 Revision.resource_id.in_(ids),
             )
         ).all()
@@ -590,7 +768,7 @@ def revert_batch(
         session,
         action=ActivityAction.DELETE,
         user=user,
-        resource_type=ResourceType.MUSEUM_OBJECT,
+        resource_type=resource_type,
         resource_id=batch.id,
         resource_label=batch.filename,
         summary=f"Reverted import of {batch.filename}: {deleted} records deleted",

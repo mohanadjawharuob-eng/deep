@@ -13,9 +13,9 @@
  */
 
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { api, type Collection, type Page } from "../lib/api";
+import { api, type ModuleName, type Page } from "../lib/api";
 import { useAction, useQuery, useSession } from "../lib/hooks";
 import {
   Badge,
@@ -25,6 +25,112 @@ import {
   PageHeader,
   formatDateTime,
 } from "../components/ui";
+
+/**
+ * What can be imported, and what it belongs to.
+ *
+ * The `parent` matters more than it looks: a sheet of contexts almost never
+ * says which site, because whoever made it knew. Offering it as a thing to
+ * choose *before* the file is read is the difference between "map a column"
+ * and editing the spreadsheet to add a column of one repeated value.
+ */
+const KINDS: {
+  value: string;
+  label: string;
+  module: ModuleName;
+  blurb: string;
+  home: string;
+  homeLabel: string;
+}[] = [
+  {
+    value: "site",
+    label: "Sites",
+    module: "archaeology",
+    blurb: "A gazetteer, or a season's list of trenches.",
+    home: "/sites",
+    homeLabel: "Sites",
+  },
+  {
+    value: "excavation_context",
+    label: "Contexts",
+    module: "archaeology",
+    blurb: "Context or locus sheets. “Locus”, “SU” and “Ctx” are all understood.",
+    home: "/sites",
+    homeLabel: "Sites",
+  },
+  {
+    value: "artifact",
+    label: "Finds",
+    module: "archaeology",
+    blurb: "A finds register. Contexts are matched by number, so import those first.",
+    home: "/artifacts",
+    homeLabel: "Finds",
+  },
+  {
+    value: "museum_object",
+    label: "Museum objects",
+    module: "museum",
+    blurb: "A catalogue. Legacy numbers are kept and flagged, not refused.",
+    home: "/museum",
+    homeLabel: "Museum catalogue",
+  },
+  {
+    value: "equipment",
+    label: "Equipment",
+    module: "inventory",
+    blurb: "An asset register.",
+    home: "/inventory/equipment",
+    homeLabel: "Equipment",
+  },
+  {
+    value: "consumable",
+    label: "Stock",
+    module: "inventory",
+    blurb: "Consumables and what is on the shelf.",
+    home: "/inventory/stock",
+    homeLabel: "Stock",
+  },
+];
+
+const kindOf = (value: string) => KINDS.find((kind) => kind.value === value);
+
+/**
+ * What each imported record hangs off, and where the options come from.
+ *
+ * Asked once, here, rather than reported four thousand times: a sheet of
+ * contexts almost never names its site, and without one every single row fails
+ * for the same reason.
+ */
+const PARENT: Record<string, { field: string; label: string; list: string; help: string }> = {
+  museum_object: {
+    field: "collection_id",
+    label: "Collection",
+    list: "collection",
+    help:
+      "Objects are numbered by this collection's own rule. A number in the file that does not fit " +
+      "its pattern is kept and flagged, exactly as a typed one is.",
+  },
+  site: {
+    field: "project_id",
+    label: "Project",
+    list: "project",
+    help: "Every site belongs to a project. Map a column instead if the file covers several.",
+  },
+  excavation_context: {
+    field: "site_id",
+    label: "Site",
+    list: "site",
+    help: "Context numbers are unique within a site, so this decides what each row is about.",
+  },
+  artifact: {
+    field: "site_id",
+    label: "Site",
+    list: "site",
+    help:
+      "Contexts named in the file are matched by number against this site, so import the " +
+      "contexts before the finds.",
+  },
+};
 
 /* --------------------------------------------------------------------------
  * Shapes
@@ -89,9 +195,16 @@ type Preview = {
 export function ImportUpload() {
   const navigate = useNavigate();
   const { can } = useSession();
+  const [params, setParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [headerRow, setHeaderRow] = useState(1);
   const [dragging, setDragging] = useState(false);
+
+  // Only the kinds this person could actually write. A chooser offering four
+  // options that all end in 403 is worse than a chooser with one.
+  const allowed = KINDS.filter((kind) => can(kind.module, "supervisor"));
+  const requested = params.get("type") ?? "";
+  const kind = allowed.find((item) => item.value === requested) ?? allowed[0];
 
   const batches = useQuery<Page<Batch>>(
     (signal) => api.get("/imports", { limit: 10 }, signal),
@@ -100,17 +213,17 @@ export function ImportUpload() {
 
   const upload = useAction(async (chosen: File) => {
     const data = await api.upload<{ id: string }>("/imports", chosen, {
-      record_type: "museum_object",
+      record_type: kind?.value ?? "museum_object",
       header_row: headerRow,
     });
-    navigate(`/museum/import/${data.id}`);
+    navigate(`/import/${data.id}`);
   });
 
-  if (!can("museum", "supervisor")) {
+  if (!kind) {
     return (
       <Empty title="Not your job, happily">
-        Importing writes hundreds of records at once, so it needs supervisor access to the museum
-        module. Ask whoever administers the platform.
+        Importing writes hundreds of records at once, so it needs supervisor access to the module
+        it writes into. Ask whoever administers the platform.
       </Empty>
     );
   }
@@ -118,14 +231,39 @@ export function ImportUpload() {
   return (
     <>
       <PageHeader
-        breadcrumb={[{ label: "Museum catalogue", to: "/museum" }, { label: "Import" }]}
-        title="Import a catalogue"
+        breadcrumb={[{ label: kind.homeLabel, to: kind.home }, { label: "Import" }]}
+        title="Import a spreadsheet"
         subtitle="Read a spreadsheet, check what every column means, then create the records."
       />
 
       {upload.error && <ErrorNote message={upload.error} />}
 
       <div className="col">
+        <section className="card">
+          <div className="card-body">
+            <div className="overline" style={{ marginBottom: 10 }}>
+              What is in this file?
+            </div>
+            <div className="kind-picker">
+              {allowed.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={`kind-option ${item.value === kind.value ? "chosen" : ""}`}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.set("type", item.value);
+                    setParams(next, { replace: true });
+                  }}
+                >
+                  <span className="kind-label">{item.label}</span>
+                  <span className="kind-blurb">{item.blurb}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section
           className={`dropzone ${dragging ? "dragging" : ""}`}
           onDragOver={(event) => {
@@ -213,7 +351,10 @@ export function ImportUpload() {
                   {batches.data.items.map((batch) => (
                     <tr key={batch.id}>
                       <td>
-                        <Link to={`/museum/import/${batch.id}`}>{batch.filename}</Link>
+                        <Link to={`/import/${batch.id}`}>{batch.filename}</Link>
+                        <div className="muted small">
+                          {kindOf(batch.record_type)?.label ?? batch.record_type}
+                        </div>
                       </td>
                       <td className="muted small">{formatDateTime(batch.created_at)}</td>
                       <td className="mono">{batch.total_rows}</td>
@@ -244,19 +385,24 @@ export function ImportBatch() {
     (signal) => api.get(`/imports/${batchId}`, undefined, signal),
     [batchId],
   );
-  const collections = useQuery<Page<Collection>>(
-    (signal) => api.get("/museum/collections", { limit: 200 }, signal),
-    [],
+  const parent = PARENT[batch.data?.record_type ?? ""];
+  const options = useQuery<{ value: string; label: string }[]>(
+    (signal) =>
+      parent
+        ? api.get(`/forms/value-lists/${parent.list}`, undefined, signal)
+        : Promise.resolve([]),
+    [parent?.list],
   );
 
   const [mapping, setMapping] = useState<Record<string, string | null> | null>(null);
-  const [collectionId, setCollectionId] = useState<string>("");
+  const [parentId, setParentId] = useState<string>("");
   const [preview, setPreview] = useState<Preview | null>(null);
 
   // The mapping being edited: the server's, until somebody changes something.
   const current = mapping ?? batch.data?.mapping ?? {};
-  const chosenCollection =
-    collectionId || (batch.data?.defaults?.collection_id as string | undefined) || "";
+  const chosenParent =
+    parentId ||
+    (parent ? ((batch.data?.defaults?.[parent.field] as string | undefined) ?? "") : "");
 
   /** Which fields are already spoken for, so a second column cannot take one. */
   const taken = new Set(Object.values(current).filter(Boolean) as string[]);
@@ -264,7 +410,7 @@ export function ImportBatch() {
   const save = useAction(async () => {
     const updated = await api.patch<Batch>(`/imports/${batchId}`, {
       mapping: current,
-      defaults: chosenCollection ? { collection_id: chosenCollection } : {},
+      defaults: parent && chosenParent ? { [parent.field]: chosenParent } : {},
     });
     setMapping(updated.mapping);
     return updated;
@@ -294,8 +440,11 @@ export function ImportBatch() {
     <>
       <PageHeader
         breadcrumb={[
-          { label: "Museum catalogue", to: "/museum" },
-          { label: "Import", to: "/museum/import" },
+          {
+            label: kindOf(record.record_type)?.homeLabel ?? "Records",
+            to: kindOf(record.record_type)?.home ?? "/",
+          },
+          { label: "Import", to: `/import?type=${record.record_type}` },
           { label: record.filename },
         ]}
         title={record.filename}
@@ -351,42 +500,41 @@ export function ImportBatch() {
       {commit.error && <ErrorNote message={commit.error} />}
 
       {committed ? (
-        <CommitResult record={record} preview={preview} onReverted={() => navigate("/museum/import")} />
+        <CommitResult record={record} preview={preview} onReverted={() => navigate("/import")} />
       ) : (
         <div className="col">
-          {/* Which collection the objects join. Almost no file names one, and
-              without it every row fails for the same reason — so it is asked
-              once, here, rather than reported four thousand times. */}
-          <section className="card">
-            <div className="card-header">
-              <span className="card-title">Applies to every row</span>
-            </div>
-            <div className="card-body">
-              <div className="form-grid">
-                <div className="form-cell" style={{ gridColumn: "span 6" }}>
-                  <div className="form-label">
-                    Collection <span className="required">*</span>
-                  </div>
-                  <select
-                    className="input"
-                    value={chosenCollection}
-                    onChange={(event) => setCollectionId(event.target.value)}
-                  >
-                    <option value="">Choose a collection…</option>
-                    {collections.data?.items.map((collection) => (
-                      <option key={collection.id} value={collection.id}>
-                        {collection.code} — {collection.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="form-help">
-                    Objects are numbered by this collection&rsquo;s own rule. A number in the file
-                    that does not fit its pattern is kept and flagged, exactly as a typed one is.
+          {/* What every row belongs to. Almost no file names it, and without
+              it every row fails for the same reason — so it is asked once,
+              here, rather than reported four thousand times. */}
+          {parent && (
+            <section className="card">
+              <div className="card-header">
+                <span className="card-title">Applies to every row</span>
+              </div>
+              <div className="card-body">
+                <div className="form-grid">
+                  <div className="form-cell" style={{ gridColumn: "span 6" }}>
+                    <div className="form-label">
+                      {parent.label} <span className="required">*</span>
+                    </div>
+                    <select
+                      className="input"
+                      value={chosenParent}
+                      onChange={(event) => setParentId(event.target.value)}
+                    >
+                      <option value="">Choose {parent.label.toLowerCase()}…</option>
+                      {options.data?.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="form-help">{parent.help}</div>
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* The verification screen. */}
           <section className="card">

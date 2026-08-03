@@ -1771,3 +1771,41 @@ tr.provisional > td:first-child {
   .month-day { min-height: 72px; }
   .month-event { font-size: 11px; }
 }
+
+/* --------------------------------------------------------------------------
+ * Import — choosing what is in the file
+ *
+ * A dropdown would be smaller and worse: the difference between importing
+ * contexts and importing finds is not obvious from the two words alone, and
+ * getting it wrong is four thousand records in the wrong table. Each option
+ * says what it is for.
+ * ----------------------------------------------------------------------- */
+.kind-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--space-3);
+}
+
+.kind-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px var(--space-4);
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.kind-option:hover { background: var(--surface-2); }
+.kind-option.chosen {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.kind-label { font-weight: 600; font-size: var(--text-base); }
+.kind-option.chosen .kind-label { color: var(--accent); }
+.kind-blurb { font-size: var(--text-sm); color: var(--text-3); line-height: 1.35; }
