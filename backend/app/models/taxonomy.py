@@ -8,12 +8,15 @@ lists without a code change.
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
-from sqlalchemy import ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Date, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.db.base import Base, OwnedRecordMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.enums import ReferenceType
 
 
 class Period(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -85,23 +88,71 @@ class ObjectCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     children: Mapped[list[ObjectCategory]] = relationship(back_populates="parent")
 
 
-class Publication(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """A bibliographic reference that records can cite."""
+class Publication(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, Base):
+    """A bibliographic reference: the record at the centre of the library.
+
+    Already existed, and finds already cite it, so it is extended rather than
+    replaced — every citation recorded before the library was built lands *in*
+    the library rather than beside it.
+
+    The fields beyond the original handful are the ones a reference manager
+    needs to hold an archaeologist's bibliography rather than a scientist's:
+    grey literature, ministry archives, and site reports that have an editor and
+    a series but no journal.
+    """
 
     __tablename__ = "publications"
 
+    reference_type: Mapped[ReferenceType] = mapped_column(
+        Enum(ReferenceType, name="reference_type", values_callable=lambda e: [m.value for m in e]),
+        default=ReferenceType.ARTICLE,
+        nullable=False,
+        index=True,
+    )
+
     title: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    #: Kept as one string rather than a table of people. Every reference manager
+    #: that split it has had to hold "Ministry of Antiquities" and "et al." in a
+    #: surname column anyway, and the citation is written from this either way.
     authors: Mapped[str | None] = mapped_column(String(500))
+    editors: Mapped[str | None] = mapped_column(String(500))
     year: Mapped[int | None] = mapped_column(Integer, index=True)
+
     publisher: Mapped[str | None] = mapped_column(String(300))
+    #: Journal, or the book a chapter is in, or the archive holding a file.
     journal: Mapped[str | None] = mapped_column(String(300))
+    series: Mapped[str | None] = mapped_column(String(300))
     volume: Mapped[str | None] = mapped_column(String(50))
+    issue: Mapped[str | None] = mapped_column(String(50))
     pages: Mapped[str | None] = mapped_column(String(50))
+    edition: Mapped[str | None] = mapped_column(String(50))
+    place: Mapped[str | None] = mapped_column(String(200))
+    institution: Mapped[str | None] = mapped_column(String(300))
+    language: Mapped[str | None] = mapped_column(String(80))
+
     doi: Mapped[str | None] = mapped_column(String(200), index=True)
     isbn: Mapped[str | None] = mapped_column(String(20))
     url: Mapped[str | None] = mapped_column(String(1000))
+    #: When a web page was read, which is the only thing that makes citing one
+    #: honest.
+    accessed_on: Mapped[date | None] = mapped_column(Date)
+
     abstract: Mapped[str | None] = mapped_column(Text)
+    #: Whatever the reader wants to remember about it. Zotero's notes, and the
+    #: field people use most.
+    notes: Mapped[str | None] = mapped_column(Text)
+    #: The rendered citation, when somebody has one they prefer to the
+    #: platform's. Left alone if set.
     citation: Mapped[str | None] = mapped_column(Text)
+    keywords: Mapped[list[str] | None] = mapped_column(ARRAY(String(80)))
+
+    #: The BibTeX key, so a reference imported from a .bib round-trips back to
+    #: the same key and somebody's LaTeX keeps compiling.
+    citation_key: Mapped[str | None] = mapped_column(String(120), index=True)
+
+    collections: Mapped[list[LibraryCollection]] = relationship(  # noqa: F821
+        secondary="library_collection_items", backref="publications", lazy="selectin"
+    )
 
     __table_args__ = (UniqueConstraint("doi", name="uq_publications_doi"),)
 

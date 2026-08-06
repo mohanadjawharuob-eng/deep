@@ -814,3 +814,27 @@ class MediaFolderKind(str, enum.Enum):
     DOCUMENTS = "documents"
     RAW = "raw"
     OTHER = "other"
+
+
+class ReferenceType(str, enum.Enum):
+    """What kind of thing a reference is.
+
+    The list a field archaeologist actually cites. ``REPORT`` and ``ARCHIVE``
+    carry more weight here than in most disciplines: the grey literature — the
+    unpublished excavation report, the ministry file — is often the only record
+    of a site, and a library that can only hold journal articles cannot hold an
+    archaeologist's bibliography.
+    """
+
+    ARTICLE = "article"
+    BOOK = "book"
+    CHAPTER = "chapter"
+    THESIS = "thesis"
+    REPORT = "report"
+    CONFERENCE = "conference"
+    #: An unpublished file, a museum register, a ministry archive.
+    ARCHIVE = "archive"
+    DATASET = "dataset"
+    MAP = "map"
+    WEBPAGE = "webpage"
+    OTHER = "other"

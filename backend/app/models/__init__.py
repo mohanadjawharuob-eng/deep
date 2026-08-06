@@ -50,6 +50,7 @@ from app.models.enums import (
     ProjectRole,
     ProjectStatus,
     ProtectionStatus,
+    ReferenceType,
     ResourceType,
     ReviewStatus,
     ShapeKind,
@@ -75,6 +76,11 @@ from app.models.inventory import (
     KitTemplate,
     KitTemplateLine,
     StockMovement,
+)
+from app.models.library import (
+    LibraryCollection,
+    ReferenceLink,
+    library_collection_items,
 )
 from app.models.management import Budget, CalendarEvent, Expense, Task
 from app.models.media import Document, MediaFolder, MediaFolderKind, Model3D, Photograph
@@ -162,6 +168,7 @@ __all__ = [
     "GisFeature",
     "GisLayer",
     "LayerCategory",
+    "LibraryCollection",
     "Material",
     "MediaFolder",
     "MediaFolderKind",
@@ -179,6 +186,8 @@ __all__ = [
     "ProjectStatus",
     "ProtectionStatus",
     "Publication",
+    "ReferenceLink",
+    "ReferenceType",
     "Module",
     "ModuleLevel",
     "MovementReason",
@@ -203,5 +212,6 @@ __all__ = [
     "UserModuleAccess",
     "UserRole",
     "artifact_materials",
+    "library_collection_items",
     "artifact_publications",
 ]

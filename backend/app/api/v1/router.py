@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     imports,
     inventory,
     labels,
+    library,
     management,
     mediafolders,
     models3d,
@@ -84,6 +85,7 @@ api_router.include_router(search.router)
 api_router.include_router(notifications.router)
 api_router.include_router(branding.router)
 api_router.include_router(mediafolders.router)
+api_router.include_router(library.router)
 api_router.include_router(labels.router)
 api_router.include_router(review.router)
 api_router.include_router(history.router)
