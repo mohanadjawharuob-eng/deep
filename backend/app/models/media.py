@@ -29,7 +29,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, OwnedRecordMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import DocumentType, Model3DFormat, ReviewStatus
+from app.models.enums import DocumentType, MediaFolderKind, Model3DFormat, ReviewStatus
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -247,3 +247,82 @@ class Model3D(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _Attachable
     metadata_json: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (Index("ix_models_3d_links", "project_id", "site_id", "artifact_id"),)
+
+
+class MediaFolder(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _AttachableMixin, Base):
+    """Files that exist, and are not in here.
+
+    A season produces four hundred gigabytes of raw frames, a photogrammetry
+    set per structure, and a drone survey. Uploading all of it is sometimes
+    right and sometimes absurd — it is already on the project drive, backed up,
+    and nobody is going to look at the RAWs through a web page.
+
+    What is *not* optional is knowing the material exists and where it is. A
+    catalogue that is silent about four hundred gigabytes is a catalogue that
+    will be believed to be complete, and the drive will be reformatted by
+    somebody who checked the archive first.
+
+    So this records the folder rather than the files: what is in it, where it
+    is, which disk that is, how many items were there when it was written down.
+
+    **This is a note, not a link.** The platform cannot open it, cannot verify
+    it, and cannot tell you when it stops being true. That is stated on the
+    screen too, because a path rendered like a hyperlink is a promise, and this
+    one cannot be kept.
+    """
+
+    __tablename__ = "media_folders"
+
+    #: What this folder is, in the words of whoever keeps it: "Trench A
+    #: season photographs", "Pottery drawings 2019".
+    label: Mapped[str] = mapped_column(String(300), nullable=False)
+    kind: Mapped[MediaFolderKind] = mapped_column(
+        Enum(
+            MediaFolderKind,
+            name="media_folder_kind",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        default=MediaFolderKind.PHOTOGRAPHS,
+        nullable=False,
+        index=True,
+    )
+
+    #: The folder exactly as written. Never parsed, never resolved, never
+    #: opened: it may be a Windows path, a share, a mount point on somebody
+    #: else's laptop, or a shelf reference for a box of DVDs.
+    path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    #: Which disk that path is on — "external drive DIG-2019", "NAS, share
+    #: `excavation`". The single most useful field here and the one most often
+    #: left out: a path with no disk names a folder on a machine nobody can
+    #: identify five years later.
+    medium: Mapped[str | None] = mapped_column(String(300))
+
+    #: How many files were there when this was recorded. Not maintained, and
+    #: not meant to be: it is evidence about a moment, which is why
+    #: ``recorded_on`` sits beside it.
+    item_count: Mapped[int | None] = mapped_column()
+    #: Approximate size, in gigabytes, for deciding whether it can ever be
+    #: uploaded.
+    size_gb: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    recorded_on: Mapped[date | None] = mapped_column(Date)
+
+    #: Whether somebody has confirmed a copy exists somewhere else. Three
+    #: states: yes, no, and nobody has said — and the third is the common one,
+    #: so it must not be stored as "no".
+    is_backed_up: Mapped[bool | None] = mapped_column()
+    note: Mapped[str | None] = mapped_column(Text)
+
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    site_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("sites.id", ondelete="CASCADE"), index=True
+    )
+    artifact_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("artifacts.id", ondelete="CASCADE"), index=True
+    )
+    context_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("excavation_contexts.id", ondelete="CASCADE"), index=True
+    )
+
+    __table_args__ = (Index("ix_media_folders_links", "project_id", "site_id", "artifact_id"),)

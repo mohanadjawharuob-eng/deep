@@ -14,6 +14,7 @@ import {
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton } from "../components/labels";
+import { MediaFolders } from "../components/MediaFolders";
 import {
   Badge,
   DeleteRecord,
@@ -476,6 +477,8 @@ export function SiteDetail() {
       {/* Only for somebody who could act on it. Offering an upload that
           ends in "you may not" wastes the one click they were sure about. */}
       <MatrixImport siteId={record.id} />
+
+      <MediaFolders parent={{ site_id: record.id }} />
     </>
   );
 }

@@ -77,7 +77,7 @@ from app.models.inventory import (
     StockMovement,
 )
 from app.models.management import Budget, CalendarEvent, Expense, Task
-from app.models.media import Document, Model3D, Photograph
+from app.models.media import Document, MediaFolder, MediaFolderKind, Model3D, Photograph
 from app.models.museum import (
     Collection,
     ConservationRecord,
@@ -163,6 +163,8 @@ __all__ = [
     "GisLayer",
     "LayerCategory",
     "Material",
+    "MediaFolder",
+    "MediaFolderKind",
     "Model3D",
     "Model3DFormat",
     "Notification",

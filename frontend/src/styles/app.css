@@ -1809,3 +1809,54 @@ tr.provisional > td:first-child {
 .kind-label { font-weight: 600; font-size: var(--text-base); }
 .kind-option.chosen .kind-label { color: var(--accent); }
 .kind-blurb { font-size: var(--text-sm); color: var(--text-3); line-height: 1.35; }
+
+/* --------------------------------------------------------------------------
+ * Files kept elsewhere
+ *
+ * The one rule: a path must not look like a link. It is a note — the platform
+ * cannot open it, check it, or tell you when it stops being true — and drawing
+ * it in blue and underlined would be a promise that cannot be kept.
+ * ----------------------------------------------------------------------- */
+.folder-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+
+.folder {
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.folder-remove { margin-left: auto; }
+
+.folder-path {
+  display: block;
+  padding: 6px 9px;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  /* Selectable and wrappable: copying it into Explorer is the only thing
+     anybody will ever do with it, and a long share must not push the card
+     sideways. */
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.folder-facts { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+
+.inset-form {
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: var(--border-width) dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}

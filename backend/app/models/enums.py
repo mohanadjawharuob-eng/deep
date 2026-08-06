@@ -801,3 +801,16 @@ class PermitStatus(str, enum.Enum):
     GRANTED = "granted"
     REFUSED = "refused"
     EXPIRED = "expired"
+
+
+class MediaFolderKind(str, enum.Enum):
+    """What is in a folder that was recorded rather than uploaded."""
+
+    PHOTOGRAPHS = "photographs"
+    DRAWINGS = "drawings"
+    SCANS = "scans"
+    MODELS_3D = "models_3d"
+    SURVEY = "survey"
+    DOCUMENTS = "documents"
+    RAW = "raw"
+    OTHER = "other"
