@@ -68,6 +68,7 @@ import {
   NewActivity,
 } from "./routes/Activities";
 import { ImportBatch, ImportUpload } from "./routes/Import";
+import { Library } from "./routes/Library";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
 import { Empty, Loading } from "./components/ui";
 
@@ -159,6 +160,8 @@ export function App() {
         <Route path="social" element={<Outreach />} />
         <Route path="social/accounts" element={<Channels />} />
         <Route path="social/posts/:postId" element={<PostScreen />} />
+
+        <Route path="library" element={<Library />} />
 
         <Route path="storage" element={<Storage />} />
         <Route path="floorplans" element={<FloorPlansForLocation />} />

@@ -201,6 +201,21 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    heading: "Library",
+    items: [
+      {
+        to: "/library",
+        label: "References",
+        module: "archaeology",
+        // An open book. The bibliography is not secret, so this sits under the
+        // archaeology module rather than getting a seventh one of its own —
+        // otherwise every new account needs one more grant before it can look
+        // anything up.
+        icon: icon("M10 5.5C8.5 4.5 6.5 4 4 4v11c2.5 0 4.5.5 6 1.5 1.5-1 3.5-1.5 6-1.5V4c-2.5 0-4.5.5-6 1.5zM10 5.5v11"),
+      },
+    ],
+  },
+  {
     heading: "What we do",
     items: [
       {

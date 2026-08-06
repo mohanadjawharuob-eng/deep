@@ -15,6 +15,7 @@ import {
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton } from "../components/labels";
 import { MediaFolders } from "../components/MediaFolders";
+import { References } from "../components/References";
 import {
   Badge,
   DeleteRecord,
@@ -515,6 +516,8 @@ export function SiteDetail() {
       <MatrixImport siteId={record.id} />
 
       <MediaFolders parent={{ site_id: record.id }} />
+
+      <References target={{ site_id: record.id }} />
     </>
   );
 }
@@ -695,6 +698,7 @@ export function ArtifactDetail() {
           </DetailGrid>
         </div>
       </div>
+      <References target={{ artifact_id: record.id }} />
     </>
   );
 }

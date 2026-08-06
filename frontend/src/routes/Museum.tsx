@@ -19,6 +19,7 @@ import {
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton, QrThumbnail } from "../components/labels";
+import { References } from "../components/References";
 import {
   RecordCard,
   RecordTabs,
@@ -584,6 +585,8 @@ export function ObjectDetail() {
           )}
         </aside>
       </div>
+
+      <References target={{ museum_object_id: objectId }} module="museum" />
 
       {confirming && (
         <ConfirmDelete
