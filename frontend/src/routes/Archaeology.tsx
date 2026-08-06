@@ -1,7 +1,7 @@
 /** Projects, sites and finds — list and detail. */
 
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
   api,
@@ -152,6 +152,7 @@ export function Projects() {
 }
 
 export function ProjectDetail() {
+  const { can } = useSession();
   // The name has to match the route's `:projectId` in App.tsx. Destructuring
   // the wrong name is silent — `id` is simply undefined, the request goes to
   // /projects/undefined, and the API rejects "undefined" as an identifier. The
@@ -198,6 +199,34 @@ export function ProjectDetail() {
           </>
         }
       />
+
+      {/* The project as a place to work in. Everything here is scoped to it,
+          which is the point: a department with four excavations should not have
+          to re-apply the same filter on every screen. */}
+      <nav className="workspace">
+        <Link className="workspace-card" to={`/sites?project_id=${record.id}`}>
+          <span className="workspace-title">Sites</span>
+          <span className="workspace-note">
+            {(sites.data?.total ?? 0).toLocaleString()} in this project
+          </span>
+        </Link>
+        <Link className="workspace-card" to={`/artifacts?project_id=${record.id}`}>
+          <span className="workspace-title">Finds</span>
+          <span className="workspace-note">Everything registered across its sites</span>
+        </Link>
+        {can("archaeology", "supervisor") && (
+          <Link className="workspace-card" to="/import?type=excavation_context">
+            <span className="workspace-title">Import</span>
+            <span className="workspace-note">
+              Sites, context sheets or a finds register, from the spreadsheets you have
+            </span>
+          </Link>
+        )}
+        <Link className="workspace-card" to={`/activities/all?project_id=${record.id}`}>
+          <span className="workspace-title">Activities</span>
+          <span className="workspace-note">Seasons, surveys, permits, equipment and costs</span>
+        </Link>
+      </nav>
 
       <div className="card" style={{ marginBottom: "var(--space-4)" }}>
         <div className="card-body">
@@ -268,9 +297,16 @@ export function Sites() {
   const [offset, setOffset] = useState(0);
   const query = useDebounced(search);
 
+  // Honoured from the URL, because the project page links here to mean "this
+  // project's sites". A link that quietly ignores its own filter is worse than
+  // no link: it shows somebody else's records under your project's heading.
+  const [params] = useSearchParams();
+  const projectId = params.get("project_id") ?? "";
+
   const { data, error, loading, reload } = useQuery<Page<Site>>(
-    (signal) => api.get("/sites", { q: query, limit: PAGE, offset }, signal),
-    [query, offset],
+    (signal) =>
+      api.get("/sites", { q: query, project_id: projectId || undefined, limit: PAGE, offset }, signal),
+    [query, projectId, offset],
   );
 
   return (
@@ -492,9 +528,24 @@ export function Artifacts() {
   const [offset, setOffset] = useState(0);
   const query = useDebounced(search);
 
+  const [params] = useSearchParams();
+  const projectId = params.get("project_id") ?? "";
+  const siteId = params.get("site_id") ?? "";
+
   const { data, error, loading, reload } = useQuery<Page<Artifact>>(
-    (signal) => api.get("/artifacts", { q: query, limit: PAGE, offset }, signal),
-    [query, offset],
+    (signal) =>
+      api.get(
+        "/artifacts",
+        {
+          q: query,
+          project_id: projectId || undefined,
+          site_id: siteId || undefined,
+          limit: PAGE,
+          offset,
+        },
+        signal,
+      ),
+    [query, projectId, siteId, offset],
   );
 
   return (

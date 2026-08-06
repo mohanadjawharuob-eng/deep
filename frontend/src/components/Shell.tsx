@@ -148,9 +148,19 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
     heading: "Museum",
     items: [
       {
+        // First, because it is the thing you work *inside*: a museum with
+        // three collections wants "which collection", not a catalogue of all
+        // of them with a filter to re-apply on every screen.
+        to: "/museum/collections",
+        label: "Collections",
+        module: "museum",
+        icon: icon("M3 5.5h14v11H3zM3 9h14M7 5.5v11"),
+      },
+      {
         to: "/museum",
         label: "Catalogue",
         module: "museum",
+        end: true,
         icon: icon("M3 7.5 10 4l7 3.5M4 8v7m4-7v7m4-7v7m4-7v7M2.5 16.5h15"),
       },
       {
@@ -158,12 +168,6 @@ const SECTIONS: { heading: string | null; items: NavItem[] }[] = [
         label: "Grid",
         module: "museum",
         icon: icon("M3 3h14v14H3zM3 7.5h14M3 12.5h14M8 3v14m4.5-14v14"),
-      },
-      {
-        to: "/museum/collections",
-        label: "Collections",
-        module: "museum",
-        icon: icon("M4 6h12M4 10h12M4 14h12"),
       },
       {
         to: "/import?type=museum_object",

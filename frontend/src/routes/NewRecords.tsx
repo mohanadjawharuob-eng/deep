@@ -711,3 +711,132 @@ export function NewArtifact() {
     </Form>
   );
 }
+
+/* --------------------------------------------------------------------------
+ * A collection
+ *
+ * The "New collection" button has pointed at a route that did not exist, so
+ * the one thing a museum has to do first — declare a collection, and with it
+ * the numbering every object underneath will take — ended on the 404 page.
+ * ----------------------------------------------------------------------- */
+export function NewCollection() {
+  const navigate = useNavigate();
+  const { can } = useSession();
+  const [form, setForm] = useState({
+    name: "",
+    code: "",
+    institution: "",
+    accession_prefix: "",
+    accession_pattern: "{prefix}.{year}.{seq:04d}",
+    enforce_pattern: false,
+  });
+
+  const set = (key: keyof typeof form, value: string | boolean) =>
+    setForm((current) => ({ ...current, [key]: value }));
+
+  const create = useAction(async () => {
+    const created = await api.post<{ id: string }>("/museum/collections", {
+      name: form.name,
+      code: form.code,
+      institution: form.institution || undefined,
+      accession_prefix: form.accession_prefix || undefined,
+      accession_pattern: form.accession_pattern || undefined,
+      enforce_pattern: form.enforce_pattern,
+    });
+    navigate(`/museum/collections/${created.id}`);
+  });
+
+  if (!can("museum", "supervisor")) {
+    return (
+      <Empty title="You cannot add a collection">
+        A collection carries the numbering every object in it will take, so
+        creating one needs supervisor access to the museum module. Ask whoever
+        administers the platform.
+      </Empty>
+    );
+  }
+
+  return (
+    <Form
+      title="New collection"
+      subtitle="A named collection, and the numbering its objects will take"
+      breadcrumb={[{ label: "Collections", to: "/museum/collections" }, { label: "New" }]}
+      onSubmit={() => void create.run()}
+      saving={create.running}
+      error={create.error}
+    >
+      <Field label="Name">
+        <input
+          className="input"
+          value={form.name}
+          maxLength={200}
+          required
+          onChange={(event) => set("name", event.target.value)}
+        />
+      </Field>
+
+      <Field label="Code" help="Short. Stored upper-case, and available to the numbering as {code}.">
+        <input
+          className="input mono"
+          value={form.code}
+          maxLength={20}
+          required
+          placeholder="ARCH"
+          onChange={(event) => set("code", event.target.value)}
+        />
+      </Field>
+
+      <Field label="Institution">
+        <input
+          className="input"
+          value={form.institution}
+          maxLength={200}
+          onChange={(event) => set("institution", event.target.value)}
+        />
+      </Field>
+
+      <Field
+        label="Numbering"
+        help={
+          "Placeholders: {prefix}, {code}, {year}, {yy}, {seq}. The sequence can be " +
+          "padded — {seq:04d} gives 0001. So {prefix}.{year}.{seq:04d} produces NM.2026.0001."
+        }
+      >
+        <input
+          className="input mono"
+          value={form.accession_pattern}
+          maxLength={120}
+          onChange={(event) => set("accession_pattern", event.target.value)}
+        />
+      </Field>
+
+      <Field label="Prefix" help="What {prefix} stands for.">
+        <input
+          className="input mono"
+          value={form.accession_prefix}
+          maxLength={20}
+          placeholder="NM"
+          onChange={(event) => set("accession_prefix", event.target.value)}
+        />
+      </Field>
+
+      <Field
+        label="Insist on the pattern"
+        help={
+          "Leave this off unless you are sure. A collection that cannot record " +
+          "1974.1a-bis is a collection that stays in its spreadsheet — with it off, " +
+          "a number that does not fit is kept and flagged rather than refused."
+        }
+      >
+        <label className="row-tight" style={{ alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={form.enforce_pattern}
+            onChange={(event) => set("enforce_pattern", event.target.checked)}
+          />
+          <span className="small">Refuse a number that does not match</span>
+        </label>
+      </Field>
+    </Form>
+  );
+}

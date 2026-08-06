@@ -1860,3 +1860,43 @@ tr.provisional > td:first-child {
   border-radius: var(--radius);
   background: var(--surface-2);
 }
+
+/* --------------------------------------------------------------------------
+ * Workspace strip
+ *
+ * A collection or a project is a place you work in, not a record about a
+ * place. The strip at the top of its page is the work: everything on it is
+ * already scoped to that collection or project, so a museum with three
+ * collections never re-applies the same filter on four screens.
+ *
+ * Cards rather than a row of buttons, because each one needs a line saying
+ * what it is for — "Grid" alone does not tell a registrar anything.
+ * ----------------------------------------------------------------------- */
+.workspace {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.workspace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--transition), background var(--transition);
+}
+.workspace-card:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.workspace-title { font-weight: 600; font-size: var(--text-base); }
+.workspace-card:hover .workspace-title { color: var(--accent); }
+.workspace-note { font-size: var(--text-sm); color: var(--text-3); line-height: 1.35; }

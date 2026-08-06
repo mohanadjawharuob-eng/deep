@@ -836,6 +836,7 @@ export function Collections() {
 }
 
 export function CollectionDetail() {
+  const { can } = useSession();
   const { collectionId = "" } = useParams();
   const collection = useQuery<Collection>(
     (signal) => api.get(`/museum/collections/${collectionId}`, undefined, signal),
@@ -859,19 +860,46 @@ export function CollectionDetail() {
         title={item.name}
         subtitle={item.institution}
         actions={
-          <>
-            <Link className="btn" to={`/museum?collection_id=${item.id}`}>
-              Browse objects
-            </Link>
-            <ExportButton
-              path={`/exports/collections/${item.id}.xlsx`}
-              label="Export everything"
-            />
-          </>
+          <ExportButton path={`/exports/collections/${item.id}.xlsx`} label="Export everything" />
         }
       />
 
-      <section className="card">
+      {/* The collection as a place to work in, rather than a record about a
+          collection. Everything here is already scoped to it, which is the
+          whole point: a museum with three collections should not have to
+          re-apply the same filter on four screens. */}
+      <nav className="workspace">
+        <Link className="workspace-card" to={`/museum?collection_id=${item.id}`}>
+          <span className="workspace-title">Catalogue</span>
+          <span className="workspace-note">
+            {(item.object_count ?? 0).toLocaleString()} object
+            {item.object_count === 1 ? "" : "s"} — search and read one at a time
+          </span>
+        </Link>
+        <Link className="workspace-card" to={`/museum/grid?collection_id=${item.id}`}>
+          <span className="workspace-title">Grid</span>
+          <span className="workspace-note">
+            The same records as a spreadsheet, for correcting one field across many
+          </span>
+        </Link>
+        {can("museum", "contributor") && (
+          <Link className="workspace-card" to={`/museum/objects/new?collection_id=${item.id}`}>
+            <span className="workspace-title">New object</span>
+            <span className="workspace-note">
+              Numbered by this collection's own rule — next is{" "}
+              <span className="mono">{item.next_accession_number ?? "…"}</span>
+            </span>
+          </Link>
+        )}
+        {can("museum", "supervisor") && (
+          <Link className="workspace-card" to="/import?type=museum_object">
+            <span className="workspace-title">Import</span>
+            <span className="workspace-note">Read a spreadsheet into this collection</span>
+          </Link>
+        )}
+      </nav>
+
+      <section className="card" style={{ marginTop: "var(--space-5)" }}>
         <div className="card-body">
           <DetailGrid>
             <Detail label="Code" value={<span className="mono">{item.code}</span>} />

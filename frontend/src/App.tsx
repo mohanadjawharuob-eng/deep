@@ -32,6 +32,7 @@ import {
 import { CatalogueGrid } from "./routes/Grid";
 import {
   NewArtifact,
+  NewCollection,
   NewContext,
   NewProject,
   NewSite,
@@ -125,6 +126,8 @@ export function App() {
         />
         <Route path="museum/import/:batchId" element={<ImportBatch />} />
         <Route path="museum/collections" element={<Collections />} />
+        {/* Before the :collectionId route, or "new" is read as an id. */}
+        <Route path="museum/collections/new" element={<NewCollection />} />
         <Route path="museum/collections/:collectionId" element={<CollectionDetail />} />
 
         <Route path="inventory/equipment" element={<EquipmentList />} />

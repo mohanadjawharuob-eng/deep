@@ -255,6 +255,10 @@ export function Activities() {
   const offset = Number(params.get("offset") ?? 0);
   const kind = params.get("kind") ?? "";
   const status = params.get("status") ?? "";
+  // Honoured from the URL: a project page links here meaning "what we did on
+  // this project", and a link that ignores its own filter shows somebody
+  // else's seasons under your project's heading.
+  const projectId = params.get("project_id") ?? "";
 
   const activities = useQuery<Page<HubActivity>>(
     (signal) =>
@@ -264,12 +268,13 @@ export function Activities() {
           q: debounced || undefined,
           kind: kind || undefined,
           status: status || undefined,
+          project_id: projectId || undefined,
           limit: PAGE,
           offset,
         },
         signal,
       ),
-    [debounced, kind, status, offset],
+    [debounced, kind, status, projectId, offset],
   );
 
   function setFilter(name: string, value: string) {
