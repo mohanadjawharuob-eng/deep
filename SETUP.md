@@ -471,6 +471,54 @@ error text says what is wrong far more reliably than a description of it.
 
 ---
 
+## Putting the files on a different disk
+
+By default everything sits inside Docker's own storage, which on Windows is a
+virtual disk on `C:` however much room you have elsewhere. That is the wrong
+place for a season of drone imagery.
+
+**Double-click `Where Data Goes.cmd`.** A folder picker opens twice: once for the
+photographs and files, once for the backups. It writes the two settings, and if
+there are already files stored it offers to copy them across first — switching
+without moving them leaves every photograph on disk and no longer found, which
+looks exactly like data loss.
+
+Put the backups on a *different* drive if you have one. A backup on the same
+disk as the thing it backs up survives somebody deleting a record and does not
+survive the disk failing.
+
+On Mac or Linux, set the same two lines in `.env` by hand:
+
+```
+DATA_ROOT=/Volumes/Archive/stratum
+BACKUP_ROOT=/Volumes/Backup/stratum
+```
+
+### The database is a separate decision
+
+The records themselves are deliberately not moved by that.
+
+PostgreSQL needs a real filesystem with real file locking. On Windows and macOS,
+a folder handed to a Linux container is neither: it goes through a translation
+layer that is markedly slower and has been known to corrupt a database under
+load. Pointing it at `D:` trades a full disk for a corrupt catalogue, which is
+the worse of the two.
+
+It is also the small part. Fifty thousand objects is a few hundred megabytes of
+database and several hundred gigabytes of photographs — and the photographs are
+what `Where Data Goes.cmd` moves.
+
+If the database itself must leave `C:`, move Docker's whole disk using Docker's
+own mechanism, which is safe:
+
+> **Docker Desktop → Settings → Resources → Advanced → Disk image location →
+> Browse → Apply and restart**
+
+Stop the platform first. That moves the database and everything else Docker
+stores in one go.
+
+---
+
 ## Removing it completely
 
 ```
