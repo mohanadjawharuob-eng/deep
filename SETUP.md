@@ -471,6 +471,41 @@ error text says what is wrong far more reliably than a description of it.
 
 ---
 
+## Bringing in a folder of photographs
+
+**Double-click `Add Photos.cmd`.** It asks for a folder, works out from the
+folder names what each photograph belongs to, shows you the counts, and waits
+before uploading anything.
+
+Arrange the folder like this:
+
+```
+<the folder you choose>
+  TED-A                 <- a site code, exactly as recorded
+    1001                <- a context number on that site
+      IMG_0001.jpg
+      IMG_0002.jpg
+    IMG_0100.jpg        <- straight on the site, no context
+  TED-B
+    ...
+```
+
+A folder whose name matches nothing is **reported and skipped, never guessed
+at**. A photograph filed against the wrong context is evidence for a sequence
+that did not happen, and nothing later in the archive will contradict it.
+
+If the folder has no sub-folders, it asks which site the whole lot belongs to.
+
+It remembers what it has sent, in `.stratum-uploaded.txt` inside the folder — so
+run it again after a day's photography and only the new ones go up. Delete that
+file to force everything to be re-sent.
+
+This **uploads**, which is different from recording a folder on a site page:
+these photographs are in the platform, searchable, thumbnailed and backed up,
+and they survive the drive being reformatted.
+
+---
+
 ## Putting the files on a different disk
 
 By default everything sits inside Docker's own storage, which on Windows is a
