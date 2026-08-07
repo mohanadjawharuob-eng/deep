@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   api,
   type Artifact,
+  type FormLayout,
   type MatrixPlan,
   type MatrixResult,
   type Page,
@@ -16,6 +17,7 @@ import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton } from "../components/labels";
 import { MediaFolders } from "../components/MediaFolders";
 import { References } from "../components/References";
+import { EditableRecord, useRecordEditor } from "../components/EditRecord";
 import {
   Badge,
   DeleteRecord,
@@ -397,7 +399,12 @@ export function Sites() {
   );
 }
 
+/** Set by the platform, or the identifier the record is found by. */
+const SITE_LOCKED = new Set(["project_id"]);
+const FIND_LOCKED = new Set(["site_id", "inventory_number"]);
+
 export function SiteDetail() {
+  const { can } = useSession();
   const { siteId: id } = useParams<{ siteId: string }>();
   const navigate = useNavigate();
 
@@ -405,6 +412,18 @@ export function SiteDetail() {
     (signal) => api.get(`/sites/${id}`, undefined, signal),
     [id],
   );
+  // The same description the spreadsheet importer maps columns onto. One
+  // layout, two uses, and they cannot drift apart.
+  const layout = useQuery<FormLayout>(
+    (signal) => api.get("/forms/layouts/site", undefined, signal),
+    [],
+  );
+  const editor = useRecordEditor({
+    layout: layout.data,
+    path: `/sites/${id}`,
+    locked: SITE_LOCKED,
+    onSaved: () => site.reload(),
+  });
   const artifacts = useQuery<Page<Artifact>>(
     (signal) => api.get("/artifacts", { site_id: id, limit: 50 }, signal),
     [id],
@@ -452,25 +471,12 @@ export function SiteDetail() {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: "var(--space-4)" }}>
-        <div className="card-body">
-          <DetailGrid>
-            <Detail label="Code" value={<span className="mono">{record.code}</span>} />
-            <Detail label="Type" value={record.site_type ? humanise(record.site_type) : null} />
-            <Detail label="Period" value={formatRange(record.date_from, record.date_to)} />
-            <Detail label="Country" value={record.country} />
-            <Detail
-              label="Position"
-              value={
-                record.latitude != null && record.longitude != null
-                  ? `${record.latitude.toFixed(5)}, ${record.longitude.toFixed(5)}`
-                  : null
-              }
-            />
-            <Detail label="Description" value={record.description as string} span={2} />
-          </DetailGrid>
-        </div>
-      </div>
+      <EditableRecord
+        editor={editor}
+        values={record as Record<string, unknown>}
+        recordId={record.id}
+        mayEdit={can("archaeology", "contributor")}
+      />
 
       <div className="card">
         <div className="card-header">
@@ -626,6 +632,7 @@ export function Artifacts() {
 }
 
 export function ArtifactDetail() {
+  const { can } = useSession();
   const { artifactId: id } = useParams<{ artifactId: string }>();
   const navigate = useNavigate();
 
@@ -633,6 +640,16 @@ export function ArtifactDetail() {
     (signal) => api.get(`/artifacts/${id}`, undefined, signal),
     [id],
   );
+  const layout = useQuery<FormLayout>(
+    (signal) => api.get("/forms/layouts/artifact", undefined, signal),
+    [],
+  );
+  const editor = useRecordEditor({
+    layout: layout.data,
+    path: `/artifacts/${id}`,
+    locked: FIND_LOCKED,
+    onSaved: () => artifact.reload(),
+  });
   const location = useQuery<{ display_path?: string | null; legacy_location?: string | null }>(
     (signal) => api.get(`/storage/artifacts/${id}/location`, undefined, signal),
     [id],
@@ -678,26 +695,12 @@ export function ArtifactDetail() {
         }
       />
 
-      <div className="card">
-        <div className="card-body">
-          <DetailGrid>
-            <Detail
-              label="Inventory number"
-              value={<span className="mono">{record.inventory_number}</span>}
-            />
-            <Detail label="Condition" value={<Badge value={record.condition} kind="condition" />} />
-            <Detail label="Trench" value={record.trench as string} />
-            <Detail label="Square" value={record.square as string} />
-            <Detail label="Found on" value={formatDate(record.find_date as string)} />
-            <Detail
-              label="Where it is"
-              value={location.data?.display_path ?? location.data?.legacy_location}
-              span={2}
-            />
-            <Detail label="Description" value={record.description as string} span={2} />
-          </DetailGrid>
-        </div>
-      </div>
+      <EditableRecord
+        editor={editor}
+        values={record as Record<string, unknown>}
+        recordId={record.id}
+        mayEdit={can("archaeology", "contributor")}
+      />
       <References target={{ artifact_id: record.id }} />
     </>
   );
