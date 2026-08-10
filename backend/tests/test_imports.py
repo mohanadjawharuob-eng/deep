@@ -574,3 +574,93 @@ class TestImportPermissions:
             f"/api/v1/imports/{batch['id']}", headers=auth_headers(client, "other")
         )
         assert response.status_code == 404
+
+
+# --------------------------------------------------------------------------
+# Values set once for the whole file
+# --------------------------------------------------------------------------
+class TestDefaults:
+    """A value set for every row is checked exactly as a column is.
+
+    Before, ``defaults`` bypassed coercion entirely and went to the database as
+    whatever the client sent. That worked only because the one thing anybody
+    set that way was already an identifier — the moment a shared date or count
+    is set, the two routes into a record start disagreeing about what a value
+    means, and the difference is invisible until something fails much later.
+    """
+
+    def test_a_shared_value_is_coerced_like_a_column(
+        self, client: TestClient, registrar: User, collection: dict
+    ) -> None:
+        data = workbook([["NM.1", "Bowl"]], headers=["Acc. No.", "Title"])
+        batch = upload(client, data)
+        client.patch(
+            f"/api/v1/imports/{batch['id']}",
+            json={
+                "mapping": {"Acc. No.": "accession_number", "Title": "title"},
+                # A count typed as text, exactly as a person would type it.
+                "defaults": {"collection_id": collection["id"], "object_count": "3"},
+            },
+            headers=auth_headers(client, "registrar"),
+        )
+
+        preview = client.post(
+            f"/api/v1/imports/{batch['id']}/preview", headers=auth_headers(client, "registrar")
+        ).json()
+
+        assert preview["rows"][0]["errors"] == []
+        # An integer, not the string that was sent.
+        assert preview["rows"][0]["values"]["object_count"] == 3
+
+    def test_a_shared_value_may_be_a_name_rather_than_an_identifier(
+        self, client: TestClient, registrar: User, collection: dict
+    ) -> None:
+        """The tray screen sets the collection from a dropdown; a person
+        writing to the API by hand has only the name. Both resolve."""
+        data = workbook([["NM.1", "Bowl"]], headers=["Acc. No.", "Title"])
+        batch = upload(client, data)
+        client.patch(
+            f"/api/v1/imports/{batch['id']}",
+            json={
+                "mapping": {"Acc. No.": "accession_number", "Title": "title"},
+                "defaults": {"collection_id": "Ceramics"},
+            },
+            headers=auth_headers(client, "registrar"),
+        )
+
+        preview = client.post(
+            f"/api/v1/imports/{batch['id']}/preview", headers=auth_headers(client, "registrar")
+        ).json()
+
+        assert preview["rows"][0]["errors"] == []
+        assert preview["rows"][0]["values"]["collection_id"] == collection["id"]
+
+    def test_an_impossible_shared_value_is_reported_and_writes_nothing(
+        self, client: TestClient, registrar: User, collection: dict
+    ) -> None:
+        data = workbook([["NM.1", "Bowl"], ["NM.2", "Lamp"]], headers=["Acc. No.", "Title"])
+        batch = upload(client, data)
+        client.patch(
+            f"/api/v1/imports/{batch['id']}",
+            json={
+                "mapping": {"Acc. No.": "accession_number", "Title": "title"},
+                "defaults": {"collection_id": collection["id"], "object_count": "several"},
+            },
+            headers=auth_headers(client, "registrar"),
+        )
+
+        preview = client.post(
+            f"/api/v1/imports/{batch['id']}/preview", headers=auth_headers(client, "registrar")
+        ).json()
+
+        # It is wrong for every row, and says so on every row, because a person
+        # scanning the preview reads rows and not a header.
+        assert preview["valid_rows"] == 0
+        assert preview["invalid_rows"] == 2
+        for row in preview["rows"]:
+            assert any("set for every row" in problem for problem in row["errors"])
+
+        listing = client.get(
+            "/api/v1/museum/objects", headers=auth_headers(client, "registrar")
+        ).json()
+        assert listing["total"] == 0

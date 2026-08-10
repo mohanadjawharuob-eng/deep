@@ -416,6 +416,34 @@ Your data survives stopping and restarting. Only `down -v` erases it.
 
 ---
 
+## Registering a tray of finds
+
+Recording forty bags one card at a time means choosing the same site and the
+same context forty times, which is why people give up and open Excel. There is
+a screen for the tray itself.
+
+**Excavations → Register a tray** (or **Collections → Register a tray** for
+museum objects).
+
+1. **The same for every one.** Set the site — and anything else the whole tray
+   shares, such as the date it was excavated. You type these once.
+2. **Different for each.** These are the columns. The ones offered to begin
+   with are the columns a finds register always has; add or remove any of them
+   from the fold-out list at the bottom of the page.
+3. **Type down the columns.** `Enter` on the last row adds another. If you
+   already have the numbers in a spreadsheet, copy the block and paste it into
+   the first cell — it fills down and across.
+4. **Check.** Nothing has been written yet. The next screen shows every row as
+   the platform reads it, and says exactly what is wrong with the ones that are
+   wrong. Fix them, or leave them out.
+5. **Create.**
+
+Afterwards the tray appears in the import list like any other, with an **Undo
+this import** button that removes every record it made. Mistyping a whole tray
+is recoverable.
+
+---
+
 ## When something goes wrong
 
 **"docker: command not found" / "not recognized"**

@@ -67,6 +67,7 @@ import {
   ActivityScreen,
   NewActivity,
 } from "./routes/Activities";
+import { BatchEntry } from "./routes/Batch";
 import { ImportBatch, ImportUpload } from "./routes/Import";
 import { Library } from "./routes/Library";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
@@ -120,6 +121,7 @@ export function App() {
         {/* One import screen for every kind of record. The old museum-only
             paths still work: a bookmark from before should not 404. */}
         <Route path="import" element={<ImportUpload />} />
+        <Route path="tray" element={<BatchEntry />} />
         <Route path="import/:batchId" element={<ImportBatch />} />
         <Route
           path="museum/import"

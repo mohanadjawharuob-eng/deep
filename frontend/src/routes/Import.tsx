@@ -34,7 +34,7 @@ import {
  * choose *before* the file is read is the difference between "map a column"
  * and editing the spreadsheet to add a column of one repeated value.
  */
-const KINDS: {
+export const KINDS: {
   value: string;
   label: string;
   module: ModuleName;
@@ -92,7 +92,7 @@ const KINDS: {
   },
 ];
 
-const kindOf = (value: string) => KINDS.find((kind) => kind.value === value);
+export const kindOf = (value: string) => KINDS.find((kind) => kind.value === value);
 
 /**
  * What each imported record hangs off, and where the options come from.
@@ -101,7 +101,7 @@ const kindOf = (value: string) => KINDS.find((kind) => kind.value === value);
  * contexts almost never names its site, and without one every single row fails
  * for the same reason.
  */
-const PARENT: Record<string, { field: string; label: string; list: string; help: string }> = {
+export const PARENT: Record<string, { field: string; label: string; list: string; help: string }> = {
   museum_object: {
     field: "collection_id",
     label: "Collection",
@@ -410,7 +410,14 @@ export function ImportBatch() {
   const save = useAction(async () => {
     const updated = await api.patch<Batch>(`/imports/${batchId}`, {
       mapping: current,
-      defaults: parent && chosenParent ? { [parent.field]: chosenParent } : {},
+      // Merged, not replaced. This screen only knows about the parent, but a
+      // batch may arrive with other values already set for every row — a tray
+      // typed on the tray screen carries its shared fields here — and sending
+      // `{parent}` alone silently threw them away.
+      defaults: {
+        ...(batch.data?.defaults ?? {}),
+        ...(parent && chosenParent ? { [parent.field]: chosenParent } : {}),
+      },
     });
     setMapping(updated.mapping);
     return updated;

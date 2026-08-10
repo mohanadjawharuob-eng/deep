@@ -327,6 +327,27 @@ def plan(
     }
     ignored = {target for target in mapping.values() if target and fields.get(target, None) is None}
 
+    # A value set once for the whole file goes through exactly the same
+    # coercion a column does. Before this it went in raw, which worked only
+    # because the one thing anybody set that way was already an identifier —
+    # the moment somebody sets a shared date or quantity, "2026-08-10" reaches
+    # the database as a string and the difference between the two routes
+    # becomes a bug nobody can see. The lookup tables accept a stored value as
+    # well as a label, so an identifier still resolves to itself.
+    settled: dict[str, Any] = {}
+    default_errors: list[str] = []
+    for name, raw in (defaults or {}).items():
+        spec = fields.get(name)
+        if spec is None or spec.read_only:
+            continue
+        try:
+            coerced = coerce(spec, raw, lookups=lookups)
+        except CellError as exc:
+            default_errors.append(f"{spec.label} (set for every row): {exc}")
+            continue
+        if coerced is not None:
+            settled[name] = coerced
+
     result = Plan(record_type=record_type)
 
     for index, row in enumerate(rows):
@@ -337,8 +358,9 @@ def plan(
                 f"Ignored columns mapped to fields this record does not have: "
                 f"{', '.join(sorted(ignored))}"
             )
+        outcome.errors.extend(default_errors)
 
-        values: dict[str, Any] = dict(defaults or {})
+        values: dict[str, Any] = dict(settled)
         for column, target in active.items():
             spec = fields[target]
             try:

@@ -69,6 +69,16 @@ class FormField:
     #: list of values to match against until the site is known. The importer
     #: passes such a column through as written and leaves it to the creator.
     resolved_late: bool = False
+    #: Whether this field is one of the columns a register of these records
+    #: always has, and so appears in the tray by default.
+    #:
+    #: A finds register is one row per find and the same six columns every
+    #: time; a form has fifty fields because a find *may* need any of them. The
+    #: tray screen needs the six, and there is nothing else in the layout that
+    #: distinguishes "what everybody records" from "what a specialist adds
+    #: later" — ``required`` is a database rule, not a habit. Fields not marked
+    #: are still available; they are one click from the list underneath.
+    in_tray: bool = False
     #: How many columns of the row this field occupies, out of twelve.
     width: int = 6
     unit: str | None = None
@@ -161,6 +171,7 @@ def museum_object_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="accession_number",
+                                in_tray=True,
                                 label="Inventory no.",
                                 required=True,
                                 max_length=120,
@@ -192,6 +203,7 @@ def museum_object_layout() -> FormLayout:
                             ),
                             FormField(
                                 name="object_count",
+                                in_tray=True,
                                 label="Number of pieces",
                                 kind="integer",
                                 width=4,
@@ -209,8 +221,16 @@ def museum_object_layout() -> FormLayout:
                     FormGroup(
                         label="Description",
                         fields=[
-                            FormField(name="title", label="Object name", required=True, width=8),
-                            FormField(name="object_type", label="Object type", width=4),
+                            FormField(
+                                name="title",
+                                in_tray=True,
+                                label="Object name",
+                                required=True,
+                                width=8,
+                            ),
+                            FormField(
+                                name="object_type", in_tray=True, label="Object type", width=4
+                            ),
                             FormField(
                                 name="description", label="Description", kind="textarea", width=12
                             ),
@@ -225,6 +245,7 @@ def museum_object_layout() -> FormLayout:
                             FormField(name="culture", label="Culture", width=6),
                             FormField(
                                 name="materials",
+                                in_tray=True,
                                 label="Materials",
                                 kind="multiselect",
                                 value_list="material",
@@ -366,6 +387,7 @@ def museum_object_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="condition",
+                                in_tray=True,
                                 label="Condition",
                                 kind="select",
                                 value_list="condition",
@@ -842,6 +864,7 @@ def site_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="code",
+                                in_tray=True,
                                 label="Site code",
                                 required=True,
                                 max_length=60,
@@ -850,6 +873,7 @@ def site_layout() -> FormLayout:
                             ),
                             FormField(
                                 name="name",
+                                in_tray=True,
                                 label="Site name",
                                 required=True,
                                 max_length=300,
@@ -879,6 +903,7 @@ def site_layout() -> FormLayout:
                             ),
                             FormField(
                                 name="site_type",
+                                in_tray=True,
                                 label="Type",
                                 kind="select",
                                 value_list="site_type",
@@ -905,10 +930,16 @@ def site_layout() -> FormLayout:
                         ),
                         fields=[
                             FormField(
-                                name="latitude", label="Latitude", kind="number", width=4, unit="°"
+                                name="latitude",
+                                in_tray=True,
+                                label="Latitude",
+                                kind="number",
+                                width=4,
+                                unit="°",
                             ),
                             FormField(
                                 name="longitude",
+                                in_tray=True,
                                 label="Longitude",
                                 kind="number",
                                 width=4,
@@ -968,6 +999,7 @@ def site_layout() -> FormLayout:
                             ),
                             FormField(
                                 name="period_text",
+                                in_tray=True,
                                 label="Period as written",
                                 max_length=300,
                                 width=6,
@@ -1076,6 +1108,7 @@ def context_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="context_number",
+                                in_tray=True,
                                 label="Context no.",
                                 required=True,
                                 max_length=50,
@@ -1093,6 +1126,7 @@ def context_layout() -> FormLayout:
                             ),
                             FormField(
                                 name="context_type",
+                                in_tray=True,
                                 label="Type",
                                 kind="select",
                                 value_list="context_type",
@@ -1106,9 +1140,17 @@ def context_layout() -> FormLayout:
                                 max_length=80,
                                 width=4,
                             ),
-                            FormField(name="trench", label="Trench", max_length=80, width=4),
+                            FormField(
+                                name="trench", in_tray=True, label="Trench", max_length=80, width=4
+                            ),
                             FormField(name="area", label="Area", max_length=80, width=4),
-                            FormField(name="square", label="Square / grid", max_length=80, width=4),
+                            FormField(
+                                name="square",
+                                in_tray=True,
+                                label="Square / grid",
+                                max_length=80,
+                                width=4,
+                            ),
                             FormField(name="phase", label="Phase", max_length=80, width=4),
                         ],
                     ),
@@ -1116,7 +1158,11 @@ def context_layout() -> FormLayout:
                         label="Description",
                         fields=[
                             FormField(
-                                name="description", label="Description", kind="textarea", width=12
+                                name="description",
+                                in_tray=True,
+                                label="Description",
+                                kind="textarea",
+                                width=12,
                             ),
                             FormField(
                                 name="interpretation",
@@ -1209,7 +1255,11 @@ def context_layout() -> FormLayout:
                         label="Who and when",
                         fields=[
                             FormField(
-                                name="excavation_date", label="Excavated on", kind="date", width=4
+                                name="excavation_date",
+                                in_tray=True,
+                                label="Excavated on",
+                                kind="date",
+                                width=4,
                             ),
                             FormField(
                                 name="excavated_by", label="Excavated by", max_length=300, width=4
@@ -1290,6 +1340,7 @@ def artifact_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="inventory_number",
+                                in_tray=True,
                                 label="Inventory no.",
                                 required=True,
                                 max_length=100,
@@ -1326,7 +1377,11 @@ def artifact_layout() -> FormLayout:
                         fields=[
                             FormField(name="name", label="Name", max_length=300, width=6),
                             FormField(
-                                name="object_type", label="Object type", max_length=200, width=6
+                                name="object_type",
+                                in_tray=True,
+                                label="Object type",
+                                max_length=200,
+                                width=6,
                             ),
                             FormField(
                                 name="category_id",
@@ -1342,6 +1397,7 @@ def artifact_layout() -> FormLayout:
                             ),
                             FormField(
                                 name="quantity",
+                                in_tray=True,
                                 label="Quantity",
                                 kind="integer",
                                 width=4,
@@ -1368,6 +1424,7 @@ def artifact_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="context_id",
+                                in_tray=True,
                                 label="Context",
                                 kind="reference",
                                 references="excavation_context",
@@ -1438,6 +1495,7 @@ def artifact_layout() -> FormLayout:
                             ),
                             FormField(
                                 name="material_text",
+                                in_tray=True,
                                 label="Material as written",
                                 max_length=200,
                                 width=4,
@@ -1528,6 +1586,7 @@ def artifact_layout() -> FormLayout:
                         fields=[
                             FormField(
                                 name="condition",
+                                in_tray=True,
                                 label="Condition",
                                 kind="select",
                                 value_list="condition",

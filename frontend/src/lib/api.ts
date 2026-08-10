@@ -459,6 +459,8 @@ export type FormField = {
   value_list?: string | null;
   references?: string | null;
   read_only: boolean;
+  /** One of the columns a register of these records always has. */
+  in_tray?: boolean;
   width: number;
   unit?: string | null;
 };
