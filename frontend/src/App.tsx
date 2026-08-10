@@ -5,7 +5,7 @@
  * defending itself, the gate is here.
  */
 
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { Shell } from "./components/Shell";
 import { useSession } from "./lib/hooks";
@@ -68,6 +68,8 @@ import {
   NewActivity,
 } from "./routes/Activities";
 import { BatchEntry } from "./routes/Batch";
+import { Requests } from "./routes/Requests";
+import { SendFiles } from "./routes/Send";
 import { ImportBatch, ImportUpload } from "./routes/Import";
 import { Library } from "./routes/Library";
 import { FloorPlanScreen, FloorPlansForLocation } from "./routes/FloorPlan";
@@ -83,6 +85,19 @@ function NotFound() {
 
 export function App() {
   const { user, loading } = useSession();
+  const location = useLocation();
+
+  // The one page that has to work for somebody with no account: an invitation
+  // to send files for one record. Checked before the session is even waited
+  // for — a photographer following a link from their mailbox should not be
+  // shown a sign-in form, and the page needs nothing a session would provide.
+  if (location.pathname.startsWith("/send/")) {
+    return (
+      <Routes>
+        <Route path="send/:token" element={<SendFiles />} />
+      </Routes>
+    );
+  }
 
   if (loading) {
     return (
@@ -150,6 +165,7 @@ export function App() {
         <Route path="management/budgets/:budgetId" element={<BudgetScreen />} />
         <Route path="management/expenses" element={<Expenses />} />
         <Route path="my-work" element={<MyTasks />} />
+        <Route path="data-requests" element={<Requests />} />
         <Route path="management/tasks" element={<Tasks />} />
         <Route path="management/calendar" element={<Calendar />} />
 

@@ -133,10 +133,11 @@ const DESTINATIONS: Destination[] = [
     end: true,
     // A sun over the horizon: what is happening now, rather than what is kept.
     icon: icon("M10 3v2m0 10.5a4 4 0 1 1 0-8 4 4 0 0 1 0 8M3.5 15.5h13M4.8 6.3l1.4 1.4m9-1.4-1.4 1.4"),
-    owns: ["/", "/my-work", "/activities", "/management", "/social"],
+    owns: ["/", "/my-work", "/data-requests", "/activities", "/management", "/social"],
     places: [
       { to: "/", label: "Overview", end: true },
       { to: "/my-work", label: "My work" },
+      { to: "/data-requests", label: "Requests" },
       // Not `end`: the hub, the full list and a single activity are all
       // "Activities", and a tab that goes dark one click in reads as having
       // left the place you are still standing in.

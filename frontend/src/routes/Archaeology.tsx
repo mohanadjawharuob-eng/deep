@@ -15,6 +15,7 @@ import {
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton } from "../components/labels";
+import { DataRequests } from "../components/DataRequests";
 import { MediaFolders } from "../components/MediaFolders";
 import { References } from "../components/References";
 import { EditableRecord, useRecordEditor } from "../components/EditRecord";
@@ -523,6 +524,8 @@ export function SiteDetail() {
 
       <MediaFolders parent={{ site_id: record.id }} />
 
+      <DataRequests parent={{ site_id: record.id }} recordId={record.id} />
+
       <References target={{ site_id: record.id }} />
     </>
   );
@@ -702,6 +705,8 @@ export function ArtifactDetail() {
         mayEdit={can("archaeology", "contributor")}
       />
       <References target={{ artifact_id: record.id }} />
+
+      <DataRequests parent={{ artifact_id: record.id }} recordId={record.id} />
     </>
   );
 }

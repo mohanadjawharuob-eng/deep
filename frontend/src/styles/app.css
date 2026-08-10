@@ -2184,3 +2184,96 @@ details.card > summary::after {
   transition: transform var(--transition);
 }
 details.card[open] > summary::after { content: "▾"; }
+
+/* --------------------------------------------------------------------------
+ * Data requests
+ *
+ * Asking somebody outside the institution for a file, and the page they land
+ * on when they follow the link.
+ * -------------------------------------------------------------------------- */
+.request-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.request {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.request:last-child { border-bottom: none; }
+.request-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.request-actions { margin-left: auto; }
+
+/* The page a stranger sees. It is the only screen on this platform that
+   somebody with no account ever loads, so it is centred, quiet, and carries
+   the institution's own mark — an unbranded page asking for an upload is
+   indistinguishable from a phishing page, and they are right to hesitate. */
+.send-shell {
+  min-height: 100vh;
+  background: var(--surface-2);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4) var(--space-8);
+}
+.send-card {
+  width: 100%;
+  max-width: 34rem;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--sh-lg);
+  padding: var(--space-6);
+}
+.send-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
+  border-bottom: var(--border-width) solid var(--border);
+  color: var(--text-2);
+}
+.send-title {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: 1.2;
+  text-wrap: balance;
+  margin: 0 0 4px;
+}
+.send-record { font-size: var(--text-lg); color: var(--accent); margin: 0 0 var(--space-5); }
+.send-message {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--border-strong);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+}
+
+.send-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.send-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 5px var(--space-3);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--border-strong);
+  background: var(--surface-2);
+  margin-bottom: 3px;
+}
+/* Never colour alone: each state's word is in the row beside it. */
+.send-done { border-left-color: var(--ok); }
+.send-failed { border-left-color: var(--danger); color: var(--danger); }
+
+.send-thanks { margin-top: var(--space-5); }
+.send-foot {
+  margin: var(--space-6) 0 0;
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--border);
+}

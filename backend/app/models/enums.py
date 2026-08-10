@@ -838,3 +838,41 @@ class ReferenceType(str, enum.Enum):
     MAP = "map"
     WEBPAGE = "webpage"
     OTHER = "other"
+
+
+class DataRequestKind(str, enum.Enum):
+    """What is being asked for.
+
+    Not a filter on what can be uploaded — it is what the message says, so the
+    person receiving it knows whether they are being asked for the site
+    photographs or the permit scan. A person who sends the wrong thing has sent
+    something, which is better than a request that went unanswered because it
+    was ambiguous.
+    """
+
+    PHOTOGRAPHS = "photographs"
+    DOCUMENTS = "documents"
+    DRAWINGS = "drawings"
+    MODELS_3D = "models_3d"
+    ANYTHING = "anything"
+
+
+class DataRequestStatus(str, enum.Enum):
+    """Where a request has got to.
+
+    ``SENT`` and ``OPEN`` are deliberately separate. A request whose e-mail
+    could not be delivered is still a valid invitation — the link works, and
+    somebody can pass it on by hand — but nobody should be waiting for a reply
+    to a message that never left the building.
+    """
+
+    #: The link exists; the e-mail has not gone out, or could not be sent.
+    OPEN = "open"
+    #: The invitation was delivered.
+    SENT = "sent"
+    #: At least one file has arrived.
+    ANSWERED = "answered"
+    #: Whoever asked has marked it finished, or the limit was reached.
+    CLOSED = "closed"
+    #: Withdrawn before it was answered. The link stops working immediately.
+    CANCELLED = "cancelled"

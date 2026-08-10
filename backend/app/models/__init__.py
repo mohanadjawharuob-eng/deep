@@ -17,6 +17,7 @@ from app.models.activities import (
 from app.models.artifact import Artifact, artifact_materials, artifact_publications
 from app.models.audit import ActivityLog, Comment, Notification, Revision
 from app.models.context import ContextRelationship, ExcavationContext
+from app.models.datarequest import DataRequest
 from app.models.enums import (
     AcquisitionMethod,
     ActivityAction,
@@ -27,6 +28,8 @@ from app.models.enums import (
     ConditionState,
     ConservationStatus,
     ContextType,
+    DataRequestKind,
+    DataRequestStatus,
     DocumentType,
     EquipmentStatus,
     ExhibitionStatus,
@@ -162,6 +165,9 @@ __all__ = [
     "ContextRelationship",
     "ContextType",
     "Document",
+    "DataRequest",
+    "DataRequestKind",
+    "DataRequestStatus",
     "DocumentType",
     "ExcavationContext",
     "GeometryKind",
