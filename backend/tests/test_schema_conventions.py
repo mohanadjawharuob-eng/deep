@@ -56,3 +56,38 @@ def test_an_enum_column_stores_its_values_not_its_member_names(
         f"project writes {expected}. Add "
         f"values_callable=lambda e: [m.value for m in e] to the Enum(...)."
     )
+
+
+def test_every_media_schema_field_exists_on_its_model() -> None:
+    """A response schema must not advertise a column its model lacks.
+
+    This is how `folder_id` reached `Model3D`: it was added to a *shared*
+    attachment schema, so three endpoints gained a field and one of them had
+    no such column. The endpoint passed it straight to the constructor and
+    blew up on a keyword argument - a failure with no connection, in the
+    message, to the schema edit that caused it.
+    """
+    from app.models import Document, Model3D, Photograph
+    from app.schemas.media import DocumentSummary, Model3DSummary, PhotographSummary
+
+    pairs = (
+        (PhotographSummary, Photograph),
+        (DocumentSummary, Document),
+        (Model3DSummary, Model3D),
+    )
+
+    for schema, model in pairs:
+        columns = set(model.__table__.c.keys())
+        attributes = {name for name in dir(model) if not name.startswith("_")}
+        # Only the link fields. A schema legitimately carries values the
+        # endpoint computes - `thumbnail_sizes` is not a column and should not
+        # be - but a `*_id` is a foreign key by convention, and one that does
+        # not exist is the mistake this is here to catch.
+        for field in schema.model_fields:
+            if not field.endswith("_id"):
+                continue
+            assert field in columns or field in attributes, (
+                f"{schema.__name__}.{field} is not on {model.__name__}. A schema "
+                f"that promises a field the model has not got fails at the "
+                f"endpoint, with a message that does not mention the schema."
+            )

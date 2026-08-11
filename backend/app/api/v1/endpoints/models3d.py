@@ -131,7 +131,17 @@ def link_model(
     # ones the client did not send. Leaving them in `data` as well would pass
     # each twice.
     data = payload.model_dump(
-        exclude={"project_id", "site_id", "artifact_id", "context_id", "museum_object_id"}
+        exclude={
+            "project_id",
+            "site_id",
+            "artifact_id",
+            "context_id",
+            "museum_object_id",
+            # Not a column on this model: 3D models are not filed in the media
+            # library. Excluded rather than trusted to be absent, because the
+            # last time this list was short the endpoint blew up on a keyword.
+            "folder_id",
+        }
     )
     model = Model3D(
         **data,
