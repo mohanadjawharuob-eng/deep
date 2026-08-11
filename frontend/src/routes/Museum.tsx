@@ -26,7 +26,7 @@ import {
   RecordCard,
   RecordTabs,
   firstTab,
-  layoutFields,
+  writableKeys,
   type RecordValues,
 } from "../components/RecordCard";
 import {
@@ -776,7 +776,7 @@ export function NewObject() {
   );
 
   const create = useAction(async () => {
-    const known = new Set(layoutFields(layout.data!).map((field) => field.name));
+    const known = writableKeys(layout.data!);
     const payload: RecordValues = {};
     for (const [key, value] of Object.entries(values)) {
       if (known.has(key) && value !== null && value !== undefined && value !== "") {

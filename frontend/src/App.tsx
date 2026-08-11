@@ -59,6 +59,7 @@ import {
   Tasks,
 } from "./routes/Management";
 import { AdminUsers } from "./routes/Admin";
+import { CustomFieldsAdmin } from "./routes/CustomFields";
 import { Appearance, MyProfile } from "./routes/Appearance";
 import { Outreach, PostScreen } from "./routes/Social";
 import {
@@ -192,6 +193,7 @@ export function App() {
 
         <Route path="admin/users" element={<AdminUsers />} />
         <Route path="admin/appearance" element={<Appearance />} />
+        <Route path="admin/fields" element={<CustomFieldsAdmin />} />
         <Route path="profile" element={<MyProfile />} />
 
         <Route path="404" element={<NotFound />} />

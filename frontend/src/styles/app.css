@@ -609,6 +609,19 @@
   margin: 0;
 }
 
+/* Whatever is stored on a record beyond its own columns, read as a short list
+   rather than as JSON. The braces are a programmer's view of what is, to
+   everybody else, a few things somebody wrote down. */
+.extra-fields { display: grid; gap: 4px; margin: 0; }
+.extra-fields > div { display: flex; gap: var(--space-2); align-items: baseline; }
+.extra-fields dt {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  min-width: 9rem;
+  flex: 0 0 auto;
+}
+.extra-fields dd { margin: 0; overflow-wrap: anywhere; }
+
 .portal { margin-bottom: 0; }
 .portal-empty { padding: var(--space-5); text-align: center; font-size: var(--text-md); color: var(--text-3); }
 

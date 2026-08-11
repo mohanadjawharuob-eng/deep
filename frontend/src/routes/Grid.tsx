@@ -23,7 +23,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { api, type Collection, type FormField, type FormLayout, type Page } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
-import { layoutFields } from "../components/RecordCard";
+import { fieldPatch, fieldValue, layoutFields } from "../components/RecordCard";
 import {
   Empty,
   ErrorNote,
@@ -109,13 +109,21 @@ export function CatalogueGrid() {
 
   const data = rows.data?.items ?? [];
 
-  /** The value a cell should show: the pending edit if there is one. */
+  /**
+   * The value a cell should show: the pending edit if there is one.
+   *
+   * A column the institution added has no column in the table behind it — its
+   * value sits inside the row's `metadata_json` — so reading it goes through
+   * the layout rather than straight at the row.
+   */
   const valueOf = useCallback(
     (row: Row, field: string) => {
       const edit = edits.find((item) => item.rowId === row.id && item.field === field);
-      return edit ? edit.value : row[field];
+      if (edit) return edit.value;
+      const definition = fields.get(field);
+      return definition ? fieldValue(row, definition) : row[field];
     },
-    [edits],
+    [edits, fields],
   );
 
   const isEdited = useCallback(
@@ -127,7 +135,9 @@ export function CatalogueGrid() {
   const setCell = (rowId: string, field: string, value: unknown) => {
     setEdits((current) => {
       const rest = current.filter((item) => !(item.rowId === rowId && item.field === field));
-      const original = data.find((row) => row.id === rowId)?.[field];
+      const definition = fields.get(field);
+      const row = data.find((item) => item.id === rowId);
+      const original = row && definition ? fieldValue(row, definition) : row?.[field];
 
       // Typing a value back to what it already was is not a change. Without
       // this, undoing an edit by hand still counts towards the save, and the
@@ -154,7 +164,16 @@ export function CatalogueGrid() {
     const byRow = new Map<string, Record<string, unknown>>();
     for (const edit of edits) {
       const patch = byRow.get(edit.rowId) ?? {};
-      patch[edit.field] = edit.value;
+      const definition = fields.get(edit.field);
+      if (definition?.custom) {
+        // Several of the institution's own columns edited on one row are one
+        // column in the database, so they merge into a single bag before it is
+        // sent. Sending them separately would have the last one erase the rest.
+        const row = data.find((item) => item.id === edit.rowId) ?? {};
+        Object.assign(patch, fieldPatch({ ...row, ...patch }, definition, edit.value));
+      } else {
+        patch[edit.field] = edit.value;
+      }
       byRow.set(edit.rowId, patch);
     }
 

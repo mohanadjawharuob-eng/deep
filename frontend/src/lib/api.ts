@@ -491,6 +491,14 @@ export type FormField = {
   read_only: boolean;
   /** One of the columns a register of these records always has. */
   in_tray?: boolean;
+  /**
+   * A field this institution added rather than one the platform ships. Its
+   * value lives inside the record's `metadata_json` under `name`, not in a
+   * column of its own — which is what lets somebody add one without a
+   * migration, and why reading and writing it goes through `fieldValue` and
+   * `withField` rather than straight at `values[name]`.
+   */
+  custom?: boolean;
   width: number;
   unit?: string | null;
 };

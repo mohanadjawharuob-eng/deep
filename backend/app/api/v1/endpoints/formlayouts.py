@@ -55,10 +55,17 @@ def read_layout(
             ),
         )
 
+    # The institution's own fields join the layout here, which is why they
+    # then appear on the record card, in the edit form and in the tray without
+    # any of the three being told about them.
+    choices: dict[str, list[dict[str, str]]] = {}
+    layout = forms.with_custom(session, layout, choices_out=choices)
+
     payload = layout.as_dict()
-    payload["value_list_options"] = (
-        forms.value_lists(session, layout.value_lists) if include_value_lists else {}
-    )
+    options = forms.value_lists(session, layout.value_lists) if include_value_lists else {}
+    # A custom select's choices are inline on the definition rather than in the
+    # taxonomy tables, so they are merged in under the field's own name.
+    payload["value_list_options"] = {**options, **choices}
     return payload
 
 

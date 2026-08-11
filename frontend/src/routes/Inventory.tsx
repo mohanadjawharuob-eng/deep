@@ -35,7 +35,7 @@ import {
   type StockMovement,
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
-import { RecordCard, layoutFields, type RecordValues } from "../components/RecordCard";
+import { RecordCard, writableKeys, type RecordValues } from "../components/RecordCard";
 import {
   Badge,
   ConfirmDelete,
@@ -1432,7 +1432,7 @@ function NewRecord({
   );
 
   const create = useAction(async () => {
-    const known = new Set(layoutFields(layout.data!).map((field) => field.name));
+    const known = writableKeys(layout.data!);
     const payload: RecordValues = {};
     for (const [key, value] of Object.entries(values)) {
       if (known.has(key) && value !== null && value !== undefined && value !== "") {

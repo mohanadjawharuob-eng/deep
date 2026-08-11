@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     auth,
     branding,
     contexts,
+    customfields,
     datarequests,
     documents,
     exports,
@@ -71,6 +72,7 @@ api_router.include_router(activities.router)
 api_router.include_router(exports.router)
 api_router.include_router(floorplans.router)
 api_router.include_router(formlayouts.router)
+api_router.include_router(customfields.router)
 api_router.include_router(imports.router)
 
 # Media

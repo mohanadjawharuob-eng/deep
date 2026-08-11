@@ -22,7 +22,7 @@ decide it. Three reasons that is worth the indirection:
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Literal
 
 from sqlalchemy import select
@@ -79,6 +79,10 @@ class FormField:
     #: later" — ``required`` is a database rule, not a habit. Fields not marked
     #: are still available; they are one click from the list underneath.
     in_tray: bool = False
+    #: An institution's own field, not one of the platform's. Its value lives
+    #: in the record's ``metadata_json`` under ``name`` rather than in a column
+    #: of its own, which is what lets somebody add one without a migration.
+    custom: bool = False
     #: How many columns of the row this field occupies, out of twelve.
     width: int = 6
     unit: str | None = None
@@ -1658,6 +1662,129 @@ LAYOUTS = {
     "excavation_context": context_layout,
     "artifact": artifact_layout,
 }
+
+
+#: The tab an institution's own fields appear on. One tab rather than
+#: scattered through the platform's own groups: somebody looking at a form
+#: should be able to tell at a glance which fields are theirs and which came
+#: with the software, because only one of the two is theirs to change.
+CUSTOM_TAB = "institution"
+
+
+def custom_fields(session: Session, record_type: str) -> list[FormField]:
+    """The fields this institution has added to one form."""
+    from app.models.customfield import CustomField
+
+    rows = session.scalars(
+        select(CustomField)
+        .where(CustomField.record_type == record_type, CustomField.is_active.is_(True))
+        .order_by(CustomField.position, CustomField.label)
+    )
+    return [
+        FormField(
+            name=row.name,
+            label=row.label,
+            kind=row.kind,  # type: ignore[arg-type]
+            required=row.required,
+            help=row.help,
+            custom=True,
+            # A custom select carries its choices inline rather than naming a
+            # taxonomy list — an institution's own list is theirs, and putting
+            # it in the shared vocabulary would offer it to everybody. The
+            # field still names a list, its own name, and the endpoint merges
+            # the choices in under that name, so the client's one lookup path
+            # works for both kinds without knowing the difference.
+            value_list=row.name if row.kind == "select" else None,
+            width=6,
+        )
+        for row in rows
+    ]
+
+
+def with_custom(
+    session: Session, layout: FormLayout, choices_out: dict | None = None
+) -> FormLayout:
+    """The layout, plus whatever this institution has added to it.
+
+    Called wherever a layout is served or used, which is the whole return on
+    layouts being data: a field defined once appears on the record card, in
+    the edit form, in the importer's column mapping and in the tray, because
+    all four read this.
+    """
+    extra = custom_fields(session, layout.record_type)
+    if not extra:
+        return layout
+
+    if choices_out is not None:
+        from app.models.customfield import CustomField
+
+        rows = session.scalars(
+            select(CustomField).where(
+                CustomField.record_type == layout.record_type,
+                CustomField.is_active.is_(True),
+            )
+        )
+        for row in rows:
+            if row.choices:
+                choices_out[row.name] = [
+                    {"value": choice, "label": choice} for choice in row.choices
+                ]
+
+    # The raw ``metadata_json`` box and the institution's own fields write to
+    # the same place, so once there are real fields the raw box stops being an
+    # editor and becomes a window. Two controls over one value is how a typed
+    # correction disappears: whichever was saved last wins, and neither says so.
+    def settled(tab: FormTab) -> FormTab:
+        return FormTab(
+            key=tab.key,
+            label=tab.label,
+            groups=[
+                FormGroup(
+                    label=group.label,
+                    help=group.help,
+                    fields=[
+                        replace(
+                            form_field,
+                            read_only=True,
+                            help=(
+                                "What is stored on the record, including the fields on "
+                                "the 'Our own fields' tab. Change them there."
+                            ),
+                        )
+                        if form_field.kind == "json"
+                        else form_field
+                        for form_field in group.fields
+                    ],
+                )
+                for group in tab.groups
+            ],
+        )
+
+    return FormLayout(
+        record_type=layout.record_type,
+        title=layout.title,
+        title_field=layout.title_field,
+        key_field=layout.key_field,
+        tabs=[
+            *(settled(tab) for tab in layout.tabs),
+            FormTab(
+                key=CUSTOM_TAB,
+                label="Our own fields",
+                groups=[
+                    FormGroup(
+                        label="Added by this institution",
+                        help=(
+                            "Fields this institution added. They are stored with "
+                            "the record and come out in every export."
+                        ),
+                        fields=extra,
+                    )
+                ],
+            ),
+        ],
+        portals=layout.portals,
+        value_lists=layout.value_lists,
+    )
 
 
 def get_layout(record_type: str) -> FormLayout | None:

@@ -27,6 +27,42 @@ import { formatDate, formatDateTime, humanise } from "./ui";
 export type RecordValues = Record<string, unknown>;
 
 /* --------------------------------------------------------------------------
+ * Where a field's value lives
+ *
+ * A field the platform ships has a column: `values.height_mm`. A field an
+ * institution added has no column — adding one would mean a migration every
+ * time somebody invents a field — so its value sits inside the record's
+ * `metadata_json` under the field's own name.
+ *
+ * Everything that reads or writes a value goes through these two, so the
+ * difference is stated once here rather than remembered in six screens.
+ * ----------------------------------------------------------------------- */
+
+/** The value of one field, whichever of the two places it lives in. */
+export function fieldValue(values: RecordValues, field: FormField): unknown {
+  if (!field.custom) return values[field.name];
+  const bag = values.metadata_json;
+  return bag && typeof bag === "object" ? (bag as RecordValues)[field.name] : undefined;
+}
+
+/**
+ * One field's new value, as a patch body.
+ *
+ * For a custom field that is the *whole* bag with one key changed, not the one
+ * key — `metadata_json` is a single column, and sending it with one key in it
+ * would erase every other custom field on the record.
+ */
+export function fieldPatch(values: RecordValues, field: FormField, next: unknown): RecordValues {
+  if (!field.custom) return { [field.name]: next };
+  const current = values.metadata_json;
+  const bag: RecordValues =
+    current && typeof current === "object" ? { ...(current as RecordValues) } : {};
+  if (next === null || next === undefined || next === "") delete bag[field.name];
+  else bag[field.name] = next;
+  return { metadata_json: bag };
+}
+
+/* --------------------------------------------------------------------------
  * Reading a value
  * ----------------------------------------------------------------------- */
 
@@ -128,8 +164,36 @@ function ReadValue({
       );
     }
 
-    case "json":
-      return <pre className="json">{JSON.stringify(value, null, 2)}</pre>;
+    case "json": {
+      // Braces and quotation marks are a programmer's view of what is, to
+      // everybody else, a short list of things somebody wrote down. Shown as
+      // that list where it can be, and as raw JSON only where it genuinely is
+      // nested and no list would be honest.
+      const entries =
+        value && typeof value === "object" && !Array.isArray(value)
+          ? Object.entries(value as Record<string, unknown>)
+          : null;
+      if (!entries) return <pre className="json">{JSON.stringify(value, null, 2)}</pre>;
+      if (entries.length === 0) return <span className="value-empty">—</span>;
+      return (
+        <dl className="extra-fields">
+          {entries.map(([key, item]) => (
+            <div key={key}>
+              <dt>{humanise(key)}</dt>
+              <dd>
+                {item !== null && typeof item === "object"
+                  ? JSON.stringify(item)
+                  : typeof item === "boolean"
+                    ? item
+                      ? "Yes"
+                      : "No"
+                    : String(item)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      );
+    }
 
     case "textarea":
       return <span className="prose">{String(value)}</span>;
@@ -478,7 +542,7 @@ export function FieldCell({
   editing: boolean;
   onChange: (name: string, value: unknown) => void;
 }) {
-  const value = values[field.name];
+  const value = fieldValue(values, field);
   return (
     <div className="form-cell" style={{ gridColumn: `span ${field.width}` }}>
       <div className="form-label">
@@ -491,7 +555,15 @@ export function FieldCell({
             layout={layout}
             field={field}
             value={value}
-            onChange={(next) => onChange(field.name, next)}
+            onChange={(next) => {
+              // A custom field's edit is a change to `metadata_json`, so the
+              // draft carries the whole bag. Callers stay unaware of the
+              // difference: they set one key, save one key, and the record
+              // keeps every other custom field it had.
+              for (const [key, patched] of Object.entries(fieldPatch(values, field, next))) {
+                onChange(key, patched);
+              }
+            }}
           />
         </div>
       ) : (
@@ -685,4 +757,18 @@ export function RecordCard({
 /** Which fields a layout has, flattened — used to build a create payload. */
 export function layoutFields(layout: FormLayout): FormField[] {
   return layout.tabs.flatMap((tab) => tab.groups.flatMap((group) => group.fields));
+}
+
+/**
+ * The keys a create or edit payload may carry.
+ *
+ * The layout's own field names, plus `metadata_json` — which is not a field on
+ * every layout but is where the institution's own fields are stored, so a form
+ * that filtered strictly by field name would drop every custom value on its
+ * way to the API and say nothing about it.
+ */
+export function writableKeys(layout: FormLayout): Set<string> {
+  const keys = new Set(layoutFields(layout).map((field) => field.name));
+  keys.add("metadata_json");
+  return keys;
 }

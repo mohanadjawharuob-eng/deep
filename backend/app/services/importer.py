@@ -374,6 +374,7 @@ def plan(
     if layout is None:
         raise ValueError(f"There is no import layout for {record_type!r}")
 
+    layout = forms.with_custom(session, layout)
     fields = forms.field_index(layout)
     lookups = _lookup_tables(session, layout)
 

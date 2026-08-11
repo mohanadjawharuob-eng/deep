@@ -179,17 +179,21 @@ def _detail(session: DbSession, batch: ImportBatch, *, sheet: spreadsheets.Sheet
     payload.unmapped_required = spreadsheets.unmapped_required(
         batch.record_type, {report.column: report.suggested_field for report in reports}
     )
-    payload.available_fields = _available_fields(batch.record_type)
+    payload.available_fields = _available_fields(batch.record_type, session)
     return payload
 
 
-def _available_fields(record_type: str) -> list[dict[str, Any]]:
+def _available_fields(record_type: str, session: DbSession | None = None) -> list[dict[str, Any]]:
     """Every field a column may be mapped onto, for the verification screen."""
     from app.services import forms
 
     layout = forms.get_layout(record_type)
     if layout is None:
         return []
+    # An institution's own fields are mappable too - otherwise a column the
+    # field was invented for cannot be imported into it.
+    if session is not None:
+        layout = forms.with_custom(session, layout)
     return [
         {
             "name": name,
@@ -370,7 +374,7 @@ def update_batch(
                     f"Its columns are: {', '.join(batch.columns)}."
                 ),
             )
-        fields = {item["name"] for item in _available_fields(batch.record_type)}
+        fields = {item["name"] for item in _available_fields(batch.record_type, session)}
         bad = {value for value in payload.mapping.values() if value and value not in fields}
         if bad:
             raise HTTPException(
@@ -591,12 +595,26 @@ def _fields_for(model: Any, values: dict, *, drop: set[str]) -> dict:
     A column mapped to a field the model does not have is dropped rather than
     raised on: the mapping is checked on the verification screen, and a row
     that fails here fails three thousand rows in.
+
+    Except for an institution's own fields. Those have no column by design -
+    their values live in ``metadata_json`` - so anything left over after the
+    real columns are taken is gathered there rather than thrown away. Without
+    this, a custom field could be defined, offered on the mapping screen,
+    mapped, previewed, committed, and silently store nothing.
     """
-    return {
-        key: value
-        for key, value in values.items()
-        if key not in drop and value is not None and hasattr(model, key)
-    }
+    kept: dict[str, Any] = {}
+    extra: dict[str, Any] = {}
+    for key, value in values.items():
+        if key in drop or value is None:
+            continue
+        if hasattr(model, key):
+            kept[key] = value
+        else:
+            extra[key] = value
+
+    if extra and hasattr(model, "metadata_json"):
+        kept["metadata_json"] = {**(kept.get("metadata_json") or {}), **extra}
+    return kept
 
 
 def _create_site(session: DbSession, values: dict, *, user: User) -> Site:

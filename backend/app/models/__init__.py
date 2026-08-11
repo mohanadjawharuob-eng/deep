@@ -17,6 +17,7 @@ from app.models.activities import (
 from app.models.artifact import Artifact, artifact_materials, artifact_publications
 from app.models.audit import ActivityLog, Comment, Notification, Revision
 from app.models.context import ContextRelationship, ExcavationContext
+from app.models.customfield import CustomField
 from app.models.datarequest import DataRequest
 from app.models.enums import (
     AcquisitionMethod,
@@ -170,6 +171,7 @@ __all__ = [
     "DataRequest",
     "DataRequestKind",
     "DataRequestStatus",
+    "CustomField",
     "Folder",
     "FolderKind",
     "DocumentType",

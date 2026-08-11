@@ -261,6 +261,10 @@ const ACCOUNT: (Place & { adminOnly?: boolean })[] = [
   // The name and mark at the top of every page: an institutional decision,
   // not a preference, so it is the administrator's and nobody else's.
   { to: "/admin/appearance", label: "Appearance", adminOnly: true },
+  // What the institution records, as opposed to what the software ships
+  // with: the same kind of decision as the period list, held by the same
+  // people, because everybody fills in the same form.
+  { to: "/admin/fields", label: "Our own fields", adminOnly: true },
 ];
 
 /**
