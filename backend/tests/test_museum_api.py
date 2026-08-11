@@ -1149,14 +1149,19 @@ class TestObjectLabels:
             f"/api/v1/museum/objects/{obj['id']}", headers=auth_headers(client, "curator")
         ).json()
 
+        # Rendered large rather than upscaled from the smallest size the API
+        # offers. OpenCV's detector is reliable on a clean big code and
+        # intermittent on a 12-pixel one blown up with nearest-neighbour - and
+        # a test that fails one run in five teaches people to ignore it, which
+        # costs more than the bug it would one day catch.
         png = client.get(
-            f"/api/v1/museum/objects/{obj['id']}/qr.png?size=12",
+            f"/api/v1/museum/objects/{obj['id']}/qr.png?size=20",
             headers=auth_headers(client, "curator"),
         ).content
 
         image = Image.open(io.BytesIO(png)).convert("L")
-        if min(image.size) < 600:
-            factor = -(-600 // min(image.size))
+        if min(image.size) < 900:
+            factor = -(-900 // min(image.size))
             image = image.resize(
                 (image.width * factor, image.height * factor), Image.Resampling.NEAREST
             )
@@ -1422,3 +1427,48 @@ class TestCsvExport:
 
         assert "On the website" in body
         assert "In the store" not in body
+
+
+class TestDeletingACollection:
+    """A collection is a container, and deleting a container is the click that
+    takes four thousand records with it. So: only an empty one."""
+
+    def test_an_empty_collection_can_be_deleted(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        response = client.delete(
+            f"/api/v1/museum/collections/{collection['id']}",
+            headers=auth_headers(client, "curator"),
+        )
+        assert response.status_code == 200, response.text
+
+        gone = client.get(
+            f"/api/v1/museum/collections/{collection['id']}",
+            headers=auth_headers(client, "curator"),
+        )
+        assert gone.status_code == 404
+
+    def test_a_collection_holding_objects_is_refused_with_the_count(
+        self, client: TestClient, curator: User, collection: dict
+    ) -> None:
+        catalogue(client, collection["id"], title="Bowl")
+        catalogue(client, collection["id"], title="Lamp")
+
+        response = client.delete(
+            f"/api/v1/museum/collections/{collection['id']}",
+            headers=auth_headers(client, "curator"),
+        )
+
+        assert response.status_code == 409
+        detail = response.json()["detail"]
+        assert "2 objects" in detail
+        # And the way out is stated, not left to be guessed.
+        assert "Move them" in detail
+
+        # Nothing was touched.
+        still = client.get(
+            "/api/v1/museum/objects",
+            params={"collection_id": collection["id"]},
+            headers=auth_headers(client, "curator"),
+        ).json()
+        assert still["total"] == 2

@@ -670,6 +670,33 @@ docker compose down -v
 Then delete the project folder, and uninstall Docker Desktop like any other
 application. Nothing is left behind elsewhere on your computer.
 
+## Backing up
+
+**Nothing else has a copy of your archive.** There is no cloud quietly keeping
+one. If the disk dies, the records die with it. This is the single biggest risk
+in the platform, and it takes two minutes to remove.
+
+Open `Stratum.cmd` and press **Back everything up**. Choose a memory stick or a
+second disk — it warns you if you pick the same disk the platform is on, because
+a backup there survives a mistake but not a disk failure.
+
+You get a folder holding:
+
+- `records.sql` — every record: sites, finds, objects, people, permissions.
+- `files\` — every photograph, document and 3D model.
+- `RESTORE.txt` — how to put it back, written **inside the backup**, because
+  instructions kept anywhere else are unreachable on the day you need them.
+
+It does not include your `.env`. That holds the database and e-mail passwords,
+and a backup gets carried about on memory sticks.
+
+Do it before a season, after a season, and whenever you have spent a day
+typing. Then copy the folder somewhere that is not the same building.
+
+*(Mac or Linux: `bash backup.sh`.)*
+
+---
+
 ## Where things end up
 
 Everything you put in belongs to a **record**, and the record is where you look

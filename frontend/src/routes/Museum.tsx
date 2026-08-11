@@ -896,7 +896,13 @@ export function Collections() {
 
 export function CollectionDetail() {
   const { can } = useSession();
+  const navigate = useNavigate();
   const { collectionId = "" } = useParams();
+  const [confirming, setConfirming] = useState(false);
+  const removeCollection = useAction(async () => {
+    await api.delete(`/museum/collections/${collectionId}`);
+    navigate("/museum/collections");
+  });
   const collection = useQuery<Collection>(
     (signal) => api.get(`/museum/collections/${collectionId}`, undefined, signal),
     [collectionId],
@@ -919,9 +925,38 @@ export function CollectionDetail() {
         title={item.name}
         subtitle={item.institution}
         actions={
-          <ExportButton path={`/exports/collections/${item.id}.xlsx`} label="Export everything" />
+          <>
+            <ExportButton path={`/exports/collections/${item.id}.xlsx`} label="Export everything" />
+            {can("museum", "supervisor") && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setConfirming(true)}
+              >
+                Delete {item.name}…
+              </button>
+            )}
+          </>
         }
       />
+
+      {removeCollection.error && <ErrorNote message={removeCollection.error} />}
+
+      {confirming && (
+        <ConfirmDelete
+          name={item.name}
+          title="Delete this collection?"
+          consequences={
+            <>
+              Only an empty collection can be deleted. If it still holds objects the platform
+              refuses and says how many — move them or delete them first.
+            </>
+          }
+          busy={removeCollection.running}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => void removeCollection.run()}
+        />
+      )}
 
       {/* The collection as a place to work in, rather than a record about a
           collection. Everything here is already scoped to it, which is the

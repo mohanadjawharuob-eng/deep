@@ -10,8 +10,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import type { ModuleName } from "../lib/api";
-import { useBranding, useSession, useTheme } from "../lib/hooks";
+import { api, type ModuleName } from "../lib/api";
+import { useBranding, useQuery, useSession, useTheme } from "../lib/hooks";
 import { Avatar, humanise } from "./ui";
 
 /** The mark: three strata cut by two section lines. */
@@ -117,7 +117,23 @@ type Place = {
   label: string;
   module?: ModuleName;
   end?: boolean;
+  /**
+   * Query keys this screen understands as "show me only this one's".
+   *
+   * Without them the bar quietly loses your place: open a project, click
+   * Sites, and you are looking at every site in the institution under your
+   * project's heading. Every list screen already honours these when they are
+   * in the URL - the bar simply was not passing them on.
+   */
+  keeps?: readonly string[];
 };
+
+/** Every key that narrows a screen, and the record kind behind it. */
+const SCOPES = [
+  { key: "project_id", endpoint: "/projects", fields: ["code", "name"] },
+  { key: "site_id", endpoint: "/sites", fields: ["code", "name"] },
+  { key: "collection_id", endpoint: "/museum/collections", fields: ["code", "name"] },
+] as const;
 
 type Destination = Place & {
   icon: ReactNode;
@@ -156,10 +172,10 @@ const DESTINATIONS: Destination[] = [
     owns: ["/projects", "/sites", "/contexts", "/artifacts", "/map", "/photographs", "/import", "/tray"],
     places: [
       { to: "/projects", label: "Projects" },
-      { to: "/sites", label: "Sites" },
-      { to: "/artifacts", label: "Finds" },
-      { to: "/map", label: "Map" },
-      { to: "/photographs", label: "Photographs" },
+      { to: "/sites", label: "Sites", keeps: ["project_id"] },
+      { to: "/artifacts", label: "Finds", keeps: ["project_id", "site_id"] },
+      { to: "/map", label: "Map", keeps: ["project_id"] },
+      { to: "/photographs", label: "Photographs", keeps: ["project_id", "site_id"] },
       { to: "/tray?type=artifact", label: "Register a tray" },
       { to: "/import?type=excavation_context", label: "Import" },
     ],
@@ -172,8 +188,8 @@ const DESTINATIONS: Destination[] = [
     owns: ["/museum", "/import?type=museum_object", "/tray?type=museum_object"],
     places: [
       { to: "/museum/collections", label: "Collections" },
-      { to: "/museum", label: "Catalogue", end: true },
-      { to: "/museum/grid", label: "Grid" },
+      { to: "/museum", label: "Catalogue", end: true, keeps: ["collection_id"] },
+      { to: "/museum/grid", label: "Grid", keeps: ["collection_id"] },
       { to: "/photographs", label: "Photographs" },
       { to: "/tray?type=museum_object", label: "Register a tray" },
       { to: "/import?type=museum_object", label: "Import" },
@@ -262,6 +278,41 @@ function destinationFor(pathname: string, search: string): Destination | undefin
   return best;
 }
 
+/**
+ * What the screen is narrowed to, named, with a way out.
+ *
+ * A filter that persists and is not visible is a trap: you look at eleven
+ * finds, conclude the site has eleven, and are wrong. So the scope is stated
+ * in words at the top of the bar, with the record's own code, and one click
+ * clears it.
+ */
+function ScopeChip({
+  scope,
+  onClear,
+}: {
+  scope: { key: string; id: string; endpoint: string; fields: readonly string[] };
+  onClear: () => void;
+}) {
+  const record = useQuery<Record<string, unknown>>(
+    (signal) => api.get(`${scope.endpoint}/${scope.id}`, undefined, signal),
+    [scope.endpoint, scope.id],
+  );
+
+  const label = scope.fields
+    .map((field) => record.data?.[field])
+    .filter(Boolean)
+    .join(" - ");
+
+  return (
+    <span className="scope-chip">
+      <span className="truncate">Only {label || "this one"}</span>
+      <button type="button" onClick={onClear} title="Show everything again" aria-label="Clear">
+        &times;
+      </button>
+    </span>
+  );
+}
+
 export function Shell() {
   const { user, signOut, levelIn, access } = useSession();
   const { theme, setTheme } = useTheme();
@@ -316,6 +367,28 @@ export function Shell() {
   const here = destinationFor(location.pathname, location.search);
   const places =
     here && mayReach(here) ? here.places.filter(mayReach) : [];
+
+  // What the current URL narrows things to, if anything.
+  const current = new URLSearchParams(location.search);
+  const scope = SCOPES.map((item) => ({ ...item, id: current.get(item.key) ?? "" })).find(
+    (item) => item.id,
+  );
+
+  /** A bar link, carrying the scope to the screens that understand it. */
+  const linkFor = (place: Place) => {
+    if (!scope || !place.keeps?.includes(scope.key)) return place.to;
+    const [path, query] = place.to.split("?");
+    const params = new URLSearchParams(query);
+    params.set(scope.key, scope.id);
+    return `${path}?${params.toString()}`;
+  };
+
+  const clearScope = () => {
+    const next = new URLSearchParams(location.search);
+    for (const item of SCOPES) next.delete(item.key);
+    const query = next.toString();
+    navigate(`${location.pathname}${query ? `?${query}` : ""}`);
+  };
 
   const who = user?.full_name ?? user?.username ?? null;
 
@@ -492,10 +565,11 @@ export function Shell() {
             am I" and this answers "what else is here". */}
         {places.length > 1 && (
           <nav className="sectionbar" aria-label={`${here?.label} screens`}>
+            {scope && <ScopeChip scope={scope} onClear={clearScope} />}
             {places.map((place) => (
               <NavLink
                 key={place.to}
-                to={place.to}
+                to={linkFor(place)}
                 end={place.end}
                 // Matched on the path alone. The two importers are one screen
                 // with a different preset, and which workspace it belongs to

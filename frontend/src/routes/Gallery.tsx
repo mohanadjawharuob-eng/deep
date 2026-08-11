@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api, type Page } from "../lib/api";
 import { useDebounced, useQuery } from "../lib/hooks";
@@ -48,6 +48,13 @@ function belongsTo(photo: Photo): { to: string; label: string } | null {
 }
 
 export function Gallery() {
+  // Honoured from the URL, because the bar links here meaning "this project's
+  // pictures". A screen that ignores its own filter shows somebody else's
+  // records under your heading.
+  const [params] = useSearchParams();
+  const projectId = params.get("project_id") ?? "";
+  const siteId = params.get("site_id") ?? "";
+
   const [term, setTerm] = useState("");
   const search = useDebounced(term);
   const [unreviewed, setUnreviewed] = useState(false);
@@ -59,13 +66,15 @@ export function Gallery() {
         "/photographs",
         {
           q: search || undefined,
+          project_id: projectId || undefined,
+          site_id: siteId || undefined,
           review_status: unreviewed ? "pending" : undefined,
           limit: PER_PAGE,
           offset,
         },
         signal,
       ),
-    [search, unreviewed, offset],
+    [search, unreviewed, offset, projectId, siteId],
   );
 
   const rows = photos.data?.items ?? [];

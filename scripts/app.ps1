@@ -184,6 +184,16 @@ function New-Glyph {
             $g.DrawLine($pen, (7 * $s), (3.5 * $s), (10 * $s), (6 * $s))
             $g.DrawLine($pen, (13 * $s), (3.5 * $s), (10 * $s), (6 * $s))
         }
+        # A shield: a copy kept somewhere else.
+        "backup" {
+            $g.DrawLine($pen, (10 * $s), (2.5 * $s), (4 * $s), (5 * $s))
+            $g.DrawLine($pen, (10 * $s), (2.5 * $s), (16 * $s), (5 * $s))
+            $g.DrawLine($pen, (4 * $s), (5 * $s), (4 * $s), (10 * $s))
+            $g.DrawLine($pen, (16 * $s), (5 * $s), (16 * $s), (10 * $s))
+            $g.DrawArc($pen, (4 * $s), (2 * $s), (12 * $s), (16 * $s), 20, 140)
+            $g.DrawLine($pen, (7.5 * $s), (9.5 * $s), (9.3 * $s), (11.3 * $s))
+            $g.DrawLine($pen, (9.3 * $s), (11.3 * $s), (12.8 * $s), (7.5 * $s))
+        }
         # An arrow onto a baseline: put it on the desktop.
         "pin" {
             $g.DrawLine($pen, (10 * $s), (3 * $s), (10 * $s), (12 * $s))
@@ -454,6 +464,12 @@ $body.Controls.Add((New-Action -Label "Check e-mail sending" -Note "Send yoursel
 
 $body.Controls.Add((New-Action -Label "Show the log" -Note "What happened, safe to send on for help" -Glyph "log" -OnClick {
     Invoke-Script "logs.ps1"
+}))
+
+$body.Controls.Add((New-Heading "Keeping it safe"))
+
+$body.Controls.Add((New-Action -Label "Back everything up" -Note "Records and files, to a stick or another disk" -Glyph "backup" -OnClick {
+    Invoke-Script "backup.ps1"
 }))
 
 $body.Controls.Add((New-Heading "Keeping it current"))

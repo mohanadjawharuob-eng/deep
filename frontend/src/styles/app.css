@@ -2367,3 +2367,32 @@ details.card[open] > summary::after { content: "▾"; }
 }
 .gallery-tile figcaption { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gallery-tile figcaption .badge { align-self: flex-start; }
+
+/* What the screen is narrowed to. Stated rather than implied: a filter that
+   persists and is not visible is a trap - you look at eleven finds, conclude
+   the site has eleven, and are wrong. */
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  margin-right: var(--space-3);
+  padding: 3px 6px 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-weak);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 18rem;
+}
+.scope-chip button {
+  background: none;
+  border: none;
+  padding: 0 3px;
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+}
+.scope-chip button:hover { opacity: 0.7; }

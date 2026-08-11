@@ -296,6 +296,50 @@ def update_collection(
     return _collection_detail(session, collection, user)
 
 
+@router.delete(
+    "/collections/{collection_id}",
+    response_model=Message,
+    summary="Delete a collection",
+    description=(
+        "Only an **empty** collection. A collection holding objects is refused "
+        "with the count, because the alternative is a single click that "
+        "removes four thousand catalogue records and everything hanging from "
+        "them.\n\n"
+        "To remove one that holds objects: move them to another collection, or "
+        "delete them, and then delete this. That is deliberately more work - "
+        "it is the difference between a decision and an accident."
+    ),
+    responses={409: {"description": "The collection still holds objects"}},
+)
+def delete_collection(
+    collection_id: uuid.UUID, session: DbSession, request: Request, user: MuseumSupervisor
+) -> Message:
+    collection = records.get_or_404(session, Collection, collection_id, "Collection")
+
+    held = session.scalar(
+        select(func.count())
+        .select_from(MuseumObject)
+        .where(MuseumObject.collection_id == collection_id)
+    )
+    if held:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=(
+                f"{collection.name!r} still holds {held} object"
+                f"{'' if held == 1 else 's'}. Move them to another collection "
+                f"or delete them first - deleting the collection would take "
+                f"them with it."
+            ),
+        )
+
+    label = collection.name
+    records.on_deleted(
+        session, collection, ResourceType.MUSEUM_OBJECT, user=user, request=request, label=label
+    )
+    session.delete(collection)
+    return Message(detail=f"Collection {label!r} deleted. It held nothing.")
+
+
 @router.get(
     "/collections/{collection_id}/next-number",
     response_model=AccessionPreview,
