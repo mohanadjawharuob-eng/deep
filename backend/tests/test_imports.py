@@ -242,8 +242,31 @@ class TestCoercion:
         lookups = {"condition": {"good": "good", "poor": "poor"}}
 
         assert importer.coerce(spec, " Good ", lookups=lookups) == "good"
-        with pytest.raises(importer.CellError, match="not one of the values"):
+
+        # Never guessed at - "goodish" does not silently become "good". But it
+        # does not fail the row either: it is recoverable, so the importer
+        # notes it and keeps what was written.
+        with pytest.raises(importer.CellError, match="not in the list of values") as raised:
             importer.coerce(spec, "goodish", lookups=lookups)
+        assert raised.value.recoverable
+        assert raised.value.fallback is None
+
+    def test_a_measurement_written_as_a_range_is_read_not_refused(self) -> None:
+        """Real recording sheets are full of "1.5 to 1.8" and "120 x 80".
+
+        Refusing the find because the width of a sherd is a range throws away
+        a hundred correct fields to protect one. The first number is taken and
+        the note says so, so nobody has to wonder what was stored.
+        """
+        spec = self.spec("width_mm", "number")
+
+        with pytest.raises(importer.CellError, match="read 1.5") as raised:
+            importer.coerce(spec, "1.5 to 1.8", lookups={})
+        assert raised.value.recoverable
+        assert raised.value.fallback == 1.5
+
+        # A single number with a unit is not a range and is not remarked on.
+        assert importer.coerce(spec, "12.5 cm", lookups={}) == 12.5
 
     def test_text_longer_than_the_field_is_reported_not_truncated(self) -> None:
         spec = self.spec("object_type", "text", max_length=10)
@@ -329,16 +352,19 @@ class TestFlow:
     ) -> None:
         data = workbook(
             [
-                ["NM.2024.0001", "Cooking pot", "210"],
-                ["NM.2024.0002", "Bowl", "120 x 80"],
+                ["NM.2024.0001", "Cooking pot", "2019-04-03"],
+                # Genuinely unreadable: 03/04 is the third of April in one
+                # half of the world and the fourth of March in the other, and
+                # nothing in the file says which.
+                ["NM.2024.0002", "Bowl", "03/04/2019"],
             ],
-            headers=["Acc. No.", "Title", "Height"],
+            headers=["Acc. No.", "Title", "Acquired"],
         )
         batch = upload(client, data)
         client.patch(
             f"/api/v1/imports/{batch['id']}",
             json={
-                "mapping": {"Height": "height_mm"},
+                "mapping": {"Acquired": "acquisition_date"},
                 "defaults": {"collection_id": collection["id"]},
             },
             headers=auth_headers(client, "registrar"),
@@ -356,7 +382,7 @@ class TestFlow:
         # so the second data row is row 3.
         assert body["rows"][0]["row_number"] == 3
         assert not body["rows"][0]["ok"]
-        assert "more than one" in body["rows"][0]["errors"][0]
+        assert "day/month" in body["rows"][0]["errors"][0]
 
         listing = client.get(
             "/api/v1/museum/objects", headers=auth_headers(client, "registrar")
@@ -368,17 +394,17 @@ class TestFlow:
     ) -> None:
         data = workbook(
             [
-                ["NM.2024.0001", "Cooking pot", "210"],
-                ["NM.2024.0002", "Bowl", "120 x 80"],
-                ["NM.2024.0003", "Lamp", "60"],
+                ["NM.2024.0001", "Cooking pot", "2019-04-03"],
+                ["NM.2024.0002", "Bowl", "03/04/2019"],
+                ["NM.2024.0003", "Lamp", "2020-01-09"],
             ],
-            headers=["Acc. No.", "Title", "Height"],
+            headers=["Acc. No.", "Title", "Acquired"],
         )
         batch = upload(client, data)
         client.patch(
             f"/api/v1/imports/{batch['id']}",
             json={
-                "mapping": {"Height": "height_mm"},
+                "mapping": {"Acquired": "acquisition_date"},
                 "defaults": {"collection_id": collection["id"]},
             },
             headers=auth_headers(client, "registrar"),
@@ -401,14 +427,14 @@ class TestFlow:
         self, client: TestClient, registrar: User, collection: dict
     ) -> None:
         data = workbook(
-            [["NM.1", "Pot", "210"], ["NM.2", "Bowl", "120 x 80"]],
-            headers=["Acc. No.", "Title", "Height"],
+            [["NM.1", "Pot", "2019-04-03"], ["NM.2", "Bowl", "03/04/2019"]],
+            headers=["Acc. No.", "Title", "Acquired"],
         )
         batch = upload(client, data)
         client.patch(
             f"/api/v1/imports/{batch['id']}",
             json={
-                "mapping": {"Height": "height_mm"},
+                "mapping": {"Acquired": "acquisition_date"},
                 "defaults": {"collection_id": collection["id"]},
             },
             headers=auth_headers(client, "registrar"),
@@ -664,3 +690,119 @@ class TestDefaults:
             "/api/v1/museum/objects", headers=auth_headers(client, "registrar")
         ).json()
         assert listing["total"] == 0
+
+
+# --------------------------------------------------------------------------
+# Meeting a real file
+# --------------------------------------------------------------------------
+class TestRealSpreadsheets:
+    """What actually arrives, rather than what a test would write.
+
+    Every case here comes from one real finds register: a title above the
+    table, materials the controlled list has never heard of, and widths
+    recorded as ranges. Before these, that file produced sixty failed rows
+    whose stated reasons were the *heading text* — "'Material' is not one of
+    the values this field accepts" — which is true, useless, and says nothing
+    about the only thing wrong: the headings were one row further down.
+    """
+
+    def test_a_title_above_the_table_does_not_become_the_headings(self) -> None:
+        openpyxl = pytest.importorskip("openpyxl")
+        book = openpyxl.Workbook()
+        sheet = book.active
+        sheet.append(["Finds register - Tell el-Demo 2024"])
+        sheet.append([])
+        sheet.append(["No.", "Material", "Width (cm)"])
+        sheet.append(["1", "Stone", "1.5"])
+        sheet.append(["2", "Flint", "2.0"])
+        buffer = io.BytesIO()
+        book.save(buffer)
+
+        read = spreadsheets.read(buffer.getvalue(), filename="finds.xlsx")
+
+        assert read.header_row == 3
+        assert read.columns == ["No.", "Material", "Width (cm)"]
+        assert len(read.rows) == 2
+
+    def test_a_table_that_starts_at_the_top_is_not_second_guessed(self) -> None:
+        """The heuristic must not move the headings of a perfectly good file."""
+        data = workbook([["NM.1", "Bowl"], ["NM.2", "Jar"]], headers=["Acc. No.", "Title"])
+
+        read = spreadsheets.read(data, filename="c.xlsx")
+
+        assert read.header_row == 1
+        assert read.columns == ["Acc. No.", "Title"]
+
+    def test_the_heading_row_can_still_be_stated(self) -> None:
+        """The guess is a suggestion. Saying which row wins over working it out."""
+        data = workbook(
+            [["Acc. No.", "Title"], ["NM.1", "Bowl"]], headers=["Catalogue export", None]
+        )
+
+        read = spreadsheets.read(data, filename="c.xlsx", header_row=2)
+
+        assert read.header_row == 2
+        assert read.columns[:2] == ["Acc. No.", "Title"]
+
+    def test_a_material_the_list_never_heard_of_is_kept_not_refused(
+        self, client: TestClient, registrar: User, collection: dict
+    ) -> None:
+        """ "Stone" where the list says something else is still what the
+        cataloguer wrote, and it is the only record of what the object is made
+        of. Refusing the whole object over one word loses the other forty
+        fields to protect nothing."""
+        data = workbook(
+            [["NM.1", "Bowl", "Stone"], ["NM.2", "Pin", "Copper Alloy"]],
+            headers=["Acc. No.", "Title", "Material"],
+        )
+        batch = upload(client, data)
+        client.patch(
+            f"/api/v1/imports/{batch['id']}",
+            json={
+                "mapping": {"Material": "materials"},
+                "defaults": {"collection_id": collection["id"]},
+            },
+            headers=auth_headers(client, "registrar"),
+        )
+
+        preview = client.post(
+            f"/api/v1/imports/{batch['id']}/preview", headers=auth_headers(client, "registrar")
+        ).json()
+
+        assert preview["invalid_rows"] == 0, preview["rows"]
+        assert preview["valid_rows"] == 2
+
+        # And what was written is what is stored. Whether the term ends up in
+        # the controlled list or as free text depends on what the list holds,
+        # but "Stone" is never simply dropped, and never guessed into
+        # something else.
+        stored = " ".join(str(row["values"].get("materials")) for row in preview["rows"])
+        assert "Stone" in stored
+        assert "Copper Alloy" in stored
+
+    def test_a_width_written_as_a_range_imports_with_a_note(
+        self, client: TestClient, registrar: User, collection: dict
+    ) -> None:
+        data = workbook(
+            [["NM.1", "Sherd", "1.5 to 1.8"], ["NM.2", "Sherd", "3.3"]],
+            headers=["Acc. No.", "Title", "Width"],
+        )
+        batch = upload(client, data)
+        client.patch(
+            f"/api/v1/imports/{batch['id']}",
+            json={
+                "mapping": {"Width": "width_mm"},
+                "defaults": {"collection_id": collection["id"]},
+            },
+            headers=auth_headers(client, "registrar"),
+        )
+
+        preview = client.post(
+            f"/api/v1/imports/{batch['id']}/preview", headers=auth_headers(client, "registrar")
+        ).json()
+
+        assert preview["invalid_rows"] == 0, preview["rows"]
+        ranged = next(row for row in preview["rows"] if row["row_number"] == 2)
+        assert ranged["values"]["width_mm"] == 1.5
+        # And it says what it did, so nobody has to wonder what was stored.
+        assert any("1.5" in note for note in ranged["warnings"])

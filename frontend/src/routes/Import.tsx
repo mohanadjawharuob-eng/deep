@@ -197,7 +197,10 @@ export function ImportUpload() {
   const { can } = useSession();
   const [params, setParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
-  const [headerRow, setHeaderRow] = useState(1);
+  // Empty means "work it out". Most files start at row 1, and the ones that
+  // do not usually open with a title and a blank line - which used to make
+  // every row fail for reasons that were actually the heading text.
+  const [headerRow, setHeaderRow] = useState("");
   const [dragging, setDragging] = useState(false);
 
   // Only the kinds this person could actually write. A chooser offering four
@@ -214,7 +217,7 @@ export function ImportUpload() {
   const upload = useAction(async (chosen: File) => {
     const data = await api.upload<{ id: string }>("/imports", chosen, {
       record_type: kind?.value ?? "museum_object",
-      header_row: headerRow,
+      header_row: headerRow || undefined,
     });
     navigate(`/import/${data.id}`);
   });
@@ -325,9 +328,14 @@ export function ImportUpload() {
               min={1}
               max={50}
               value={headerRow}
+              placeholder="auto"
               style={{ width: "5rem" }}
-              onChange={(event) => setHeaderRow(Math.max(1, Number(event.target.value) || 1))}
+              onChange={(event) => setHeaderRow(event.target.value)}
             />
+            <span>
+              Leave blank and it works this out from the file. The next screen says which
+              row it read, and lets you move it.
+            </span>
           </label>
         </section>
 
@@ -421,6 +429,20 @@ export function ImportBatch() {
     });
     setMapping(updated.mapping);
     return updated;
+  });
+
+  /**
+   * Read the file again from a different row.
+   *
+   * The mapping is discarded on purpose: it named columns that no longer
+   * exist, and carrying it over would leave "Column 6" mapped to something on
+   * a file that no longer has a Column 6.
+   */
+  const moveHeader = useAction(async (row: number) => {
+    const updated = await api.patch<Batch>(`/imports/${batchId}`, { header_row: row });
+    setMapping(updated.mapping);
+    setPreview(null);
+    batch.reload();
   });
 
   const check = useAction(async () => {
@@ -542,6 +564,44 @@ export function ImportBatch() {
               </div>
             </section>
           )}
+
+          {/* Where the headings came from. First, because every column below
+              is wrong if this is wrong - and when it is wrong, every row fails
+              for reasons that are really the heading text, which says nothing
+              about the actual problem. */}
+          <section className="card">
+            <div className="card-header">
+              <span className="card-title">Where the headings came from</span>
+              <span className="muted small">Change this and the columns are read again</span>
+            </div>
+            <div className="card-body">
+              <label className="row-tight small">
+                Column headings are on row
+                <input
+                  type="number"
+                  className="input input-sm"
+                  min={1}
+                  max={50}
+                  value={record.header_row}
+                  style={{ width: "5rem" }}
+                  onChange={(event) => {
+                    const row = Math.max(1, Number(event.target.value) || 1);
+                    if (row !== record.header_row) void moveHeader.run(row);
+                  }}
+                />
+                <span className="muted">
+                  Read as: {record.columns.slice(0, 6).join(" · ")}
+                  {record.columns.length > 6 ? " …" : ""}
+                </span>
+              </label>
+              {moveHeader.error && <ErrorNote message={moveHeader.error} />}
+              <p className="form-help" style={{ marginBottom: 0 }}>
+                If those look like data rather than headings — or if they read
+                &ldquo;Column 6&rdquo;, &ldquo;Column 8&rdquo; — the table starts further down.
+                Try the next row.
+              </p>
+            </div>
+          </section>
 
           {/* The verification screen. */}
           <section className="card">

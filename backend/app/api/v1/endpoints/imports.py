@@ -229,7 +229,16 @@ async def create_batch(
     file: Annotated[UploadFile, File(description=".xlsx or .csv")],
     record_type: Annotated[str, Form()] = "museum_object",
     sheet_name: Annotated[str | None, Form()] = None,
-    header_row: Annotated[int, Form()] = 1,
+    header_row: Annotated[
+        int | None,
+        Form(
+            description=(
+                "Which row holds the column headings. Left out, it is worked "
+                "out from the file - most spreadsheets start at row 1, and the "
+                "ones that do not usually open with a title and a blank line."
+            )
+        ),
+    ] = None,
 ) -> ImportBatchDetail:
     _require_import_access(user, record_type)
 
@@ -254,7 +263,8 @@ async def create_batch(
         checksum=stored.checksum,
         size_bytes=stored.size,
         sheet_name=sheet.name if extension == ".xlsx" else None,
-        header_row=header_row,
+        # What was *used*, which may have been worked out rather than given.
+        header_row=sheet.header_row,
         columns=sheet.columns,
         mapping=suggested,
         defaults={},

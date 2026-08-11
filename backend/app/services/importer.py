@@ -43,6 +43,23 @@ LIST_SPLIT = re.compile(r"\s*[;,/|]\s*|\s+and\s+")
 
 
 class CellError(Exception):
+    """A cell the platform could not take at face value.
+
+    ``recoverable`` is the difference between "this row cannot be written" and
+    "this cell was not quite what was expected and here is what was made of
+    it". A width recorded as "1.5 to 1.8" is the second kind: refusing the
+    whole find because its width is a range throws away a hundred correct
+    fields to protect one, which is not a trade anybody would make on paper.
+
+    When ``recoverable`` is set, ``fallback`` is what to store - possibly
+    ``None`` - and the message is written as a note rather than a complaint.
+    """
+
+    def __init__(self, message: str, *, fallback: Any = None, recoverable: bool = False) -> None:
+        super().__init__(message)
+        self.fallback = fallback
+        self.recoverable = recoverable
+
     """One cell could not be understood. The message names the value."""
 
 
@@ -130,10 +147,19 @@ def _to_number(value: Any, *, integer: bool) -> int | float:
     # the number is what is wanted. A cell with two numbers is ambiguous and
     # is refused rather than resolved.
     found = _NUMBER.findall(text)
-    if len(found) != 1:
+    if not found:
+        raise CellError(f"{text!r} is not a number")
+    if len(found) > 1:
+        # "1.5 to 1.8", "120 x 80". Real recording sheets are full of these,
+        # and the number somebody wants is nearly always the first. Taking it
+        # and saying so beats refusing a find over the width of a sherd.
+        first = float(found[0].replace(",", "."))
+        if integer and not first.is_integer():
+            raise CellError(f"{text!r} is not a whole number", recoverable=True)
         raise CellError(
-            f"{text!r} is not a single number"
-            + (" — it contains more than one" if len(found) > 1 else "")
+            f"read {found[0]} from {text!r}, which holds more than one number",
+            fallback=int(first) if integer else first,
+            recoverable=True,
         )
     cleaned = found[0].replace(",", ".")
     number = float(cleaned)
@@ -261,7 +287,16 @@ def coerce(
         key = str(value).strip().lower()
         if key in table:
             return table[key]
-        raise CellError(f"{str(value).strip()!r} is not one of the values this field accepts")
+        # A name the controlled list has never heard of - "Stone" where the
+        # list says "stone (unworked)", or a material nobody has added yet.
+        # Refusing the row would be refusing a whole find over one word, and
+        # the word itself is data: it is what the cataloguer wrote down. So it
+        # is kept, either in the field's own "as written" twin or as a note,
+        # and somebody decides later whether the list should grow.
+        raise CellError(
+            f"{str(value).strip()!r} is not in the list of values for this field",
+            recoverable=True,
+        )
 
     if kind in ("multiselect", "tags"):
         items = _to_list(value)
@@ -269,11 +304,24 @@ def coerce(
         if not table:
             return items
         resolved = []
+        unknown = []
         for item in items:
             key = item.lower()
             if key not in table:
-                raise CellError(f"{item!r} is not one of the values this field accepts")
+                # Same rule as a single-value list: what the cataloguer wrote
+                # is data. A bag of sherds described as "Stone, Flint" should
+                # not be refused because one of the two is not in the list.
+                unknown.append(item)
+                continue
             resolved.append(table[key])
+        if unknown:
+            raise CellError(
+                f"{', '.join(repr(item) for item in unknown)} "
+                f"{'is' if len(unknown) == 1 else 'are'} not in the list of values "
+                f"for this field",
+                fallback=resolved or None,
+                recoverable=True,
+            )
         return resolved
 
     if kind == "json":
@@ -297,6 +345,16 @@ def _as_uuid(value: Any, spec: forms.FormField) -> str:
 # --------------------------------------------------------------------------
 # Planning a run
 # --------------------------------------------------------------------------
+def _twin_of(name: str) -> str:
+    """The free-text field that stands beside a controlled one.
+
+    ``material_id`` -> ``material_text``, ``period_id`` -> ``period_text``.
+    Where a layout offers that pair, the text half is where a value the list
+    does not hold belongs.
+    """
+    return f"{name[:-3]}_text" if name.endswith("_id") else f"{name}_text"
+
+
 def plan(
     session: Session,
     record_type: str,
@@ -363,11 +421,21 @@ def plan(
         values: dict[str, Any] = dict(settled)
         for column, target in active.items():
             spec = fields[target]
+            raw = row.get(column)
             try:
-                coerced = coerce(spec, row.get(column), lookups=lookups)
+                coerced = coerce(spec, raw, lookups=lookups)
             except CellError as exc:
-                outcome.errors.append(f"{spec.label} (column {column!r}): {exc}")
-                continue
+                if not exc.recoverable:
+                    outcome.errors.append(f"{spec.label} (column {column!r}): {exc}")
+                    continue
+                outcome.warnings.append(f"{spec.label}: {exc}")
+                # Never lose what was written. A layout that pairs a controlled
+                # field with a free-text twin - material_id / material_text -
+                # exists precisely for the value the list does not have.
+                twin = _twin_of(target)
+                if twin in fields and not values.get(twin):
+                    values[twin] = str(raw).strip()
+                coerced = exc.fallback
             if coerced is not None:
                 values[target] = coerced
 

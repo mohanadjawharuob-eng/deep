@@ -67,6 +67,10 @@ class Sheet:
     #: Column headings, in file order, with blanks named for their position.
     columns: list[str]
     rows: list[dict[str, Any]]
+    #: Which row the headings came from, 1-based. Worth carrying because it may
+    #: have been *worked out* rather than given, and the screen that shows the
+    #: mapping has to say which row it read and let somebody move it.
+    header_row: int = 1
 
     @property
     def sample(self) -> list[dict[str, Any]]:
@@ -93,7 +97,7 @@ def _unique(names: list[str]) -> list[str]:
     return result
 
 
-def read_csv(data: bytes, *, header_row: int = 1) -> Sheet:
+def read_csv(data: bytes, *, header_row: int | None = None) -> Sheet:
     """Read a delimited text file, guessing its delimiter and encoding."""
     text = _decode(data)
 
@@ -106,6 +110,8 @@ def read_csv(data: bytes, *, header_row: int = 1) -> Sheet:
 
     reader = csv.reader(io.StringIO(text), dialect)
     all_rows = list(reader)
+    if header_row is None:
+        header_row = find_header_row([list(row) for row in all_rows])
     if len(all_rows) < header_row:
         raise SpreadsheetError(
             f"The file has {len(all_rows)} rows, so there is no row {header_row} "
@@ -124,7 +130,7 @@ def read_csv(data: bytes, *, header_row: int = 1) -> Sheet:
             {name: _normalise(raw[i] if i < len(raw) else None) for i, name in enumerate(columns)}
         )
 
-    return Sheet(name="CSV", columns=columns, rows=rows)
+    return Sheet(name="CSV", columns=columns, rows=rows, header_row=header_row)
 
 
 def _decode(data: bytes) -> str:
@@ -140,7 +146,9 @@ def _decode(data: bytes) -> str:
     )
 
 
-def read_xlsx(data: bytes, *, sheet_name: str | None = None, header_row: int = 1) -> Sheet:
+def read_xlsx(
+    data: bytes, *, sheet_name: str | None = None, header_row: int | None = None
+) -> Sheet:
     """Read one worksheet of an Excel file."""
     try:
         import openpyxl
@@ -172,6 +180,19 @@ def read_xlsx(data: bytes, *, sheet_name: str | None = None, header_row: int = 1
             worksheet = book[book.sheetnames[0]]
 
         iterator = worksheet.iter_rows(values_only=True)
+
+        if header_row is None:
+            # Peek at the top of the sheet, work out where the headings are,
+            # then start again. Cheap: a handful of rows, once.
+            peek = []
+            for _ in range(HEADER_SEARCH_ROWS):
+                row = next(iterator, None)
+                if row is None:
+                    break
+                peek.append(list(row))
+            header_row = find_header_row(peek) if peek else 1
+            iterator = worksheet.iter_rows(values_only=True)
+
         header: tuple[Any, ...] | None = None
         for _ in range(header_row):
             header = next(iterator, None)
@@ -200,7 +221,7 @@ def read_xlsx(data: bytes, *, sheet_name: str | None = None, header_row: int = 1
                 )
 
         _check_shape(columns, len(rows))
-        return Sheet(name=worksheet.title, columns=columns, rows=rows)
+        return Sheet(name=worksheet.title, columns=columns, rows=rows, header_row=header_row)
     finally:
         book.close()
 
@@ -248,8 +269,114 @@ def sheet_names(data: bytes) -> list[str]:
         book.close()
 
 
+# --------------------------------------------------------------------------
+# Finding the headings
+# --------------------------------------------------------------------------
+#: How far down to look. A title, a blank line, a subtitle and a merged banner
+#: is four; beyond about eight the file is something other than a table and
+#: guessing further would be guessing.
+HEADER_SEARCH_ROWS = 8
+
+#: How much better a later row must score before the headings are taken from
+#: it rather than from row 1. Deliberately wide.
+MOVE_MARGIN = 0.75
+
+
+def _header_score(row: list[Any], below: list[list[Any]]) -> float:
+    """How much this row looks like a row of column headings.
+
+    A heading row is short text, most cells filled, few numbers, no repeats -
+    and, crucially, *unlike the rows under it*. A row of "Stone", "Stone",
+    "Copper Alloy" is data no matter how word-like it is; a row of "Material",
+    "Height (cm)", "Weight (gr)" is not, because nothing repeats and the rows
+    below it are full of numbers where it has none.
+    """
+    values = ["" if cell is None else str(cell).strip() for cell in row]
+    filled = [value for value in values if value]
+    if len(filled) < 2:
+        return 0.0
+
+    score = 0.0
+    # Most of the row has something in it.
+    score += 2.0 * (len(filled) / max(len(values), 1))
+
+    # Headings are words. A row that is mostly numbers is data.
+    numeric = sum(1 for value in filled if _looks_numeric(value))
+    score += 2.0 * (1 - numeric / len(filled))
+
+    # Headings are distinct. Data repeats.
+    score += 1.5 * (len({value.lower() for value in filled}) / len(filled))
+
+    # Headings are short.
+    average = sum(len(value) for value in filled) / len(filled)
+    if average <= 40:
+        score += 1.0
+    if average > 80:
+        score -= 1.0
+
+    # And the strongest signal of all: the rows underneath contain numbers
+    # where this row does not.
+    for other in below[:5]:
+        others = ["" if cell is None else str(cell).strip() for cell in other]
+        other_filled = [value for value in others if value]
+        if not other_filled:
+            continue
+        other_numeric = sum(1 for value in other_filled if _looks_numeric(value))
+        if other_numeric / len(other_filled) > numeric / len(filled):
+            score += 0.4
+
+    return score
+
+
+def _looks_numeric(value: str) -> bool:
+    try:
+        float(value.replace(",", "").replace(" ", ""))
+    except ValueError:
+        return False
+    return True
+
+
+def find_header_row(rows: list[list[Any]]) -> int:
+    """Which row holds the column headings, 1-based.
+
+    Assuming row 1 is right most of the time and catastrophic the rest of it: a
+    file with a title above the table gets columns called "Column 6", the real
+    headings become the first row of data, and every single row then fails for
+    reasons that are actually the heading text - "'Material' is not one of the
+    values this field accepts". Nothing about that says "the headings are one
+    row further down", which is the only thing anybody needed to be told.
+
+    So: score the first few rows and take the best. It is a suggestion, shown
+    on the mapping screen and changeable there - the reader never insists.
+    """
+    if not rows:
+        return 1
+
+    scores: list[float] = []
+    for index in range(min(HEADER_SEARCH_ROWS, len(rows))):
+        below = rows[index + 1 :]
+        # A heading row with nothing under it is not a heading row. Without
+        # this a two-line file - one heading, one record - can be read as one
+        # heading on line 2 and no records at all.
+        if not any(any(str(cell).strip() for cell in row if cell is not None) for row in below):
+            scores.append(-1.0)
+            continue
+        scores.append(_header_score(rows[index], below))
+
+    # Row 1 unless something further down is clearly better. Most files start
+    # at the top, the scoring is a heuristic, and a heuristic that overrules
+    # the ordinary case on a narrow margin is worse than no heuristic: it
+    # would move the headings of a perfectly good file for no reason anybody
+    # could see.
+    best_index = 0
+    for index in range(1, len(scores)):
+        if scores[index] > scores[best_index] + MOVE_MARGIN:
+            best_index = index
+    return best_index + 1
+
+
 def read(
-    data: bytes, *, filename: str, sheet_name: str | None = None, header_row: int = 1
+    data: bytes, *, filename: str, sheet_name: str | None = None, header_row: int | None = None
 ) -> Sheet:
     """Read whichever kind of file this is."""
     if len(data) > MAX_BYTES:
@@ -257,11 +384,13 @@ def read(
             f"The file is larger than {MAX_BYTES // (1024 * 1024)} MB. A catalogue "
             f"of text should be far smaller; check it does not contain images."
         )
-    if header_row < 1:
+    if header_row is not None and header_row < 1:
         raise SpreadsheetError("The heading row must be row 1 or later.")
 
     lowered = filename.lower()
     if lowered.endswith((".xlsx", ".xlsm")):
+        # `header_row=None` means "work it out", which needs the raw grid, so
+        # the detection happens inside each reader rather than here.
         return read_xlsx(data, sheet_name=sheet_name, header_row=header_row)
     if lowered.endswith((".csv", ".tsv", ".txt")):
         return read_csv(data, header_row=header_row)
