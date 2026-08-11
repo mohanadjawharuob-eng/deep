@@ -201,6 +201,11 @@ class SocialPost(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, Base):
         cascade="all, delete-orphan",
         order_by="PostMetric.recorded_at.desc()",
     )
+    notes_thread: Mapped[list[PostNote]] = relationship(
+        back_populates="post",
+        cascade="all, delete-orphan",
+        order_by="PostNote.created_at",
+    )
 
     __table_args__ = (
         Index("ix_social_posts_account_status", "account_id", "status"),
@@ -313,3 +318,41 @@ class PostMetric(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<PostMetric {self.post_id} {self.recorded_at:%Y-%m-%d}>"
+
+
+class PostNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """A colleague's remark on a post that has not gone out yet.
+
+    Approving is one bit — yes or not yet — and almost every real review is
+    not one bit. "The find number is wrong", "can we wait until the permit is
+    signed", "lovely, but crop the trowel out" are the substance of getting a
+    post right, and without somewhere to put them they are said in a corridor
+    or a chat app and lost the moment the post goes out.
+
+    Kept after publication rather than cleared. Why a post says what it says is
+    a question that gets asked later, usually by somebody who was not in the
+    room, and an empty thread cannot answer it.
+    """
+
+    __tablename__ = "post_notes"
+
+    post_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("social_posts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    author_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    #: A note attached to an approval or a send-back, rather than said in
+    #: passing. Shown differently, because "not yet, because X" is the reason a
+    #: post is sitting still and a remark is not.
+    decision: Mapped[str | None] = mapped_column(String(20))
+
+    post: Mapped[SocialPost] = relationship(back_populates="notes_thread")
+    author: Mapped[User | None] = relationship()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"<PostNote on {self.post_id}>"

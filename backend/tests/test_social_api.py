@@ -650,3 +650,201 @@ class TestVisibility:
         ).json()
 
         assert detail["subject_label"] is None
+
+
+class TestReview:
+    """Getting a post right, which is mostly not a yes or a no.
+
+    Approval is one bit. "The find number is wrong", "wait until the permit is
+    signed", "lovely, but crop the trowel out" are the substance of a real
+    review, and with nowhere to put them they get said in a corridor and lost.
+    """
+
+    def test_anybody_who_can_see_the_module_can_leave_a_note(
+        self, client: TestClient, comms: User, drafter: User
+    ) -> None:
+        account = add_account(client)
+        post = draft(client, account["id"])
+
+        response = client.post(
+            f"/api/v1/social/posts/{post['id']}/notes",
+            json={"body": "The find number is TD-114, not TD-141."},
+            headers=auth_headers(client, "drafter"),
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["author_label"] == "Drafter"
+        assert response.json()["decision"] is None
+
+    def test_the_thread_comes_back_with_the_post(
+        self, client: TestClient, comms: User, drafter: User
+    ) -> None:
+        account = add_account(client)
+        post = draft(client, account["id"])
+        for who, text in (("drafter", "Number is wrong"), ("comms", "Fixed, thanks")):
+            client.post(
+                f"/api/v1/social/posts/{post['id']}/notes",
+                json={"body": text},
+                headers=auth_headers(client, who),
+            )
+
+        detail = client.get(
+            f"/api/v1/social/posts/{post['id']}", headers=auth_headers(client, "comms")
+        ).json()
+        assert [note["body"] for note in detail["notes_thread"]] == [
+            "Number is wrong",
+            "Fixed, thanks",
+        ]
+
+    def test_sending_back_returns_it_to_draft_with_the_reason(
+        self, client: TestClient, comms: User
+    ) -> None:
+        account = add_account(client)
+        post = draft(client, account["id"])
+        client.post(
+            f"/api/v1/social/posts/{post['id']}/approve",
+            json={},
+            headers=auth_headers(client, "comms"),
+        )
+
+        sent_back = client.post(
+            f"/api/v1/social/posts/{post['id']}/send-back",
+            json={"note": "Wait until the permit is signed."},
+            headers=auth_headers(client, "comms"),
+        )
+        assert sent_back.status_code == 200, sent_back.text
+        body = sent_back.json()
+        assert body["status"] == "draft"
+        assert body["approved_by_id"] is None
+        assert body["notes_thread"][-1]["decision"] == "sent_back"
+
+    def test_a_reason_is_required_to_send_one_back(
+        self, client: TestClient, comms: User
+    ) -> None:
+        # "Not yet" with nothing attached is a dead end for whoever wrote it.
+        account = add_account(client)
+        post = draft(client, account["id"])
+        response = client.post(
+            f"/api/v1/social/posts/{post['id']}/send-back",
+            json={"note": ""},
+            headers=auth_headers(client, "comms"),
+        )
+        assert response.status_code == 422
+
+    def test_a_published_post_is_withdrawn_not_sent_back(
+        self, client: TestClient, comms: User
+    ) -> None:
+        account = add_account(client)
+        post = draft(client, account["id"])
+        client.post(
+            f"/api/v1/social/posts/{post['id']}/approve",
+            json={},
+            headers=auth_headers(client, "comms"),
+        )
+        client.post(
+            f"/api/v1/social/posts/{post['id']}/publish",
+            json={"external_url": "https://example.org/p/1"},
+            headers=auth_headers(client, "comms"),
+        )
+
+        response = client.post(
+            f"/api/v1/social/posts/{post['id']}/send-back",
+            json={"note": "Too late"},
+            headers=auth_headers(client, "comms"),
+        )
+        assert response.status_code == 409
+
+    def test_approving_with_a_note_puts_it_in_the_thread(
+        self, client: TestClient, comms: User
+    ) -> None:
+        account = add_account(client)
+        post = draft(client, account["id"])
+        approved = client.post(
+            f"/api/v1/social/posts/{post['id']}/approve",
+            json={"note": "Checked with the permit office"},
+            headers=auth_headers(client, "comms"),
+        ).json()
+
+        assert approved["notes_thread"][-1]["decision"] == "approved"
+        assert approved["notes_thread"][-1]["body"] == "Checked with the permit office"
+
+
+class TestTellingThePublisher:
+    """An approval that nobody is told about is an approval that does nothing.
+
+    The platform publishes nothing itself, on purpose - it holds no API keys.
+    So the approval has to reach a person, or the post sits in a database
+    exactly as it used to sit in a drawer.
+    """
+
+    def test_approving_mails_whoever_will_put_it_up(
+        self, client: TestClient, db: Session, comms: User, monkeypatch
+    ) -> None:
+        from app.services import mail
+
+        editor = make_user(
+            db,
+            email="poster@example.org",
+            username="poster",
+            role=UserRole.VISITOR,
+            modules={Module.SOCIAL_MEDIA: ModuleLevel.EDITOR},
+            grant_defaults=False,
+        )
+        sent: list[tuple] = []
+        monkeypatch.setattr(
+            mail, "send", lambda to, subject, body, **rest: sent.append((to, subject, body))
+        )
+
+        account = add_account(client)
+        post = draft(client, account["id"], title="A jar from Trench 4")
+        client.post(
+            f"/api/v1/social/posts/{post['id']}/approve",
+            json={},
+            headers=auth_headers(client, "comms"),
+        )
+
+        assert len(sent) == 1
+        recipients, subject, body = sent[0]
+        assert recipients == [editor.email]
+        assert "A jar from Trench 4" in subject
+        assert "does not post anything itself" in body
+
+    def test_the_approver_is_not_told_what_they_just_did(
+        self, client: TestClient, db: Session, comms: User, monkeypatch
+    ) -> None:
+        from app.services import mail
+
+        sent: list[tuple] = []
+        monkeypatch.setattr(
+            mail, "send", lambda to, subject, body, **rest: sent.append((to, subject, body))
+        )
+
+        account = add_account(client)
+        post = draft(client, account["id"])
+        client.post(
+            f"/api/v1/social/posts/{post['id']}/approve",
+            json={},
+            headers=auth_headers(client, "comms"),
+        )
+
+        # comms is a supervisor, so they would otherwise qualify.
+        assert sent == []
+
+
+class TestComposers:
+    """Each channel wants a post written its own way, and says so."""
+
+    def test_instagram_needs_a_picture_and_has_no_link(self, client: TestClient) -> None:
+        composers = client.get("/api/v1/social/composers").json()
+        instagram = next(item for item in composers if item["platform"] == "instagram")
+
+        assert instagram["needs_image"] is True
+        assert instagram["allows_link"] is False
+        assert instagram["text_label"] == "Caption"
+        assert instagram["text_limit"] == 2200
+
+    def test_facebook_takes_a_link_and_needs_no_picture(self, client: TestClient) -> None:
+        composers = client.get("/api/v1/social/composers").json()
+        facebook = next(item for item in composers if item["platform"] == "facebook")
+
+        assert facebook["needs_image"] is False
+        assert facebook["allows_link"] is True

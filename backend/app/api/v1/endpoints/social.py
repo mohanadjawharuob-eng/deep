@@ -24,6 +24,7 @@ Three decisions worth stating:
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -42,7 +43,7 @@ from app.models.enums import (
 from app.models.enums import ModuleLevel as Level
 from app.models.media import Photograph
 from app.models.project import Project
-from app.models.social import PostAsset, PostMetric, SocialAccount, SocialPost
+from app.models.social import PostAsset, PostMetric, PostNote, SocialAccount, SocialPost
 from app.models.user import User
 from app.schemas.common import Message, Page
 from app.schemas.social import (
@@ -52,20 +53,24 @@ from app.schemas.social import (
     ApprovalRequest,
     AssetAdd,
     AssetRead,
+    ComposerRead,
     CoverageEntry,
     Engagement,
     LocationCheckResult,
     LocationFinding,
     MetricCreate,
     MetricRead,
+    NoteCreate,
+    NoteRead,
     OutreachSummary,
     PostCreate,
     PostDetail,
     PostSummary,
     PostUpdate,
     PublishRequest,
+    SendBackRequest,
 )
-from app.services import activity, outreach, records
+from app.services import activity, mail, outreach, records
 
 router = APIRouter(prefix="/social", tags=["Social media"])
 
@@ -179,6 +184,28 @@ def create_account(
     )
     session.flush()
     return _account_read(session, account)
+
+
+@router.get(
+    "/composers",
+    response_model=list[ComposerRead],
+    summary="How each channel wants a post written",
+    description=(
+        "Writing for Instagram is not writing for Facebook. A caption goes "
+        "under a picture and cannot carry a tappable link; a Facebook post is "
+        "text that may have a link and may have no picture at all.\n\n"
+        "Served rather than built into the client for the same reason form "
+        "layouts are: these are conventions, they change when the platforms "
+        "change, and they should change in one place. Every limit here is "
+        "advisory - the platform counts and says so, and never refuses. It is "
+        "not the one publishing."
+    ),
+)
+def list_composers() -> list[ComposerRead]:
+    return [
+        ComposerRead.model_validate(asdict(composer))
+        for composer in outreach.COMPOSERS.values()
+    ]
 
 
 @router.get("/accounts", response_model=Page[AccountRead], summary="The channels")
@@ -332,6 +359,59 @@ def delete_account(
 # --------------------------------------------------------------------------
 # Posts
 # --------------------------------------------------------------------------
+def _tell_the_publishers(
+    session: DbSession, post: SocialPost, approver: User, account: SocialAccount | None
+) -> None:
+    """E-mail whoever will actually put the post up.
+
+    The platform publishes nothing itself - it holds no API keys, deliberately
+    - so an approval is a message to a person: this is cleared, it is your turn.
+    Without it the approval lands in a database and the post sits there, which
+    is exactly what happened to every institution that ran this on paper.
+
+    It goes to everybody with editor access or better to the social media
+    module, minus the approver, who does not need telling what they just did.
+    Mail never raises here: a mail server being down is not a reason for an
+    approval to fail.
+    """
+    recipients = [
+        user
+        for user in session.scalars(select(User).where(User.is_active.is_(True))).all()
+        if user.id != approver.id
+        and user.email
+        and has_module_access(user, MODULE, Level.EDITOR)
+    ]
+    if not recipients:
+        return
+
+    where = f"{account.platform.value} (@{account.handle})" if account else "the channel"
+    signed_off_by = approver.full_name or approver.username
+    body = "\n".join(
+        [
+            f"{signed_off_by} has approved a post for {where}:",
+            "",
+            f"    {post.title}",
+            "",
+            (post.body or "(no text yet)"),
+            "",
+            "It is cleared to go up. The platform does not post anything itself,",
+            "so this is the point at which somebody puts it on the channel and",
+            "records where it landed.",
+        ]
+    )
+    if post.location_warning:
+        body += (
+            "\n\nOne thing to know before it goes out:\n"
+            f"    {post.location_warning}"
+        )
+
+    mail.send(
+        [user.email for user in recipients],
+        subject=f"Ready to post: {post.title}",
+        body=body,
+    )
+
+
 def _subject_label(session: DbSession, post: SocialPost) -> str | None:
     """What the post is about, in words.
 
@@ -393,10 +473,24 @@ def _post_detail(session: DbSession, post: SocialPost, user: User | None) -> Pos
     # none at all.
     payload.location_check = _as_result(outreach.check_location_disclosure(session, post))
 
+    payload.notes_thread = _notes(session, post.id)
+
     payload.can_edit = _may_edit(user, post)
     payload.can_delete = has_module_access(user, MODULE, Level.SUPERVISOR)
     payload.can_approve = has_module_access(user, MODULE, Level.SUPERVISOR)
     return payload
+
+
+def _notes(session: DbSession, post_id: uuid.UUID) -> list[NoteRead]:
+    rows = []
+    for note in session.scalars(
+        select(PostNote).where(PostNote.post_id == post_id).order_by(PostNote.created_at)
+    ).all():
+        entry = NoteRead.model_validate(note)
+        author = session.get(User, note.author_id) if note.author_id else None
+        entry.author_label = (author.full_name or author.username) if author else None
+        rows.append(entry)
+    return rows
 
 
 @router.post(
@@ -622,6 +716,14 @@ def approve_post(
     post.approved_by_id = user.id
     post.approved_at = datetime.now(UTC)
     post.approval_note = payload.note
+    if payload.note:
+        session.add(
+            PostNote(
+                post_id=post.id, author_id=user.id, body=payload.note, decision="approved"
+            )
+        )
+
+    _tell_the_publishers(session, post, user, session.get(SocialAccount, post.account_id))
 
     activity.log(
         session,
@@ -638,6 +740,93 @@ def approve_post(
     )
     session.flush()
     return _post_detail(session, post, user)
+
+
+@router.post(
+    "/posts/{post_id}/send-back",
+    response_model=PostDetail,
+    summary="Send a post back to be changed",
+    description=(
+        "The other half of approving. Approving is one bit and almost no real "
+        "review is one bit - 'the find number is wrong', 'wait for the "
+        "permit', 'crop the trowel out' are the substance of getting a post "
+        "right.\n\n"
+        "A reason is required: 'not yet' with nothing attached is a dead end "
+        "for whoever wrote it."
+    ),
+)
+def send_post_back(
+    post_id: uuid.UUID,
+    payload: SendBackRequest,
+    session: DbSession,
+    request: Request,
+    user: SocialSupervisor,
+) -> PostDetail:
+    post = records.get_or_404(session, SocialPost, post_id, "Post")
+    if post.status is PostStatus.PUBLISHED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="That post has already gone out. Withdraw it rather than sending it back.",
+        )
+
+    post.status = PostStatus.DRAFT
+    post.approved_by_id = None
+    post.approved_at = None
+    post.approval_note = payload.note
+    session.add(
+        PostNote(post_id=post.id, author_id=user.id, body=payload.note, decision="sent_back")
+    )
+
+    activity.log(
+        session,
+        action=ActivityAction.UPDATE,
+        user=user,
+        resource_type=RESOURCE,
+        resource_id=post.id,
+        resource_label=post.title,
+        summary=f"Sent post {post.title!r} back to be changed",
+        request=request,
+    )
+    session.flush()
+    return _post_detail(session, post, user)
+
+
+@router.get(
+    "/posts/{post_id}/notes",
+    response_model=list[NoteRead],
+    summary="What colleagues have said about a post",
+)
+def list_notes(post_id: uuid.UUID, session: DbSession, user: SocialViewer) -> list[NoteRead]:
+    records.get_or_404(session, SocialPost, post_id, "Post")
+    return _notes(session, post_id)
+
+
+@router.post(
+    "/posts/{post_id}/notes",
+    response_model=NoteRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Say something about a post",
+    description=(
+        "Anybody who can see the module can leave a note - reviewing a post is "
+        "not the same job as approving it, and the person who knows the find "
+        "number is wrong is usually not the person who signs it off."
+    ),
+)
+def add_note(
+    post_id: uuid.UUID,
+    payload: NoteCreate,
+    session: DbSession,
+    request: Request,
+    user: SocialViewer,
+) -> NoteRead:
+    post = records.get_or_404(session, SocialPost, post_id, "Post")
+    note = PostNote(post_id=post.id, author_id=user.id, body=payload.body.strip())
+    session.add(note)
+    session.flush()
+
+    entry = NoteRead.model_validate(note)
+    entry.author_label = user.full_name or user.username
+    return entry
 
 
 @router.post(

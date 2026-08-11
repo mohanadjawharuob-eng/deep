@@ -2495,6 +2495,29 @@ details.card[open] > summary::after { content: "▾"; }
   transition: border-color var(--transition), transform var(--transition);
 }
 .channel-card:hover { border-color: var(--accent); }
+/* The card opens the channel's pictures; writing a post is its own button
+   underneath. A card that did both would do the wrong one half the time. */
+.channel-slot { display: flex; flex-direction: column; gap: var(--space-2); align-items: stretch; }
+.channel-slot .btn { justify-content: center; }
+
+/* A review, read top to bottom. A decision is marked on the left rather than
+   only coloured, because "not yet, because X" is why a post is sitting still
+   and a passing remark is not. */
+.thread { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.thread > li {
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.thread > li.decision { border-left: 3px solid var(--text-3); }
+.thread > li.decision.approved { border-left-color: var(--success, var(--accent)); }
+.thread > li.decision.sent_back { border-left-color: var(--warning, var(--danger)); }
+
+/* How much of the channel's limit is used. Advisory: it turns red and nothing
+   stops. This platform does not publish and is in no position to refuse. */
+.count { float: right; font-weight: 400; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.count.over { color: var(--danger); font-weight: 700; }
 .channel-name { font-size: var(--text-lg); font-weight: 600; }
 /* The one place a brand's own colour earns its keep: it is how somebody finds
    the right box in half a second. */

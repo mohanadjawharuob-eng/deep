@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "../lib/api";
 import { useAction, useQuery, useSession } from "../lib/hooks";
@@ -73,14 +74,19 @@ export function Channels() {
     const channel = CHANNELS.find((item) => item.kind === chosen)!;
     return (
       <div>
-        <button
-          type="button"
-          className="btn btn-sm"
-          style={{ marginBottom: 12 }}
-          onClick={() => setChosen(null)}
-        >
-          ← Both channels
-        </button>
+        <div className="row-tight" style={{ marginBottom: 12 }}>
+          <button type="button" className="btn btn-sm" onClick={() => setChosen(null)}>
+            ← Both channels
+          </button>
+          {mayEdit && (
+            <Link className="btn btn-sm btn-primary" to={`/social/posts/new?platform=${channel.kind}`}>
+              Write a {channel.name} post
+            </Link>
+          )}
+          <Link className="btn btn-sm" to={`/social?platform=${channel.kind}`}>
+            What has gone out
+          </Link>
+        </div>
         <Media
           onlyKind={channel.kind}
           title={channel.name}
@@ -104,8 +110,8 @@ export function Channels() {
           const folder = roots[channel.kind];
           const inside = all.filter((item) => item.parent_id === folder?.id).length;
           return (
+            <div key={channel.kind} className="channel-slot">
             <button
-              key={channel.kind}
               type="button"
               className={`channel-card channel-${channel.kind}`}
               onClick={() => setChosen(channel.kind)}
@@ -128,6 +134,15 @@ export function Channels() {
                   : "setting up…"}
               </span>
             </button>
+            {mayEdit && (
+              <Link
+                className="btn btn-sm"
+                to={`/social/posts/new?platform=${channel.kind}`}
+              >
+                Create post
+              </Link>
+            )}
+            </div>
           );
         })}
       </div>

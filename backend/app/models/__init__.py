@@ -102,7 +102,7 @@ from app.models.museum import (
 )
 from app.models.project import Project, ProjectMembership
 from app.models.site import Site
-from app.models.social import PostAsset, PostMetric, SocialAccount, SocialPost
+from app.models.social import PostAsset, PostMetric, PostNote, SocialAccount, SocialPost
 from app.models.storage import StorageLocation, StorageMovement
 from app.models.taxonomy import Material, ObjectCategory, Period, Publication, SystemSetting
 from app.models.user import RecordPermission, RefreshToken, User, UserModuleAccess
@@ -120,6 +120,7 @@ __all__ = [
     "PostAsset",
     "PostKind",
     "PostMetric",
+    "PostNote",
     "PostStatus",
     "SocialAccount",
     "SocialPlatform",

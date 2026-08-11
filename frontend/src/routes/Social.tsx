@@ -464,6 +464,8 @@ export function PostScreen() {
     [postId],
   );
 
+  const [sendingBack, setSendingBack] = useState(false);
+
   const approve = useAction(async () => {
     await api.post(`/social/posts/${postId}/approve`, {});
     post.reload();
@@ -497,6 +499,11 @@ export function PostScreen() {
                 onClick={() => void approve.run()}
               >
                 {approve.running ? "Approving…" : "Approve"}
+              </button>
+            )}
+            {record.can_approve && record.status !== "published" && (
+              <button type="button" className="btn" onClick={() => setSendingBack(true)}>
+                Send it back…
               </button>
             )}
             {record.can_edit && record.status !== "published" && (
@@ -659,6 +666,19 @@ export function PostScreen() {
         </section>
       )}
 
+      <ReviewThread post={record} onChanged={() => post.reload()} />
+
+      {sendingBack && (
+        <SendBackDialog
+          postId={record.id}
+          onClose={() => setSendingBack(false)}
+          onDone={() => {
+            setSendingBack(false);
+            post.reload();
+          }}
+        />
+      )}
+
       {publishing && (
         <PublishDialog
           post={record}
@@ -740,6 +760,150 @@ function PublishDialog({
             onClick={() => void publish.run()}
           >
             {publish.running ? "Recording…" : "Record it"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What colleagues have said about a post that has not gone out.
+ *
+ * Approving is one bit, and almost no real review is one bit. "The find number
+ * is wrong", "wait until the permit is signed", "lovely, but crop the trowel
+ * out" are the substance of getting a post right, and with nowhere to put them
+ * they are said in a corridor and lost the moment the post goes up.
+ *
+ * Kept after publication rather than cleared, because why a post says what it
+ * says is a question that gets asked later, usually by somebody who was not in
+ * the room.
+ */
+function ReviewThread({
+  post,
+  onChanged,
+}: {
+  post: SocialPostDetail;
+  onChanged: () => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const add = useAction(async () => {
+    await api.post(`/social/posts/${post.id}/notes`, { body: draft.trim() });
+    setDraft("");
+    onChanged();
+  });
+
+  const notes = post.notes_thread ?? [];
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <span className="card-title">What people have said</span>
+        <span className="muted small">{notes.length || ""}</span>
+      </div>
+      <div className="card-body">
+        {notes.length === 0 ? (
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Nothing yet. A post is easier to fix before it goes out than after.
+          </p>
+        ) : (
+          <ol className="thread">
+            {notes.map((note) => (
+              <li key={note.id} className={note.decision ? `decision ${note.decision}` : ""}>
+                <div className="small muted">
+                  {note.author_label ?? "Somebody"}
+                  {note.decision === "approved" && " approved this"}
+                  {note.decision === "sent_back" && " sent it back"}
+                  {" · "}
+                  {formatDateTime(note.created_at)}
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{note.body}</div>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {add.error && <ErrorNote message={add.error} />}
+
+        <div className="field" style={{ marginTop: 12 }}>
+          <textarea
+            className="input"
+            rows={3}
+            value={draft}
+            placeholder="The find number is TD-114, not TD-141."
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={!draft.trim() || add.running}
+          onClick={() => void add.run()}
+        >
+          {add.running ? "Adding…" : "Add a note"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function SendBackDialog({
+  postId,
+  onClose,
+  onDone,
+}: {
+  postId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [note, setNote] = useState("");
+
+  const send = useAction(async () => {
+    await api.post(`/social/posts/${postId}/send-back`, { note: note.trim() });
+    onDone();
+  });
+
+  return (
+    <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Send this post back">
+      <div className="modal">
+        <div className="modal-title">Send it back to be changed</div>
+        <p className="small" style={{ margin: "8px 0 14px", color: "var(--text-2)" }}>
+          It goes back to a draft and the reason joins the thread, so whoever wrote it can
+          see what to do rather than being told no.
+        </p>
+
+        {send.error && <ErrorNote message={send.error} />}
+
+        <div className="field">
+          <label className="field-label" htmlFor="why">
+            What needs changing?
+          </label>
+          <textarea
+            id="why"
+            className="input"
+            rows={4}
+            autoFocus
+            value={note}
+            placeholder="Wait until the permit is signed."
+            onChange={(event) => setNote(event.target.value)}
+          />
+          <p className="field-help">
+            Required — “not yet” with nothing attached is a dead end for whoever wrote it.
+          </p>
+        </div>
+
+        <div className="row-tight" style={{ justifyContent: "flex-end" }}>
+          <button type="button" className="btn" onClick={onClose} disabled={send.running}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!note.trim() || send.running}
+            onClick={() => void send.run()}
+          >
+            {send.running ? "Sending…" : "Send it back"}
           </button>
         </div>
       </div>

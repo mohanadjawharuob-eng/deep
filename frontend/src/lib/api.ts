@@ -1136,6 +1136,17 @@ export type SocialPostDetail = SocialPost & {
   can_edit: boolean;
   can_delete: boolean;
   can_approve: boolean;
+  /** What colleagues have said while it was being got right. */
+  notes_thread?: PostNote[];
+};
+
+export type PostNote = {
+  id: string;
+  body: string;
+  /** `approved` or `sent_back` when the note came with a decision. */
+  decision?: string | null;
+  author_label?: string | null;
+  created_at: string;
 };
 
 export type OutreachSummary = {

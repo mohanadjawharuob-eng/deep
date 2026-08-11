@@ -60,6 +60,7 @@ import {
 } from "./routes/Management";
 import { AdminUsers } from "./routes/Admin";
 import { CustomFieldsAdmin } from "./routes/CustomFields";
+import { NewPost } from "./routes/NewPost";
 import { Appearance, MyProfile } from "./routes/Appearance";
 import { Outreach, PostScreen } from "./routes/Social";
 import {
@@ -183,6 +184,7 @@ export function App() {
 
         <Route path="social" element={<Outreach />} />
         <Route path="social/accounts" element={<MediaChannels />} />
+        <Route path="social/posts/new" element={<NewPost />} />
         <Route path="social/posts/:postId" element={<PostScreen />} />
 
         <Route path="library" element={<Library />} />

@@ -148,6 +148,46 @@ class ApprovalRequest(BaseModel):
     )
 
 
+class NoteCreate(BaseModel):
+    body: str = Field(min_length=1, description="What needs saying about this post")
+
+
+class NoteRead(ORMModel):
+    id: uuid.UUID
+    body: str
+    #: ``approved`` or ``sent_back`` when the note came with a decision, so a
+    #: reason a post is sitting still reads differently from a passing remark.
+    decision: str | None = None
+    author_label: str | None = None
+    created_at: datetime
+
+
+class SendBackRequest(BaseModel):
+    note: str = Field(
+        min_length=1,
+        description=(
+            "What needs changing. Required: 'not yet' with no reason is a dead "
+            "end for whoever wrote the post."
+        ),
+    )
+
+
+class ComposerRead(BaseModel):
+    """How one channel wants a post written."""
+
+    platform: str
+    label: str
+    text_label: str
+    text_help: str
+    text_limit: int | None = None
+    needs_image: bool
+    image_help: str
+    allows_link: bool
+    link_help: str | None = None
+    kinds: list[str] = Field(default_factory=list)
+    hashtag_help: str
+
+
 class LocationFinding(BaseModel):
     kind: str
     detail: str
@@ -287,6 +327,7 @@ class PostDetail(PostRead):
     can_edit: bool = False
     can_delete: bool = False
     can_approve: bool = False
+    notes_thread: list[NoteRead] = Field(default_factory=list)
 
 
 class OutreachSummary(BaseModel):

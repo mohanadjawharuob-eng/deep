@@ -235,3 +235,107 @@ def mark_published(
         post.external_id = external_id
     session.flush()
     return post
+
+
+# --------------------------------------------------------------------------
+# What each channel asks for
+# --------------------------------------------------------------------------
+@dataclass(slots=True)
+class Composer:
+    """How one platform wants a post written.
+
+    Writing for Instagram is not writing for Facebook. A caption goes under a
+    picture and cannot carry a working link; a Facebook post is text that may
+    have a link and may have no picture at all. A single "post" form that
+    ignores the difference produces drafts that cannot be posted as written,
+    and whoever has to actually publish them rewrites every one.
+
+    Served rather than hard-coded in the client for the same reason layouts
+    are: these are conventions, they change when the platforms change, and
+    they should change in one place. The limits are advisory - the platform
+    counts and says so, and never refuses. It is not the one publishing.
+    """
+
+    platform: str
+    label: str
+    #: What the writing is called on this platform, in its own words.
+    text_label: str
+    text_help: str
+    #: The platform's own cap on the writing, as of now. Advisory.
+    text_limit: int | None
+    #: Whether a picture is the point, or optional.
+    needs_image: bool
+    image_help: str
+    #: A link that works when somebody taps it.
+    allows_link: bool
+    link_help: str | None
+    #: What shapes of post this channel actually has.
+    kinds: list[str]
+    hashtag_help: str
+
+
+COMPOSERS: dict[str, Composer] = {
+    "instagram": Composer(
+        platform="instagram",
+        label="Instagram",
+        text_label="Caption",
+        text_help=(
+            "It sits under the picture. The first line is what people see "
+            "before tapping 'more', so put the find in it."
+        ),
+        text_limit=2200,
+        needs_image=True,
+        image_help=(
+            "At least one. Instagram is the picture - a post with no image "
+            "cannot be published there at all."
+        ),
+        allows_link=False,
+        link_help=(
+            "Links in a caption are not tappable on Instagram. Put the address "
+            "in the profile and say 'link in bio', or leave it out."
+        ),
+        kinds=["post", "story", "reel"],
+        hashtag_help="Up to 30. Most accounts do better with five that mean something.",
+    ),
+    "facebook": Composer(
+        platform="facebook",
+        label="Facebook",
+        text_label="What it says",
+        text_help=(
+            "Longer is fine here. Facebook shows the first few lines and a "
+            "'See more', so lead with the thing worth reading."
+        ),
+        text_limit=63206,
+        needs_image=False,
+        image_help="Optional. A post with a picture reaches further, but text alone works.",
+        allows_link=True,
+        link_help="A link here is tappable, and Facebook draws a preview card from it.",
+        kinds=["post", "story", "video", "announcement"],
+        hashtag_help="A couple at most. Facebook is not a hashtag place.",
+    ),
+}
+
+
+def composer_for(platform: str) -> Composer:
+    """The composer for a platform, falling back to a plain one.
+
+    A channel on a platform nobody has written rules for should still be
+    postable, so the fallback is the least opinionated form there is rather
+    than an error.
+    """
+    known = COMPOSERS.get(platform)
+    if known is not None:
+        return known
+    return Composer(
+        platform=platform,
+        label=platform.replace("_", " ").title(),
+        text_label="What it says",
+        text_help="",
+        text_limit=None,
+        needs_image=False,
+        image_help="Optional.",
+        allows_link=True,
+        link_help=None,
+        kinds=["post", "article", "announcement"],
+        hashtag_help="",
+    )
