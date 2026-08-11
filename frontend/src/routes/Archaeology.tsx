@@ -233,7 +233,7 @@ export function ProjectDetail() {
         </Link>
       </nav>
 
-      <RecordPhotos parent={{ project_id: record.id }} />
+      <RecordPhotos parent={{ project_id: record.id }} counted="in this project" />
 
       <DataRequests parent={{ project_id: record.id }} recordId={record.id} />
 
@@ -527,7 +527,10 @@ export function SiteDetail() {
           ends in "you may not" wastes the one click they were sure about. */}
       <MatrixImport siteId={record.id} />
 
-      <RecordPhotos parent={{ site_id: record.id }} />
+      <RecordPhotos
+        parent={{ site_id: record.id }}
+        counted="on this site and its finds"
+      />
 
       <MediaFolders parent={{ site_id: record.id }} />
 

@@ -1371,3 +1371,69 @@ class TestMuseumObjectMedia:
             headers=auth_headers(client, "outsider"),
         )
         assert response.status_code in (403, 404), response.text
+
+
+class TestWhatASiteStripShows:
+    """The pictures of a site, as opposed to the pictures on its record.
+
+    A photograph is attached to one record, but an upload against a find also
+    records the site and project it came from - so asking for a site's
+    photographs already reaches the finds dug out of it. This is the test that
+    says so, because it is the behaviour a screen depends on and nothing else
+    was holding it.
+    """
+
+    def test_a_site_reaches_the_photographs_of_its_finds(
+        self, client: TestClient, researcher: User, site: dict, artifact: dict
+    ) -> None:
+        upload_photo(client, filename="trench.jpg", title="Trench A", site_id=site["id"])
+        upload_photo(client, filename="rim.jpg", title="The rim", artifact_id=artifact["id"])
+
+        listing = client.get(
+            "/api/v1/photographs",
+            params={"site_id": site["id"]},
+            headers=auth_headers(client, "researcher"),
+        ).json()
+        assert sorted(row["title"] for row in listing["items"]) == ["The rim", "Trench A"]
+
+    def test_it_does_not_reach_another_site(
+        self, client: TestClient, researcher: User, project: dict, site: dict, artifact: dict
+    ) -> None:
+        other = client.post(
+            "/api/v1/sites",
+            json={"project_id": project["id"], "name": "Elsewhere", "code": "ELS"},
+            headers=auth_headers(client, "researcher"),
+        ).json()
+        upload_photo(client, filename="rim.jpg", title="The rim", artifact_id=artifact["id"])
+        upload_photo(client, filename="other.jpg", title="Not ours", site_id=other["id"])
+
+        listing = client.get(
+            "/api/v1/photographs",
+            params={"site_id": site["id"]},
+            headers=auth_headers(client, "researcher"),
+        ).json()
+        assert [row["title"] for row in listing["items"]] == ["The rim"]
+
+
+class TestCollectionMedia:
+    def test_a_collection_shows_the_photographs_of_its_objects(
+        self, client: TestClient, curator: User, museum_object: dict, other_object: dict
+    ) -> None:
+        client.post(
+            "/api/v1/photographs",
+            files={"file": ("dish.png", make_image(80, 60, "PNG"), "image/png")},
+            data={"title": "The dish", "museum_object_id": museum_object["id"]},
+            headers=auth_headers(client, "curator"),
+        )
+
+        detail = client.get(
+            f"/api/v1/museum/objects/{museum_object['id']}",
+            headers=auth_headers(client, "curator"),
+        ).json()
+
+        listing = client.get(
+            "/api/v1/photographs",
+            params={"collection_id": detail["collection_id"]},
+            headers=auth_headers(client, "curator"),
+        ).json()
+        assert [row["title"] for row in listing["items"]] == ["The dish"]

@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.permissions import can_delete, can_edit, visibility_filter
 from app.models.enums import ResourceType, ReviewStatus
 from app.models.media import Photograph
+from app.models.museum import MuseumObject
 from app.models.user import User
 from app.schemas.common import Message, Page
 from app.schemas.media import PhotographDetail, PhotographSummary, PhotographUpdate
@@ -203,6 +204,9 @@ def list_photographs(
     artifact_id: Annotated[uuid.UUID | None, Query()] = None,
     context_id: Annotated[uuid.UUID | None, Query()] = None,
     museum_object_id: Annotated[uuid.UUID | None, Query()] = None,
+    collection_id: Annotated[
+        uuid.UUID | None, Query(description="Photographs of the objects in one collection")
+    ] = None,
     folder_id: Annotated[
         str | None, Query(description="A folder's id, or `none` for what is unfiled")
     ] = None,
@@ -225,6 +229,11 @@ def list_photographs(
                 func.lower(func.array_to_string(Photograph.tags, " ")).like(pattern),
             )
         )
+    # `site_id` already reaches a site's finds and contexts, because an upload
+    # against a find records the site it came from as well - so these are the
+    # pictures *of* the site, not only the ones hung on its own record. A
+    # collection has no such column to inherit, so it is answered through its
+    # objects below.
     if project_id is not None:
         statement = statement.where(Photograph.project_id == project_id)
     if site_id is not None:
@@ -235,6 +244,12 @@ def list_photographs(
         statement = statement.where(Photograph.context_id == context_id)
     if museum_object_id is not None:
         statement = statement.where(Photograph.museum_object_id == museum_object_id)
+    if collection_id is not None:
+        statement = statement.where(
+            Photograph.museum_object_id.in_(
+                select(MuseumObject.id).where(MuseumObject.collection_id == collection_id)
+            )
+        )
     if folder_id == "none":
         statement = statement.where(Photograph.folder_id.is_(None))
     elif folder_id:

@@ -59,6 +59,7 @@ export function PhotoViewer({
 }) {
   const { can, user } = useSession();
   const [confirming, setConfirming] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
 
@@ -96,13 +97,23 @@ export function PhotoViewer({
   return (
     <div className="modal-scrim" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="viewer" onClick={(event) => event.stopPropagation()}>
-        <div className="viewer-image">
-          <AuthImage
-            path={`/photographs/${it.id}/thumbnail`}
-            query={{ size: 1600 }}
-            alt={it.title}
-            fallback={<span className="muted">This picture could not be loaded.</span>}
-          />
+        <div className={`viewer-image ${zoomed ? "zoomed" : ""}`}>
+          {/* The photograph itself, not a thumbnail of it. The largest
+              thumbnail the platform generates is 800px wide, so a viewer built
+              on thumbnails shows a blurred copy of a 24-megapixel frame and
+              gives somebody no way to reach the picture they uploaded. */}
+          <button
+            type="button"
+            className="viewer-zoom"
+            onClick={() => setZoomed(!zoomed)}
+            title={zoomed ? "Fit to the window" : "Show it at full size"}
+          >
+            <AuthImage
+              path={`/photographs/${it.id}/file`}
+              alt={it.title}
+              fallback={<span className="muted">This picture could not be loaded.</span>}
+            />
+          </button>
         </div>
 
         <aside className="viewer-side">
@@ -220,7 +231,13 @@ export function PhotoViewer({
             <button
               type="button"
               className="btn btn-sm"
-              onClick={() => void api.download(`/photographs/${it.id}/download`)}
+              onClick={() =>
+                void api.download(
+                  `/photographs/${it.id}/file`,
+                  undefined,
+                  it.original_filename ?? `${it.title}.jpg`,
+                )
+              }
             >
               Download
             </button>

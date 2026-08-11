@@ -19,6 +19,7 @@
  */
 
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api, type Page } from "../lib/api";
 import { useAction, useQuery, useSession } from "../lib/hooks";
@@ -31,6 +32,13 @@ export type Parent = {
   artifact_id?: string;
   context_id?: string;
   museum_object_id?: string;
+  /**
+   * A collection is not something a photograph attaches to — it is a place
+   * to look. Passing one shows the photographs of every object in it, and
+   * there is nothing to upload here, because there is no one record for an
+   * uploaded picture to belong to.
+   */
+  collection_id?: string;
 };
 
 export type PhotoRow = {
@@ -41,20 +49,45 @@ export type PhotoRow = {
   taken_at?: string | null;
   created_at: string;
   review_status?: string;
+  site_id?: string | null;
+  artifact_id?: string | null;
+  context_id?: string | null;
+  museum_object_id?: string | null;
 };
+
+/** Which record a picture is of, when the strip is showing more than one. */
+function recordOf(photo: PhotoRow): { to: string; label: string } | null {
+  if (photo.museum_object_id) {
+    return { to: `/museum/objects/${photo.museum_object_id}`, label: "an object" };
+  }
+  if (photo.artifact_id) return { to: `/artifacts/${photo.artifact_id}`, label: "a find" };
+  if (photo.context_id) return { to: `/contexts/${photo.context_id}`, label: "a context" };
+  if (photo.site_id) return { to: `/sites/${photo.site_id}`, label: "the site" };
+  return null;
+}
 
 export function RecordPhotos({
   parent,
   /** Which module governs adding one. A museum object is the museum's. */
   module = "archaeology",
   title = "Photographs",
+  /**
+   * How the count reads — "on this site and its finds", "in this collection".
+   *
+   * A site's photographs already include the ones taken of the finds dug out
+   * of it, because an upload against a find records the site too. Saying "12
+   * on this record" over a strip that is mostly finds is the count being
+   * quietly wrong about what it counted.
+   */
+  counted = "on this record",
 }: {
   parent: Parent;
   module?: "archaeology" | "museum";
   title?: string;
+  counted?: string;
 }) {
   const { can } = useSession();
-  const mayAdd = can(module, "contributor");
+  const mayAdd = can(module, "contributor") && !parent.collection_id;
   const chooser = useRef<HTMLInputElement>(null);
   const [failures, setFailures] = useState<string[]>([]);
   const [viewing, setViewing] = useState<PhotoRow | null>(null);
@@ -86,7 +119,7 @@ export function RecordPhotos({
         <span className="card-title">{title}</span>
         <span className="muted small">
           {photos.data?.total
-            ? `${photos.data.total} on this record`
+            ? `${photos.data.total} ${counted}`
             : photos.loading
               ? ""
               : "none yet"}
@@ -121,6 +154,18 @@ export function RecordPhotos({
                 </button>
                 <figcaption className="truncate" title={photo.title}>
                   {photo.title}
+                  {/* A site's strip mixes trench shots with pictures of the
+                      finds. Saying which record each is on is the difference
+                      between a useful wall and a wall of unlabelled
+                      thumbnails. */}
+                  {!parent.artifact_id && !parent.museum_object_id && recordOf(photo) && (
+                    <>
+                      {" "}
+                      <Link className="small" to={recordOf(photo)!.to}>
+                        {recordOf(photo)!.label}
+                      </Link>
+                    </>
+                  )}
                   {/* Arrived from outside, or from somebody whose work is
                       reviewed: said out loud rather than shown as settled. */}
                   {photo.review_status === "pending" && (

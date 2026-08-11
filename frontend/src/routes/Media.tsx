@@ -29,6 +29,7 @@ import {
   PageHeader,
   formatDate,
 } from "../components/ui";
+import { PhotoViewer } from "../components/PhotoViewer";
 
 export type Folder = {
   id: string;
@@ -87,6 +88,7 @@ export function Media({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<string | null | false>(false);
+  const [viewing, setViewing] = useState<Photo | null>(null);
 
   const folders = useQuery<Folder[]>(
     (signal) => api.get("/folders", undefined, signal),
@@ -290,12 +292,15 @@ export function Media({
                     key={photo.id}
                     className={`gallery-tile pickable ${chosen.has(photo.id) ? "chosen" : ""}`}
                   >
+                    {/* Clicking a photograph opens it. Choosing several to
+                        move is the tick in the corner, deliberately separate:
+                        a grid where the only thing a click does is select is a
+                        grid where nobody can look at their own pictures. */}
                     <button
                       type="button"
                       className="pick-target"
-                      onClick={() => pick(photo.id)}
-                      aria-pressed={chosen.has(photo.id)}
-                      aria-label={`Choose ${photo.title}`}
+                      onClick={() => setViewing(photo)}
+                      aria-label={`Open ${photo.title}`}
                     >
                       <AuthImage
                         path={`/photographs/${photo.id}/thumbnail`}
@@ -304,6 +309,14 @@ export function Media({
                         fallback={<span className="small muted">could not load</span>}
                       />
                     </button>
+                    <label className="tile-tick" title="Choose it, to move or file it">
+                      <input
+                        type="checkbox"
+                        checked={chosen.has(photo.id)}
+                        onChange={() => pick(photo.id)}
+                        aria-label={`Choose ${photo.title}`}
+                      />
+                    </label>
                     <figcaption>
                       <span className="strong truncate" title={photo.title}>
                         {photo.title}
@@ -327,6 +340,17 @@ export function Media({
           )}
         </section>
       </div>
+
+      {viewing && (
+        <PhotoViewer
+          photo={viewing}
+          onClose={() => setViewing(null)}
+          onChanged={() => {
+            photos.reload();
+            folders.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

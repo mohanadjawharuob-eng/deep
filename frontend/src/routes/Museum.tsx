@@ -1018,6 +1018,16 @@ export function CollectionDetail() {
         </div>
       </section>
 
+      {/* The pictures of the objects in here, in the place somebody stands
+          when they are thinking about the collection rather than about one
+          object. */}
+      <RecordPhotos
+        parent={{ collection_id: item.id }}
+        module="museum"
+        title="Photographs in this collection"
+        counted="in this collection"
+      />
+
       <section className="card" style={{ marginTop: "var(--space-5)" }}>
         <div className="card-header">
           <span className="card-title">Recent objects</span>
