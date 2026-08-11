@@ -383,18 +383,19 @@ function RefFiles({
       )}
 
       {rows.map((file) => (
-        <a
+        // Not a plain href: the browser would fetch it with no session on the
+        // request and be answered as if nobody were signed in.
+        <button
           key={file.id}
+          type="button"
           className="ref-file"
-          href={`/api/v1/documents/${file.id}/download`}
-          target="_blank"
-          rel="noreferrer"
+          onClick={() => void api.download(`/documents/${file.id}/download`)}
         >
           <span className="truncate">{file.original_filename ?? file.title}</span>
           <span className="muted small">
             {file.file_size ? `${Math.round(file.file_size / 1024)} KB` : "file"}
           </span>
-        </a>
+        </button>
       ))}
 
       {reference.url && (

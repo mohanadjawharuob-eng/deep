@@ -76,6 +76,7 @@ async def upload_document(
     site_id: Annotated[uuid.UUID | None, Form()] = None,
     artifact_id: Annotated[uuid.UUID | None, Form()] = None,
     context_id: Annotated[uuid.UUID | None, Form()] = None,
+    museum_object_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> DocumentDetail:
     links = attachments.resolve_attachment(
         session,
@@ -84,6 +85,7 @@ async def upload_document(
         site_id=site_id,
         artifact_id=artifact_id,
         context_id=context_id,
+        museum_object_id=museum_object_id,
     )
 
     max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
@@ -151,6 +153,7 @@ def list_documents(
     site_id: Annotated[uuid.UUID | None, Query()] = None,
     artifact_id: Annotated[uuid.UUID | None, Query()] = None,
     context_id: Annotated[uuid.UUID | None, Query()] = None,
+    museum_object_id: Annotated[uuid.UUID | None, Query()] = None,
     document_type: Annotated[DocumentType | None, Query()] = None,
     author: Annotated[str | None, Query()] = None,
     sort: Annotated[str, Query(pattern="^-?(created_at|title|document_date)$")] = "-created_at",
@@ -178,6 +181,8 @@ def list_documents(
         statement = statement.where(Document.artifact_id == artifact_id)
     if context_id is not None:
         statement = statement.where(Document.context_id == context_id)
+    if museum_object_id is not None:
+        statement = statement.where(Document.museum_object_id == museum_object_id)
     if document_type is not None:
         statement = statement.where(Document.document_type == document_type)
     if author:

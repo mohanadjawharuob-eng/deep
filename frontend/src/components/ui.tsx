@@ -287,6 +287,63 @@ export function Badge({
  * plain `<img src>` — that would be a request with no Authorization header,
  * answered as if nobody were signed in.
  */
+/**
+ * An image the browser cannot fetch on its own.
+ *
+ * A plain `<img src="/api/v1/…">` is a request the browser makes by itself,
+ * carrying no Authorization header, so the server answers it as if nobody were
+ * signed in. On a platform where almost nothing is public that means a broken
+ * image icon and no clue why — which is exactly how the record photograph on
+ * every museum object looked, and the QR code before it.
+ *
+ * So the bytes are fetched through the session and handed to the browser as a
+ * blob. Revoked on unmount, or the tab leaks a copy of every picture it has
+ * scrolled past.
+ */
+export function AuthImage({
+  path,
+  alt,
+  query,
+  className,
+  fallback = null,
+}: {
+  path: string;
+  alt: string;
+  query?: Record<string, unknown>;
+  className?: string;
+  fallback?: ReactNode;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let created: string | null = null;
+    let live = true;
+    setFailed(false);
+
+    api
+      .imageUrl(path, query)
+      .then((made) => {
+        created = made;
+        if (live) setUrl(made);
+        else URL.revokeObjectURL(made);
+      })
+      .catch(() => live && setFailed(true));
+
+    return () => {
+      live = false;
+      if (created) URL.revokeObjectURL(created);
+    };
+    // The query is an inline object on every render; its contents are what
+    // matter, not its identity.
+  }, [path, JSON.stringify(query ?? {})]);
+
+  if (failed) return <>{fallback}</>;
+  if (!url) return <span className="skeleton" style={{ width: "100%", height: "100%" }} />;
+  return <img className={className} src={url} alt={alt} />;
+}
+
+
 export function Avatar({
   userId,
   name,

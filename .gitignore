@@ -43,3 +43,7 @@ Thumbs.db
 # is drawn at startup, and the error note only exists when something went wrong.
 .stratum-icon.ico
 stratum-launcher-error.txt
+
+# Written by the log viewer, for sending on when something goes wrong. It never
+# reads .env, so it is safe to pass around - but it is generated, not source.
+stratum-log.txt

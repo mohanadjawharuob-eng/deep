@@ -93,9 +93,10 @@ def _label(session: DbSession, links: dict[str, uuid.UUID | None]) -> str:
     # Imported here rather than at module scope: these four are the record
     # types a request can be about, and the endpoint module has no other use
     # for them.
-    from app.models import Artifact, ExcavationContext, Project, Site
+    from app.models import Artifact, ExcavationContext, MuseumObject, Project, Site
 
     for key, model, fields in (
+        ("museum_object_id", MuseumObject, ("accession_number", "title")),
         ("artifact_id", Artifact, ("inventory_number", "name")),
         ("context_id", ExcavationContext, ("context_number", "description")),
         ("site_id", Site, ("code", "name")),
@@ -148,6 +149,7 @@ def create_request(
         site_id=payload.site_id,
         artifact_id=payload.artifact_id,
         context_id=payload.context_id,
+        museum_object_id=payload.museum_object_id,
     )
 
     token, digest = datarequests.new_token()
@@ -324,6 +326,7 @@ def list_requests(
                 DataRequest.site_id == record_id,
                 DataRequest.artifact_id == record_id,
                 DataRequest.context_id == record_id,
+                DataRequest.museum_object_id == record_id,
             )
         )
 

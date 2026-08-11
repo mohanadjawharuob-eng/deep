@@ -1232,3 +1232,142 @@ def test_every_photograph_row_keeps_its_thumbnail_map(
     for row in rows:
         for size, path in (row.thumbnails or {}).items():
             assert storage.exists(path), f"thumbnail {size} is recorded but missing"
+
+
+# --------------------------------------------------------------------------
+# The museum half of the platform
+# --------------------------------------------------------------------------
+@pytest.fixture
+def curator(db: Session) -> User:
+    from app.models import Module, ModuleLevel, UserRole
+
+    return make_user(
+        db,
+        email="curator@example.org",
+        username="curator",
+        role=UserRole.VISITOR,
+        modules={Module.MUSEUM: ModuleLevel.SUPERVISOR},
+        grant_defaults=False,
+    )
+
+
+@pytest.fixture
+def outsider(db: Session) -> User:
+    from app.models import UserRole
+
+    return make_user(
+        db,
+        email="nobody@example.org",
+        username="outsider",
+        role=UserRole.VISITOR,
+        grant_defaults=False,
+    )
+
+
+@pytest.fixture
+def museum_collection(client: TestClient, curator: User) -> dict:
+    response = client.post(
+        "/api/v1/museum/collections",
+        json={"name": "Ceramics", "code": "cer", "accession_prefix": "NM"},
+        headers=auth_headers(client, "curator"),
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _object(client: TestClient, collection: dict, title: str) -> dict:
+    response = client.post(
+        "/api/v1/museum/objects",
+        json={"title": title, "collection_id": collection["id"]},
+        headers=auth_headers(client, "curator"),
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture
+def museum_object(client: TestClient, curator: User, museum_collection: dict) -> dict:
+    return _object(client, museum_collection, "Dish")
+
+
+@pytest.fixture
+def other_object(client: TestClient, curator: User, museum_collection: dict) -> dict:
+    return _object(client, museum_collection, "Lamp")
+
+
+class TestMuseumObjectMedia:
+    """An accessioned object can carry a photograph.
+
+    It could not, until now, and the reason was structural rather than
+    deliberate: every media record hung from an excavation record, and an
+    accessioned object is not one. The catalogue screen showed a photograph
+    panel that was reading *every* photograph in the platform, because the
+    filter it passed did not exist and was silently ignored - so an object
+    with none showed somebody else's site.
+    """
+
+    def test_a_photograph_can_be_attached_to_an_object(
+        self, client: TestClient, curator: User, museum_object: dict
+    ) -> None:
+        response = client.post(
+            "/api/v1/photographs",
+            files={"file": ("dish.png", make_image(80, 60, "PNG"), "image/png")},
+            data={"title": "The dish, from above", "museum_object_id": museum_object["id"]},
+            headers=auth_headers(client, "curator"),
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["museum_object_id"] == museum_object["id"]
+
+    def test_the_filter_shows_only_that_objects_photographs(
+        self, client: TestClient, curator: User, museum_object: dict, other_object: dict
+    ) -> None:
+        for target, name in ((museum_object, "mine.png"), (other_object, "theirs.png")):
+            client.post(
+                "/api/v1/photographs",
+                files={"file": (name, make_image(80, 60, "PNG"), "image/png")},
+                data={"title": name, "museum_object_id": target["id"]},
+                headers=auth_headers(client, "curator"),
+            )
+
+        listing = client.get(
+            "/api/v1/photographs",
+            params={"museum_object_id": museum_object["id"]},
+            headers=auth_headers(client, "curator"),
+        ).json()
+
+        assert listing["total"] == 1
+        assert listing["items"][0]["title"] == "mine.png"
+
+    def test_an_object_with_no_photographs_shows_none(
+        self, client: TestClient, curator: User, museum_object: dict, other_object: dict
+    ) -> None:
+        """The bug that started this: an unrecognised filter used to be
+        ignored, so a panel asking for one object's pictures was handed the
+        whole platform's."""
+        client.post(
+            "/api/v1/photographs",
+            files={"file": ("theirs.png", make_image(80, 60, "PNG"), "image/png")},
+            data={"title": "theirs", "museum_object_id": other_object["id"]},
+            headers=auth_headers(client, "curator"),
+        )
+
+        listing = client.get(
+            "/api/v1/photographs",
+            params={"museum_object_id": museum_object["id"]},
+            headers=auth_headers(client, "curator"),
+        ).json()
+
+        assert listing["total"] == 0
+
+    def test_it_needs_museum_permission_not_a_project(
+        self, client: TestClient, curator: User, outsider: User, museum_object: dict
+    ) -> None:
+        """An object may have been donated in 1890 and have no project above
+        it, so the check cannot be a project one."""
+        response = client.post(
+            "/api/v1/photographs",
+            files={"file": ("x.png", make_image(80, 60, "PNG"), "image/png")},
+            data={"museum_object_id": museum_object["id"]},
+            headers=auth_headers(client, "outsider"),
+        )
+        assert response.status_code in (403, 404), response.text

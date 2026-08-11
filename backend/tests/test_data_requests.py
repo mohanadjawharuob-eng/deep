@@ -452,3 +452,50 @@ class TestUnreadableFiles:
         detail = sent.json()["detail"]
         assert "looks like a picture" in detail
         assert "not accepted" not in detail
+
+
+class TestMuseumObjects:
+    """The commonest thing a museum needs asked for is a photograph of an
+    object somebody else has - a lender, a previous curator, a photographer."""
+
+    def test_files_can_be_asked_for_against_an_object(
+        self, client: TestClient, director: User
+    ) -> None:
+        headers = auth_headers(client, "dir")
+        collection = client.post(
+            "/api/v1/museum/collections",
+            json={"name": "Ceramics", "code": "cer", "accession_prefix": "NM"},
+            headers=headers,
+        ).json()
+        obj = client.post(
+            "/api/v1/museum/objects",
+            json={"title": "Oil lamp", "collection_id": collection["id"]},
+            headers=headers,
+        ).json()
+
+        created = client.post(
+            "/api/v1/data-requests",
+            json={
+                "recipient_email": "lender@example.org",
+                "kind": "photographs",
+                "museum_object_id": obj["id"],
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        # Named by its accession number, so the message reads as the recipient
+        # would recognise it.
+        assert obj["accession_number"] in created.json()["record_label"]
+
+        token = created.json()["invite_url"].rsplit("/", 1)[-1]
+        sent = client.post(
+            f"/api/v1/data-requests/invite/{token}",
+            files={"file": ("lamp.png", png(), "image/png")},
+        )
+        assert sent.status_code == 201, sent.text
+
+        landed = client.get(
+            "/api/v1/photographs", params={"museum_object_id": obj["id"]}, headers=headers
+        ).json()
+        assert landed["total"] == 1

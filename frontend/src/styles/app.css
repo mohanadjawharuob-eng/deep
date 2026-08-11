@@ -2310,7 +2310,16 @@ details.card[open] > summary::after { content: "▾"; }
   font-size: var(--text-base);
   text-decoration: none;
 }
-.ref-file { background: var(--surface-2); border: var(--border-width) solid var(--border); }
+.ref-file {
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border);
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
 .ref-file:hover { border-color: var(--accent); text-decoration: none; }
 /* Broken line: this one is only as good as somebody else's website. */
 .ref-link { border: 1px dashed var(--border-strong); color: var(--info); }

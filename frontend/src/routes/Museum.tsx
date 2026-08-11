@@ -7,7 +7,7 @@
  * gets done: find the drawer, then work through it.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
@@ -19,6 +19,7 @@ import {
 } from "../lib/api";
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton, QrThumbnail } from "../components/labels";
+import { DataRequests } from "../components/DataRequests";
 import { References } from "../components/References";
 import {
   RecordCard,
@@ -28,6 +29,7 @@ import {
   type RecordValues,
 } from "../components/RecordCard";
 import {
+  AuthImage,
   Badge,
   ConfirmDelete,
   Detail,
@@ -550,7 +552,7 @@ export function ObjectDetail() {
         {/* The three things a registrar looks at *while* reading the fields:
             what it looks like, where it is, and what goes on its label. */}
         <aside className="record-aside">
-          <ObjectPhoto objectId={objectId} />
+          <ObjectPhoto objectId={objectId} mayEdit={can("museum", "contributor")} />
           <CurrentLocation object={object} />
 
           <div className="card">
@@ -588,6 +590,8 @@ export function ObjectDetail() {
 
       <References target={{ museum_object_id: objectId }} module="museum" />
 
+      <DataRequests parent={{ museum_object_id: objectId }} recordId={objectId} />
+
       {confirming && (
         <ConfirmDelete
           name={object.accession_number}
@@ -607,19 +611,43 @@ export function ObjectDetail() {
   );
 }
 
-/** The primary photograph, or an honest placeholder. */
-function ObjectPhoto({ objectId }: { objectId: string }) {
+/**
+ * The object's photographs, and a way to add one.
+ *
+ * Three things were wrong here and all of them were invisible. The panel asked
+ * for `museum_object_id`, which the API did not know, so an unrecognised query
+ * parameter was ignored and it was handed *every photograph in the platform* -
+ * an object with none showed somebody else's site. The picture it then drew was
+ * a plain `<img src="/api/v1/…">`, a request with no session on it, so it came
+ * back as a broken image. And there was no way to add one, because media could
+ * only hang from an excavation record and an accessioned object is not one.
+ */
+function ObjectPhoto({ objectId, mayEdit }: { objectId: string; mayEdit: boolean }) {
+  const chooser = useRef<HTMLInputElement>(null);
   const photos = useQuery<Page<{ id: string; title: string }>>(
-    (signal) => api.get("/photographs", { museum_object_id: objectId, limit: 4 }, signal),
+    (signal) => api.get("/photographs", { museum_object_id: objectId, limit: 8 }, signal),
     [objectId],
   );
   const first = photos.data?.items[0];
+
+  const send = useAction(async (file: File) => {
+    await api.upload("/photographs", file, {
+      museum_object_id: objectId,
+      title: file.name,
+    });
+    photos.reload();
+  });
 
   return (
     <div className="card">
       <div className="record-photo">
         {first ? (
-          <img src={`/api/v1/photographs/${first.id}/thumbnail?size=600`} alt={first.title} />
+          <AuthImage
+            path={`/photographs/${first.id}/thumbnail`}
+            query={{ size: 600 }}
+            alt={first.title}
+            fallback="That photograph could not be loaded"
+          />
         ) : (
           "No photograph"
         )}
@@ -627,9 +655,34 @@ function ObjectPhoto({ objectId }: { objectId: string }) {
       <div className="card-body" style={{ padding: "8px 12px" }}>
         <span className="small muted">
           {photos.data?.total
-            ? `${photos.data.total} photograph${photos.data.total === 1 ? "" : "s"} · primary shown`
-            : "None uploaded"}
+            ? `${photos.data.total} photograph${photos.data.total === 1 ? "" : "s"} - primary shown`
+            : "None yet"}
         </span>
+        {send.error && <ErrorNote message={send.error} />}
+        {mayEdit && (
+          <>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ width: "100%", marginTop: 6 }}
+              disabled={send.running}
+              onClick={() => chooser.current?.click()}
+            >
+              {send.running ? "Uploading…" : "Add a photograph…"}
+            </button>
+            <input
+              ref={chooser}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void send.run(file);
+                event.target.value = "";
+              }}
+            />
+          </>
+        )}
       </div>
     </div>
   );

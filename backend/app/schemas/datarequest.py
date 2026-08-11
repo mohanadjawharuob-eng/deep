@@ -37,6 +37,7 @@ class DataRequestCreate(BaseModel):
     site_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     context_id: uuid.UUID | None = None
+    museum_object_id: uuid.UUID | None = None
 
     @field_validator("message", "recipient_name")
     @classmethod
@@ -68,6 +69,7 @@ class DataRequestRead(ORMModel):
     site_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     context_id: uuid.UUID | None = None
+    museum_object_id: uuid.UUID | None = None
 
     requested_by_id: uuid.UUID | None = None
 

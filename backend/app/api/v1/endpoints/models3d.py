@@ -127,7 +127,12 @@ def link_model(
     )
     _validate_external_url(payload.external_url)
 
-    data = payload.model_dump(exclude={"project_id", "site_id", "artifact_id", "context_id"})
+    # Every parent comes back from `resolve_attachment`, which fills in the
+    # ones the client did not send. Leaving them in `data` as well would pass
+    # each twice.
+    data = payload.model_dump(
+        exclude={"project_id", "site_id", "artifact_id", "context_id", "museum_object_id"}
+    )
     model = Model3D(
         **data,
         **links,
@@ -178,6 +183,7 @@ async def upload_model(
     site_id: Annotated[uuid.UUID | None, Form()] = None,
     artifact_id: Annotated[uuid.UUID | None, Form()] = None,
     context_id: Annotated[uuid.UUID | None, Form()] = None,
+    museum_object_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> Model3DDetail:
     links = attachments.resolve_attachment(
         session,
@@ -186,6 +192,7 @@ async def upload_model(
         site_id=site_id,
         artifact_id=artifact_id,
         context_id=context_id,
+        museum_object_id=museum_object_id,
     )
 
     extension = extension_of(file.filename)

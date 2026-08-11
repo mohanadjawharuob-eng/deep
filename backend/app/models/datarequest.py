@@ -61,6 +61,11 @@ class DataRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     context_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("excavation_contexts.id", ondelete="SET NULL"), index=True
     )
+    #: An accessioned object. The commonest thing a museum needs asked for is a
+    #: photograph of an object somebody else has.
+    museum_object_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("museum_objects.id", ondelete="SET NULL"), index=True
+    )
 
     #: What the record was called when the request was made. Kept as text so
     #: the list still reads sensibly after a record is renamed or removed —
@@ -134,6 +139,7 @@ class DataRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "site_id": self.site_id,
             "artifact_id": self.artifact_id,
             "context_id": self.context_id,
+            "museum_object_id": self.museum_object_id,
         }
 
     @property

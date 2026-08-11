@@ -23,6 +23,7 @@ class AttachmentTargets(BaseModel):
     site_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     context_id: uuid.UUID | None = None
+    museum_object_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _at_least_one(self) -> AttachmentTargets:
@@ -77,6 +78,7 @@ class PhotographSummary(ORMModel):
     site_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     context_id: uuid.UUID | None = None
+    museum_object_id: uuid.UUID | None = None
     review_status: ReviewStatus
     is_public: bool
     created_at: datetime
@@ -138,6 +140,7 @@ class DocumentSummary(ORMModel):
     site_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     context_id: uuid.UUID | None = None
+    museum_object_id: uuid.UUID | None = None
     review_status: ReviewStatus
     is_public: bool
     created_at: datetime
@@ -225,6 +228,7 @@ class Model3DSummary(ORMModel):
     site_id: uuid.UUID | None = None
     artifact_id: uuid.UUID | None = None
     context_id: uuid.UUID | None = None
+    museum_object_id: uuid.UUID | None = None
     is_public: bool
     created_at: datetime
 

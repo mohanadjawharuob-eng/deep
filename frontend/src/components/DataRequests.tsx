@@ -45,11 +45,18 @@ export type DataRequest = {
   site_id?: string | null;
   artifact_id?: string | null;
   context_id?: string | null;
+  museum_object_id?: string | null;
 };
 
 type Created = DataRequest & { invite_url: string };
 
-type Parent = { project_id?: string; site_id?: string; artifact_id?: string; context_id?: string };
+type Parent = {
+  project_id?: string;
+  site_id?: string;
+  artifact_id?: string;
+  context_id?: string;
+  museum_object_id?: string;
+};
 
 const KINDS = [
   { value: "photographs", label: "Photographs" },

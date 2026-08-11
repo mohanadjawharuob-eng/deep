@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 
 class _AttachableMixin:
-    """The four optional parents every media record may hang from."""
+    """The optional parents every media record may hang from."""
 
     @property
     def parent_ids(self) -> dict[str, uuid.UUID | None]:
@@ -45,6 +45,7 @@ class _AttachableMixin:
             "site_id": getattr(self, "site_id", None),
             "artifact_id": getattr(self, "artifact_id", None),
             "context_id": getattr(self, "context_id", None),
+            "museum_object_id": getattr(self, "museum_object_id", None),
         }
 
 
@@ -108,6 +109,15 @@ class Photograph(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _Attacha
     )
     context_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("excavation_contexts.id", ondelete="CASCADE"), index=True
+    )
+    #: A museum object. Added late, and its absence was a real hole: the museum
+    #: half of the platform could not hold a photograph at all, because every
+    #: media record hung from an excavation record and an accessioned object is
+    #: not one. An object that came out of a trench still has its find, and the
+    #: two sets of pictures are different things - the find as excavated, the
+    #: object as catalogued.
+    museum_object_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("museum_objects.id", ondelete="CASCADE"), index=True
     )
 
     review_status: Mapped[ReviewStatus] = mapped_column(
@@ -173,6 +183,15 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _Attachabl
     )
     context_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("excavation_contexts.id", ondelete="CASCADE"), index=True
+    )
+    #: A museum object. Added late, and its absence was a real hole: the museum
+    #: half of the platform could not hold a photograph at all, because every
+    #: media record hung from an excavation record and an accessioned object is
+    #: not one. An object that came out of a trench still has its find, and the
+    #: two sets of pictures are different things - the find as excavated, the
+    #: object as catalogued.
+    museum_object_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("museum_objects.id", ondelete="CASCADE"), index=True
     )
     publication_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("publications.id", ondelete="SET NULL"), index=True
@@ -242,6 +261,15 @@ class Model3D(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _Attachable
     )
     context_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("excavation_contexts.id", ondelete="CASCADE"), index=True
+    )
+    #: A museum object. Added late, and its absence was a real hole: the museum
+    #: half of the platform could not hold a photograph at all, because every
+    #: media record hung from an excavation record and an accessioned object is
+    #: not one. An object that came out of a trench still has its find, and the
+    #: two sets of pictures are different things - the find as excavated, the
+    #: object as catalogued.
+    museum_object_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("museum_objects.id", ondelete="CASCADE"), index=True
     )
 
     metadata_json: Mapped[dict | None] = mapped_column(JSONB)
@@ -323,6 +351,15 @@ class MediaFolder(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _Attach
     )
     context_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("excavation_contexts.id", ondelete="CASCADE"), index=True
+    )
+    #: A museum object. Added late, and its absence was a real hole: the museum
+    #: half of the platform could not hold a photograph at all, because every
+    #: media record hung from an excavation record and an accessioned object is
+    #: not one. An object that came out of a trench still has its find, and the
+    #: two sets of pictures are different things - the find as excavated, the
+    #: object as catalogued.
+    museum_object_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("museum_objects.id", ondelete="CASCADE"), index=True
     )
 
     __table_args__ = (Index("ix_media_folders_links", "project_id", "site_id", "artifact_id"),)

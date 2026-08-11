@@ -444,6 +444,23 @@ This is the whole of it:
 3. Close that window.
 4. Press **Start Stratum**.
 
+#### "These files in the project folder have been changed"
+
+If it stops and lists files, read the list. Anything with `??` in front of it
+is a file git has never tracked — it was **never at risk**, and older versions
+of the update script stopped for those by mistake. `stratum-log.txt` is the
+usual culprit; it is written by the platform itself.
+
+That is fixed. If you are still on the version with the bug, this once:
+
+```
+cd path\to\the\project
+git pull
+docker compose build
+```
+
+After that the button works properly and you never need the terminal again.
+
 Two things it will not do, deliberately:
 
 - **It will not touch your edits.** If anything in the project folder has been
@@ -652,6 +669,17 @@ docker compose down -v
 
 Then delete the project folder, and uninstall Docker Desktop like any other
 application. Nothing is left behind elsewhere on your computer.
+
+## Photographs of museum objects
+
+Open an object in the catalogue. The panel on the right, under the picture,
+has **Add a photograph…**. Choose a file and it appears.
+
+If the object was catalogued from an excavated find, the picture also shows on
+that find's page — they are the same thing seen twice, and the archive should
+say so.
+
+---
 
 ## Adding people
 

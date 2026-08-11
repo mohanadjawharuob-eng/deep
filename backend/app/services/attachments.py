@@ -15,10 +15,16 @@ from fastapi import HTTPException, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.core.permissions import can_edit, can_view, resolve_project_id
+from app.core.permissions import (
+    can_edit,
+    can_view,
+    has_module_access,
+    resolve_project_id,
+)
 from app.models.artifact import Artifact
 from app.models.context import ExcavationContext
-from app.models.enums import ResourceType
+from app.models.enums import Module, ModuleLevel, ResourceType
+from app.models.museum import MuseumObject
 from app.models.project import Project
 from app.models.site import Site
 from app.models.user import User
@@ -34,6 +40,7 @@ def resolve_attachment(
     site_id: uuid.UUID | None = None,
     artifact_id: uuid.UUID | None = None,
     context_id: uuid.UUID | None = None,
+    museum_object_id: uuid.UUID | None = None,
 ) -> dict[str, uuid.UUID | None]:
     """Validate the parents a media record is being attached to.
 
@@ -42,22 +49,51 @@ def resolve_attachment(
     project filled in — a photograph of an artifact belongs to that artifact
     *and* to its site and project, and storing all three is what lets the
     gallery at any level be a single indexed query.
+
+    A **museum object** is the one parent that does not fit that chain, and
+    saying why matters. An accessioned object may have come out of a trench,
+    in which case it names the find it was — but it may equally have been
+    donated, bought, or held since 1890, and then there is no project above it
+    at all. So it is checked against the museum module rather than against a
+    project's contributor list, and it does not fill in a site or a project it
+    may not have.
     """
     links: dict[str, uuid.UUID | None] = {
         "project_id": project_id,
         "site_id": site_id,
         "artifact_id": artifact_id,
         "context_id": context_id,
+        "museum_object_id": museum_object_id,
     }
 
     if not any(links.values()):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                "Attach this to a project, site, artifact or context — an "
-                "unattached file cannot be found again or permission-checked"
+                "Attach this to a project, site, context, find or museum "
+                "object — an unattached file cannot be found again or "
+                "permission-checked"
             ),
         )
+
+    if museum_object_id is not None:
+        obj = records.get_or_404(session, MuseumObject, museum_object_id, "Object")
+        # Contributor, not editor: photographing the collection is ordinary
+        # work, and it is normal to photograph an object somebody else
+        # catalogued. What a contributor's upload does *not* do is arrive
+        # approved - it waits for review, like every other contribution.
+        if not has_module_access(user, Module.MUSEUM, ModuleLevel.CONTRIBUTOR):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to add files to the museum catalogue.",
+            )
+        # An object catalogued from an excavated find inherits that find's
+        # place in the archive, so a picture of it appears on the find's page
+        # too. An object with no find keeps every excavation link empty.
+        if obj.artifact_id is not None and artifact_id is None:
+            links["artifact_id"] = obj.artifact_id
+        if links["artifact_id"] is None:
+            return links
 
     # Resolve from the most specific link upwards, so the parents are
     # consistent even when the client sends only the deepest one.
@@ -86,7 +122,9 @@ def resolve_attachment(
         project = records.get_or_404(session, Project, links["project_id"], "Project")
         _require_visible(session, user, project, ResourceType.PROJECT, "Project")
 
-    # One check, at the project level, mirroring how records are created.
+    # One check, at the project level, mirroring how records are created. An
+    # object-only attachment has already returned above, having been checked
+    # against the museum module instead.
     records.check_can_contribute(session, user, links["project_id"])
     return links
 

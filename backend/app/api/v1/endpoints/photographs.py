@@ -81,6 +81,7 @@ async def upload_photograph(
     site_id: Annotated[uuid.UUID | None, Form()] = None,
     artifact_id: Annotated[uuid.UUID | None, Form()] = None,
     context_id: Annotated[uuid.UUID | None, Form()] = None,
+    museum_object_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> PhotographDetail:
     links = attachments.resolve_attachment(
         session,
@@ -89,6 +90,7 @@ async def upload_photograph(
         site_id=site_id,
         artifact_id=artifact_id,
         context_id=context_id,
+        museum_object_id=museum_object_id,
     )
 
     max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
@@ -200,6 +202,7 @@ def list_photographs(
     site_id: Annotated[uuid.UUID | None, Query()] = None,
     artifact_id: Annotated[uuid.UUID | None, Query()] = None,
     context_id: Annotated[uuid.UUID | None, Query()] = None,
+    museum_object_id: Annotated[uuid.UUID | None, Query()] = None,
     shot_type: Annotated[str | None, Query()] = None,
     photographer: Annotated[str | None, Query()] = None,
     covers_only: Annotated[bool, Query(description="Only representative images")] = False,
@@ -227,6 +230,8 @@ def list_photographs(
         statement = statement.where(Photograph.artifact_id == artifact_id)
     if context_id is not None:
         statement = statement.where(Photograph.context_id == context_id)
+    if museum_object_id is not None:
+        statement = statement.where(Photograph.museum_object_id == museum_object_id)
     if shot_type:
         statement = statement.where(func.lower(Photograph.shot_type) == shot_type.lower())
     if photographer:

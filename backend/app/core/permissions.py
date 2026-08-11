@@ -275,6 +275,39 @@ def explicit_level(
     return grant.level
 
 
+# --------------------------------------------------------------------------
+# Media that belongs to the museum rather than to a trench
+# --------------------------------------------------------------------------
+def _is_museum_media(record: Any) -> bool:
+    """Whether this record hangs from an accessioned object.
+
+    Photographs, documents and models are gated on the archaeology module,
+    which was right while every one of them hung from an excavation record.
+    An accessioned object is not one: it may have been donated in 1890 and
+    have no project anywhere above it. A curator with no archaeology access
+    could upload a picture of a dish and then not be able to see it.
+
+    So a media record naming a museum object is governed by the museum module
+    instead. The excavation links, where the object came out of a trench, still
+    do their own work - the picture appears on the find's page too, for people
+    who can see the find.
+    """
+    return getattr(record, "museum_object_id", None) is not None
+
+
+def _museum_media_level(user: User | None) -> PermissionLevel | None:
+    """What the museum module grants over its own media."""
+    if has_module_access(user, Module.MUSEUM, ModuleLevel.ADMINISTRATOR):
+        return PermissionLevel.OWNER
+    if has_module_access(user, Module.MUSEUM, ModuleLevel.EDITOR):
+        return PermissionLevel.EDITOR
+    if has_module_access(user, Module.MUSEUM, ModuleLevel.CONTRIBUTOR):
+        return PermissionLevel.EDITOR
+    if has_module_access(user, Module.MUSEUM, ModuleLevel.VIEWER):
+        return PermissionLevel.VIEWER
+    return None
+
+
 def effective_level(
     session: Session,
     user: User | None,
@@ -292,6 +325,11 @@ def effective_level(
         return PermissionLevel.OWNER
 
     levels: list[PermissionLevel] = []
+
+    if _is_museum_media(record):
+        museum = _museum_media_level(user)
+        if museum is not None:
+            levels.append(museum)
 
     if _record_is_public(record):
         levels.append(PermissionLevel.VIEWER)
@@ -338,7 +376,10 @@ def can_view(session: Session, user: User | None, record: Any, resource_type: Re
 
 def can_edit(session: Session, user: User | None, record: Any, resource_type: ResourceType) -> bool:
     """Editing needs an ``EDITOR`` level *and* module access that may write."""
-    if not has_module_access(user, module_of(resource_type), ModuleLevel.CONTRIBUTOR):
+    writable = has_module_access(user, module_of(resource_type), ModuleLevel.CONTRIBUTOR)
+    if _is_museum_media(record):
+        writable = writable or has_module_access(user, Module.MUSEUM, ModuleLevel.CONTRIBUTOR)
+    if not writable:
         return False
     level = effective_level(session, user, record, resource_type)
     return level is not None and level >= PermissionLevel.EDITOR
@@ -528,6 +569,13 @@ def visibility_filter(user: User | None, model: Any, resource_type: ResourceType
 
     # Module access is a per-user scalar, so it is resolved here rather than
     # joined — the shape of the generated SQL is unchanged by this check.
+    # The museum's own media, for a user who may have no archaeology access at
+    # all. Mirrors `_is_museum_media` on the single-record path.
+    if hasattr(model, "museum_object_id") and has_module_access(
+        user, Module.MUSEUM, ModuleLevel.VIEWER
+    ):
+        clauses.append(model.museum_object_id.isnot(None))
+
     if user is not None and user.is_active and module_level(user, module) is not None:
         clauses.append(model.owner_id == user.id)
 
@@ -548,12 +596,17 @@ def editable_filter(user: User | None, model: Any, resource_type: ResourceType) 
     Mirrors :func:`can_edit` for queries that act on many rows at once.
     """
     module = module_of(resource_type)
-    if not has_module_access(user, module, ModuleLevel.CONTRIBUTOR):
+    museum_media = hasattr(model, "museum_object_id") and has_module_access(
+        user, Module.MUSEUM, ModuleLevel.CONTRIBUTOR
+    )
+    if not has_module_access(user, module, ModuleLevel.CONTRIBUTOR) and not museum_media:
         return false()
     if has_module_access(user, module, ModuleLevel.ADMINISTRATOR):
         return true()
 
     clauses: list[Any] = [model.owner_id == user.id]
+    if museum_media:
+        clauses.append(model.museum_object_id.isnot(None))
 
     editor_clause = _scope_to_projects(
         model, _member_projects(user, [ProjectRole.DIRECTOR, ProjectRole.RESEARCHER])

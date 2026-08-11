@@ -137,7 +137,8 @@ fi
 if command -v git >/dev/null 2>&1 && [ -d .git ]; then
     # Never overwrite work in progress. Somebody who has edited a file wants
     # to know about it, not to have a launcher quietly clobber it.
-    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    # Tracked changes only: an untracked file cannot be overwritten by a pull.
+    if [ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then
         warn "You have unsaved changes in the project folder, so it was not updated."
     else
         branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"

@@ -68,7 +68,11 @@ Download the project again with Git, or ask for a fresh copy.
 # --------------------------------------------------------------------------
 # 2. Your work comes first
 # --------------------------------------------------------------------------
-$dirty = git status --porcelain 2>$null
+# `--untracked-files=no` matters. A file git has never tracked cannot be
+# overwritten by a pull - there is nothing in the incoming version to overwrite
+# it with. Counting one as "your work is at risk" blocked the update on
+# stratum-log.txt, a file this platform writes itself.
+$dirty = git status --porcelain --untracked-files=no 2>$null
 if ($dirty) {
     Write-Host ""
     Say "These files in the project folder have been changed:" "Yellow"

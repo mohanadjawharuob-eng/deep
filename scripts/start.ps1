@@ -214,7 +214,8 @@ stops animating, then run this again.
 if (Get-Command git -ErrorAction SilentlyContinue) {
     # Never overwrite work in progress. Somebody who has edited a file wants
     # to know about it, not to have a launcher quietly stash or clobber it.
-    $dirty = git status --porcelain 2>$null
+    # Tracked changes only - see scripts/update.ps1.
+    $dirty = git status --porcelain --untracked-files=no 2>$null
     if ($dirty) {
         Say "You have unsaved changes in the project folder, so it was not updated." "Yellow"
     } else {

@@ -91,6 +91,7 @@ export function Requests() {
               {rows.map((request) => {
                 const state = STATE[request.status];
                 const to =
+                  (request.museum_object_id && `/museum/objects/${request.museum_object_id}`) ||
                   (request.artifact_id && `/artifacts/${request.artifact_id}`) ||
                   (request.site_id && `/sites/${request.site_id}`) ||
                   (request.project_id && `/projects/${request.project_id}`) ||
