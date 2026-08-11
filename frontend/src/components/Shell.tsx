@@ -169,20 +169,22 @@ const DESTINATIONS: Destination[] = [
     label: "Excavations",
     module: "archaeology",
     icon: icon("M10 17s5.5-4.9 5.5-9a5.5 5.5 0 1 0-11 0c0 4.1 5.5 9 5.5 9Zm0-7.2a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"),
-    owns: ["/projects", "/sites", "/contexts", "/artifacts", "/map", "/photographs", "/import", "/tray"],
+    owns: ["/projects", "/sites", "/contexts", "/artifacts", "/map", "/import", "/tray"],
     places: [
       { to: "/projects", label: "Projects" },
       { to: "/sites", label: "Sites", keeps: ["project_id"] },
       { to: "/artifacts", label: "Finds", keeps: ["project_id", "site_id"] },
       { to: "/map", label: "Map", keeps: ["project_id"] },
-      { to: "/photographs", label: "Photographs", keeps: ["project_id", "site_id"] },
       { to: "/tray?type=artifact", label: "Register a tray" },
       { to: "/import?type=excavation_context", label: "Import" },
     ],
   },
   {
     to: "/museum/collections",
-    label: "Collections",
+    // "Museum", not "Collections". The sidebar names places the way the people
+    // who work there name them, and "Collections" is also the name of a screen
+    // *inside* this one - two things called the same thing at two levels.
+    label: "Museum",
     module: "museum",
     icon: icon("M3 7.5 10 4l7 3.5M4 8v7m4-7v7m4-7v7m4-7v7M2.5 16.5h15"),
     owns: ["/museum", "/import?type=museum_object", "/tray?type=museum_object"],
@@ -190,7 +192,6 @@ const DESTINATIONS: Destination[] = [
       { to: "/museum/collections", label: "Collections" },
       { to: "/museum", label: "Catalogue", end: true, keeps: ["collection_id"] },
       { to: "/museum/grid", label: "Grid", keeps: ["collection_id"] },
-      { to: "/photographs", label: "Photographs" },
       { to: "/tray?type=museum_object", label: "Register a tray" },
       { to: "/import?type=museum_object", label: "Import" },
     ],
@@ -205,6 +206,17 @@ const DESTINATIONS: Destination[] = [
     icon: icon("M10 5.5C8.5 4.5 6.5 4 4 4v11c2.5 0 4.5.5 6 1.5 1.5-1 3.5-1.5 6-1.5V4c-2.5 0-4.5.5-6 1.5zM10 5.5v11"),
     owns: ["/library"],
     places: [],
+  },
+  {
+    to: "/media",
+    label: "Media",
+    // A stack of pictures.
+    icon: icon("M6 3.5h11v11H6zM3 6.5v10h10M9 11l2.5-2.5L14 11l1.5-1.5"),
+    owns: ["/media", "/photographs"],
+    places: [
+      { to: "/media", label: "Folders" },
+      { to: "/photographs", label: "Everything" },
+    ],
   },
   {
     to: "/social",

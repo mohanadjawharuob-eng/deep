@@ -203,6 +203,9 @@ def list_photographs(
     artifact_id: Annotated[uuid.UUID | None, Query()] = None,
     context_id: Annotated[uuid.UUID | None, Query()] = None,
     museum_object_id: Annotated[uuid.UUID | None, Query()] = None,
+    folder_id: Annotated[
+        str | None, Query(description="A folder's id, or `none` for what is unfiled")
+    ] = None,
     shot_type: Annotated[str | None, Query()] = None,
     photographer: Annotated[str | None, Query()] = None,
     covers_only: Annotated[bool, Query(description="Only representative images")] = False,
@@ -232,6 +235,10 @@ def list_photographs(
         statement = statement.where(Photograph.context_id == context_id)
     if museum_object_id is not None:
         statement = statement.where(Photograph.museum_object_id == museum_object_id)
+    if folder_id == "none":
+        statement = statement.where(Photograph.folder_id.is_(None))
+    elif folder_id:
+        statement = statement.where(Photograph.folder_id == uuid.UUID(folder_id))
     if shot_type:
         statement = statement.where(func.lower(Photograph.shot_type) == shot_type.lower())
     if photographer:

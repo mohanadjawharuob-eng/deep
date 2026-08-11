@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     documents,
     exports,
     floorplans,
+    folders,
     formlayouts,
     gis,
     health,
@@ -88,6 +89,7 @@ api_router.include_router(branding.router)
 api_router.include_router(mediafolders.router)
 api_router.include_router(library.router)
 api_router.include_router(datarequests.router)
+api_router.include_router(folders.router)
 api_router.include_router(labels.router)
 api_router.include_router(review.router)
 api_router.include_router(history.router)

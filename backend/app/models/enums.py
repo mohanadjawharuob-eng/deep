@@ -876,3 +876,21 @@ class DataRequestStatus(str, enum.Enum):
     CLOSED = "closed"
     #: Withdrawn before it was answered. The link stops working immediately.
     CANCELLED = "cancelled"
+
+
+class FolderKind(str, enum.Enum):
+    """What a folder in the media library is for.
+
+    Nearly all of them are ``GENERAL`` — a folder somebody made to keep things
+    in. The two channel kinds exist because "the pictures we posted to
+    Instagram" is a real drawer in a real institution, and giving it a place in
+    the same tree beats a separate module with its own idea of a folder.
+
+    A channel folder is an ordinary folder in every other respect. It can hold
+    sub-folders, it holds the same photographs, and deleting it leaves the
+    photographs where they were.
+    """
+
+    GENERAL = "general"
+    FACEBOOK = "facebook"
+    INSTAGRAM = "instagram"

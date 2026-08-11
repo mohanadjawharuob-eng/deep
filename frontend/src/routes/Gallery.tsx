@@ -17,6 +17,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api, type Page } from "../lib/api";
 import { useDebounced, useQuery } from "../lib/hooks";
 import { AuthImage, Empty, ErrorNote, Loading, PageHeader, formatDate } from "../components/ui";
+import { PhotoViewer } from "../components/PhotoViewer";
 
 type Photo = {
   id: string;
@@ -56,6 +57,7 @@ export function Gallery() {
   const siteId = params.get("site_id") ?? "";
 
   const [term, setTerm] = useState("");
+  const [viewing, setViewing] = useState<Photo | null>(null);
   const search = useDebounced(term);
   const [unreviewed, setUnreviewed] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -133,12 +135,19 @@ export function Gallery() {
               const origin = belongsTo(photo);
               return (
                 <figure key={photo.id} className="gallery-tile">
-                  <AuthImage
-                    path={`/photographs/${photo.id}/thumbnail`}
-                    query={{ size: 600 }}
-                    alt={photo.title}
-                    fallback={<span className="small muted">could not load</span>}
-                  />
+                  <button
+                    type="button"
+                    className="pick-target"
+                    onClick={() => setViewing(photo)}
+                    aria-label={`Open ${photo.title}`}
+                  >
+                    <AuthImage
+                      path={`/photographs/${photo.id}/thumbnail`}
+                      query={{ size: 600 }}
+                      alt={photo.title}
+                      fallback={<span className="small muted">could not load</span>}
+                    />
+                  </button>
                   <figcaption>
                     <span className="strong truncate" title={photo.title}>
                       {photo.title}
@@ -185,6 +194,13 @@ export function Gallery() {
             </button>
           </div>
         </>
+      )}
+      {viewing && (
+        <PhotoViewer
+          photo={viewing}
+          onClose={() => setViewing(null)}
+          onChanged={() => photos.reload()}
+        />
       )}
     </div>
   );

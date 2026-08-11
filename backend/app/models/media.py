@@ -120,6 +120,13 @@ class Photograph(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _Attacha
         PGUUID(as_uuid=True), ForeignKey("museum_objects.id", ondelete="CASCADE"), index=True
     )
 
+    #: Which folder somebody filed this in, if any. Nullable and deliberately
+    #: singular: a photograph in three folders is a photograph nobody can file,
+    #: because "where is it" stops having an answer. `SET NULL`, because
+    #: deleting a drawer must not delete what was in it.
+    folder_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("folders.id", ondelete="SET NULL"), index=True
+    )
     review_status: Mapped[ReviewStatus] = mapped_column(
         Enum(ReviewStatus, name="review_status", values_callable=lambda e: [m.value for m in e]),
         default=ReviewStatus.APPROVED,
@@ -200,6 +207,13 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, OwnedRecordMixin, _Attachabl
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
 
+    #: Which folder somebody filed this in, if any. Nullable and deliberately
+    #: singular: a photograph in three folders is a photograph nobody can file,
+    #: because "where is it" stops having an answer. `SET NULL`, because
+    #: deleting a drawer must not delete what was in it.
+    folder_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("folders.id", ondelete="SET NULL"), index=True
+    )
     review_status: Mapped[ReviewStatus] = mapped_column(
         Enum(ReviewStatus, name="review_status", values_callable=lambda e: [m.value for m in e]),
         default=ReviewStatus.APPROVED,

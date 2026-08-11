@@ -35,6 +35,7 @@ from app.models.enums import (
     ExhibitionStatus,
     ExpenseCategory,
     ExpenseStatus,
+    FolderKind,
     GeometryKind,
     ImportStatus,
     LayerCategory,
@@ -68,6 +69,7 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.floorplan import FloorPlan, FloorPlanShape
+from app.models.folder import Folder
 from app.models.gis import GisFeature, GisLayer
 from app.models.imports import ImportBatch
 from app.models.inventory import (
@@ -168,6 +170,8 @@ __all__ = [
     "DataRequest",
     "DataRequestKind",
     "DataRequestStatus",
+    "Folder",
+    "FolderKind",
     "DocumentType",
     "ExcavationContext",
     "GeometryKind",

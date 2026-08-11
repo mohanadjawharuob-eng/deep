@@ -712,6 +712,35 @@ for it. There is no separate "my uploads" pile.
 | Asked somebody for files | **Today → Requests**, and the *Files asked for* panel on the record |
 | Files somebody sent you | On the record they were asked for, in **Photographs** |
 
+### The Media tab
+
+**Media → Folders.** A tree of folders you make, nested as deep as you like:
+`2024 → Trench A → working shots`. Click **Unfiled** to see everything nobody
+has put away yet, click pictures to choose them, and move them into a folder.
+
+Two things worth knowing:
+
+- **A picture is in one folder.** Moving it moves it. A photograph in three
+  folders is a photograph nobody can find, because "where is it" stops having
+  an answer.
+- **Deleting a folder deletes nothing.** The pictures become unfiled and are
+  still on the site or object they belong to. A folder is a label, not a box.
+
+**Media → Everything** is the same pictures with no folders — search them, or
+tick *Waiting for review* to see what has arrived and not been checked.
+
+**Click any photograph** — in Media, on a record, anywhere — and it opens
+large, with what you can do to it: approve it, send it back with a note,
+download it, delete it.
+
+### Social media
+
+**Social media → Channels** gives you Facebook and Instagram. Each one is a
+folder in the same media library, so putting a picture in Instagram is
+*filing* it, not copying it: it is the same photograph, still on its record,
+and taking it out leaves it there. Make folders inside a channel for whatever
+you like — by month, by campaign, by material.
+
 ### Photographs
 
 **Excavations → Photographs** (or **Collections → Photographs**) shows every

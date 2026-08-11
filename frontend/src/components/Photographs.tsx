@@ -23,6 +23,7 @@ import { useRef, useState } from "react";
 import { api, type Page } from "../lib/api";
 import { useAction, useQuery, useSession } from "../lib/hooks";
 import { AuthImage, ErrorNote, Loading } from "./ui";
+import { PhotoViewer } from "./PhotoViewer";
 
 export type Parent = {
   project_id?: string;
@@ -38,6 +39,7 @@ export type PhotoRow = {
   description?: string | null;
   photographer?: string | null;
   taken_at?: string | null;
+  created_at: string;
   review_status?: string;
 };
 
@@ -55,6 +57,7 @@ export function RecordPhotos({
   const mayAdd = can(module, "contributor");
   const chooser = useRef<HTMLInputElement>(null);
   const [failures, setFailures] = useState<string[]>([]);
+  const [viewing, setViewing] = useState<PhotoRow | null>(null);
 
   const key = Object.values(parent).find(Boolean) ?? "";
   const photos = useQuery<Page<PhotoRow>>(
@@ -103,12 +106,19 @@ export function RecordPhotos({
           <div className="photo-strip">
             {rows.map((photo) => (
               <figure key={photo.id} className="photo-tile">
-                <AuthImage
-                  path={`/photographs/${photo.id}/thumbnail`}
-                  query={{ size: 400 }}
-                  alt={photo.title}
-                  fallback={<span className="small muted">could not load</span>}
-                />
+                <button
+                  type="button"
+                  className="pick-target"
+                  onClick={() => setViewing(photo)}
+                  aria-label={`Open ${photo.title}`}
+                >
+                  <AuthImage
+                    path={`/photographs/${photo.id}/thumbnail`}
+                    query={{ size: 400 }}
+                    alt={photo.title}
+                    fallback={<span className="small muted">could not load</span>}
+                  />
+                </button>
                 <figcaption className="truncate" title={photo.title}>
                   {photo.title}
                   {/* Arrived from outside, or from somebody whose work is
@@ -166,6 +176,14 @@ export function RecordPhotos({
           </div>
         )}
       </div>
+
+      {viewing && (
+        <PhotoViewer
+          photo={viewing}
+          onClose={() => setViewing(null)}
+          onChanged={() => photos.reload()}
+        />
+      )}
     </section>
   );
 }

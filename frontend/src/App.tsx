@@ -60,7 +60,7 @@ import {
 } from "./routes/Management";
 import { AdminUsers } from "./routes/Admin";
 import { Appearance, MyProfile } from "./routes/Appearance";
-import { Channels, Outreach, PostScreen } from "./routes/Social";
+import { Outreach, PostScreen } from "./routes/Social";
 import {
   Activities,
   ActivityHub,
@@ -69,6 +69,8 @@ import {
 } from "./routes/Activities";
 import { BatchEntry } from "./routes/Batch";
 import { Gallery } from "./routes/Gallery";
+import { Channels as MediaChannels } from "./routes/Channels";
+import { Media } from "./routes/Media";
 import { Requests } from "./routes/Requests";
 import { SendFiles } from "./routes/Send";
 import { ImportBatch, ImportUpload } from "./routes/Import";
@@ -117,6 +119,7 @@ export function App() {
         <Route path="search" element={<Search />} />
         <Route path="map" element={<MapView />} />
         <Route path="photographs" element={<Gallery />} />
+        <Route path="media" element={<Media />} />
 
         <Route path="projects" element={<Projects />} />
         {/* Before the :projectId route, or "new" is read as an id. */}
@@ -178,7 +181,7 @@ export function App() {
         <Route path="activities/:activityId" element={<ActivityScreen />} />
 
         <Route path="social" element={<Outreach />} />
-        <Route path="social/accounts" element={<Channels />} />
+        <Route path="social/accounts" element={<MediaChannels />} />
         <Route path="social/posts/:postId" element={<PostScreen />} />
 
         <Route path="library" element={<Library />} />
