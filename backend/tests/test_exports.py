@@ -199,9 +199,7 @@ class TestSiteWorkbook:
         # Underscores become spaces too: "single context" beats "single_context".
         assert "_" not in str(contexts[0]["Type"])
 
-    def test_the_header_row_is_frozen(
-        self, client: TestClient, director: User, dig: dict
-    ) -> None:
+    def test_the_header_row_is_frozen(self, client: TestClient, director: User, dig: dict) -> None:
         book = open_book(
             client.get(
                 f"/api/v1/exports/sites/{dig['site']['id']}.xlsx",
@@ -311,9 +309,7 @@ class TestProjectWorkbook:
         assert "Finds" in book.sheetnames
         assert len(rows_of(book, "Finds")) == 2
 
-    def test_the_finds_name_their_site(
-        self, client: TestClient, director: User, dig: dict
-    ) -> None:
+    def test_the_finds_name_their_site(self, client: TestClient, director: User, dig: dict) -> None:
         book = open_book(
             client.get(
                 f"/api/v1/exports/projects/{dig['project']['id']}.xlsx",

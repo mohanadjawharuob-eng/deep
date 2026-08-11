@@ -176,3 +176,86 @@ def send(
 
     logger.info("Sent %r to %s", subject, recipients)
     return Result(True, f"Sent to {', '.join(recipients)}")
+
+
+# --------------------------------------------------------------------------
+# The message a new colleague gets
+# --------------------------------------------------------------------------
+def welcome(
+    *,
+    full_name: str,
+    username: str,
+    password: str,
+    address: str,
+    organisation: str,
+    role: str,
+    invited_by: str | None = None,
+) -> tuple[str, str, str]:
+    """Subject, plain text and HTML telling somebody their account exists.
+
+    It carries the first password, which is a deliberate and limited choice.
+    The password is temporary, the administrator who typed it already knows it,
+    and the alternative - a set-your-own-password link - is a token flow this
+    platform does not have yet. What that costs is that the password travels
+    through e-mail in the clear, so the message says plainly that it should be
+    changed, and says it before anything else.
+    """
+    who = full_name or username
+    greeting = f"Dear {who}," if who else "Hello,"
+
+    subject = f"Your {organisation} account"
+
+    body = (
+        f"{greeting}\n\n"
+        f"{invited_by or organisation} has made you an account on "
+        f"{organisation}'s records platform.\n\n"
+        f"  Address:   {address}\n"
+        f"  Username:  {username}\n"
+        f"  Password:  {password}\n\n"
+        f"CHANGE THAT PASSWORD once you are in. It was typed by whoever made "
+        f"the account and it has travelled through e-mail, so it is not "
+        f"private. Your profile page is where you change it.\n\n"
+        f"Your account is a {role} account. What you can see and change is set "
+        f"per part of the platform, so if something you expect is missing, ask "
+        f"whoever made the account rather than assuming it is broken.\n\n"
+        f"Every change in the platform is recorded against the person who made "
+        f"it, which is the reason you have your own account rather than sharing "
+        f"one.\n\n"
+        f"- {organisation}\n"
+    )
+
+    html = (
+        f"<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;"
+        f'font-size:15px;line-height:1.55;color:#2b2118;max-width:34rem">'
+        f"<p>{_escape(greeting)}</p>"
+        f"<p><strong>{_escape(invited_by or organisation)}</strong> has made you an "
+        f"account on {_escape(organisation)}'s records platform.</p>"
+        f'<table style="border-collapse:collapse;margin:1rem 0;font-size:14px">'
+        f'<tr><td style="padding:3px 14px 3px 0;color:#6b5c4d">Address</td>'
+        f'<td><a href="{_escape(address)}">{_escape(address)}</a></td></tr>'
+        f'<tr><td style="padding:3px 14px 3px 0;color:#6b5c4d">Username</td>'
+        f"<td><code>{_escape(username)}</code></td></tr>"
+        f'<tr><td style="padding:3px 14px 3px 0;color:#6b5c4d">Password</td>'
+        f"<td><code>{_escape(password)}</code></td></tr>"
+        f"</table>"
+        f'<p style="background:#fdf3e3;border-left:3px solid #a67c00;padding:10px 14px">'
+        f"<strong>Change that password once you are in.</strong> It was typed by "
+        f"whoever made the account and it has travelled through e-mail, so it is "
+        f"not private. Your profile page is where you change it.</p>"
+        f"<p>Your account is a <strong>{_escape(role)}</strong> account. What you can "
+        f"see and change is set per part of the platform, so if something you expect "
+        f"is missing, ask whoever made the account rather than assuming it is "
+        f"broken.</p>"
+        f'<p style="font-size:13px;color:#6b5c4d">Every change is recorded against the '
+        f"person who made it, which is the reason you have your own account rather "
+        f"than sharing one.</p>"
+        f'<p style="font-size:13px;color:#6b5c4d">- {_escape(organisation)}</p>'
+        f"</div>"
+    )
+    return subject, body, html
+
+
+def _escape(value: str) -> str:
+    return (
+        value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    )

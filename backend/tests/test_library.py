@@ -135,14 +135,20 @@ class TestReferences:
         add(client, title="Roman glass", authors="Brown, P.", journal="Levant")
 
         headers = auth_headers(client, "dir")
-        assert client.get("/api/v1/library/references?q=nabataean", headers=headers).json()[
-            "total"
-        ] == 1
-        assert client.get("/api/v1/library/references?q=brown", headers=headers).json()["total"] == 1
-        assert client.get("/api/v1/library/references?q=levant", headers=headers).json()["total"] == 1
-        assert client.get("/api/v1/library/references?keyword=survey", headers=headers).json()[
-            "total"
-        ] == 1
+        assert (
+            client.get("/api/v1/library/references?q=nabataean", headers=headers).json()["total"]
+            == 1
+        )
+        assert (
+            client.get("/api/v1/library/references?q=brown", headers=headers).json()["total"] == 1
+        )
+        assert (
+            client.get("/api/v1/library/references?q=levant", headers=headers).json()["total"] == 1
+        )
+        assert (
+            client.get("/api/v1/library/references?keyword=survey", headers=headers).json()["total"]
+            == 1
+        )
 
     def test_references_with_no_year_sort_last_not_first(
         self, client: TestClient, director: User
@@ -248,9 +254,7 @@ class TestWhatItIsAbout:
         # one request rather than one per row.
         assert found[0]["reference"]["title"] == "A study of Nabataean pottery"
 
-    def test_one_record_per_attachment(
-        self, client: TestClient, director: User, dig: dict
-    ) -> None:
+    def test_one_record_per_attachment(self, client: TestClient, director: User, dig: dict) -> None:
         """Or "what is this about" has two answers in one row."""
         reference = add(client).json()
         response = client.post(
@@ -260,9 +264,7 @@ class TestWhatItIsAbout:
         )
         assert response.status_code == 422
 
-    def test_an_attachment_to_nothing_is_refused(
-        self, client: TestClient, director: User
-    ) -> None:
+    def test_an_attachment_to_nothing_is_refused(self, client: TestClient, director: User) -> None:
         reference = add(client).json()
         response = client.post(
             f"/api/v1/library/references/{reference['id']}/links",
@@ -409,9 +411,94 @@ class TestPermission:
     ) -> None:
         add(client)
         assert (
-            client.get("/api/v1/library/references", headers=auth_headers(client, "cur")).status_code
+            client.get(
+                "/api/v1/library/references", headers=auth_headers(client, "cur")
+            ).status_code
             == 403
         )
 
     def test_it_needs_an_account(self, client: TestClient, director: User) -> None:
         assert client.get("/api/v1/library/references").status_code == 401
+
+
+# --------------------------------------------------------------------------
+# The thing itself, not only its description
+# --------------------------------------------------------------------------
+class TestReferenceFiles:
+    """A bibliography that holds only descriptions sends you to a shelf.
+
+    What an archaeologist actually has is a folder of PDFs and a handful of
+    links, and the reference manager they abandoned is the one that could hold
+    neither.
+    """
+
+    def test_a_file_can_be_kept_with_a_reference(self, client: TestClient, director: User) -> None:
+        reference = add(client, title="A study of Nabataean pottery").json()
+
+        sent = client.post(
+            f"/api/v1/library/references/{reference['id']}/files",
+            files={
+                "file": (
+                    "offprint.pdf",
+                    b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n",
+                    "application/pdf",
+                )
+            },
+            headers=auth_headers(client, "dir"),
+        )
+        assert sent.status_code == 201, sent.text
+        assert sent.json()["original_filename"] == "offprint.pdf"
+
+        kept = client.get(
+            f"/api/v1/library/references/{reference['id']}/files",
+            headers=auth_headers(client, "dir"),
+        ).json()
+        assert [item["original_filename"] for item in kept] == ["offprint.pdf"]
+
+    def test_it_needs_no_site_to_hang_from(self, client: TestClient, director: User) -> None:
+        """The reason this is a library route and not the ordinary document
+        upload: that one insists on a project, site, find or context, and
+        correctly - an excavation document with nothing to hang from is lost.
+        A published article is not that. It belongs to the reference."""
+        reference = add(client, title="Grey literature, unpublished").json()
+
+        sent = client.post(
+            f"/api/v1/library/references/{reference['id']}/files",
+            files={"file": ("ministry-file.txt", b"Ministry archive copy.", "text/plain")},
+            headers=auth_headers(client, "dir"),
+        )
+        assert sent.status_code == 201, sent.text
+
+        stored = sent.json()
+        assert stored["site_id"] is None
+        assert stored["project_id"] is None
+
+    def test_a_file_the_platform_cannot_store_is_refused_with_a_reason(
+        self, client: TestClient, director: User
+    ) -> None:
+        reference = add(client, title="Something").json()
+
+        sent = client.post(
+            f"/api/v1/library/references/{reference['id']}/files",
+            files={"file": ("thing.exe", b"MZ\x90\x00binary", "application/octet-stream")},
+            headers=auth_headers(client, "dir"),
+        )
+        assert sent.status_code == 422
+        assert ".exe" in sent.json()["detail"] or "not accepted" in sent.json()["detail"]
+
+    def test_a_reference_carries_a_link_as_well(self, client: TestClient, director: User) -> None:
+        """`url` has always been on the reference. This holds the line that it
+        is offered, because a library that can hold a PDF and not a URL is
+        missing half of what people have."""
+        reference = add(
+            client,
+            title="A page on the web",
+            url="https://example.org/report.pdf",
+        ).json()
+        assert reference["url"] == "https://example.org/report.pdf"
+
+        read = client.get(
+            f"/api/v1/library/references/{reference['id']}",
+            headers=auth_headers(client, "dir"),
+        ).json()
+        assert read["url"] == "https://example.org/report.pdf"

@@ -475,8 +475,11 @@ class TestAccessEndpoints:
             headers=auth_headers(client, "admin"),
         )
         assert response.status_code == 201, response.text
+        # Creating an account answers with the account nested under `user`,
+        # alongside what happened to the welcome message.
+        created = response.json()["user"]
         return client.get(
-            f"/api/v1/users/{response.json()['id']}/access", headers=auth_headers(client, "admin")
+            f"/api/v1/users/{created['id']}/access", headers=auth_headers(client, "admin")
         ).json()
 
     def test_an_account_created_without_a_map_gets_the_role_default(

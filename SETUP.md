@@ -652,3 +652,32 @@ docker compose down -v
 
 Then delete the project folder, and uninstall Docker Desktop like any other
 application. Nothing is left behind elsewhere on your computer.
+
+## Adding people
+
+**Today → your avatar (top right) → People → Add a person.**
+
+Give everybody their own account. The platform records who changed what, and
+that is worth nothing if everybody is you.
+
+**The first password must have ten characters or more, an upper case letter, a
+lower case letter and a digit.** `1234567890` is refused — it has no letters.
+Something like `TrowelAndTape7` is fine. If a password is refused the form now
+says which rule it broke.
+
+Leave **"E-mail them their sign-in details"** ticked and they get a message
+with the address, their username and that password, and a line telling them to
+change it. Untick it to hand the password over yourself.
+
+After you press **Create the account** a line appears saying either
+*"Their sign-in details were e-mailed to …"* or *"The account was made, but the
+e-mail did not go out"* — with the reason. The account exists either way. Read
+that line: if you assume somebody was told their password and they were not,
+they cannot get in and will not know why.
+
+> The password travels through e-mail in the clear. It is temporary, you typed
+> it, and the message says to change it — but if that is not acceptable at your
+> institution, untick the box and tell them in person. A set-your-own-password
+> link would be better and is not built yet.
+
+---

@@ -87,6 +87,17 @@ class UserCreateAdmin(UserCreate):
         ),
         examples=[{"museum": "editor", "inventory": "viewer"}],
     )
+    send_welcome_email: bool = Field(
+        default=True,
+        description=(
+            "E-mail the new person their address, username and first password. "
+            "The password travels in the clear, so the message tells them to "
+            "change it; turn this off if you would rather hand it over in "
+            "person. Creating the account never depends on the message going "
+            "out - if e-mail is not configured, the account is still made and "
+            "the response says the message was not sent."
+        ),
+    )
 
 
 class ModuleAccessGrant(BaseModel):
@@ -190,6 +201,22 @@ class UserRead(UserPublic):
     is_verified: bool
     last_login_at: datetime | None = None
     created_at: datetime
+
+
+class UserCreated(BaseModel):
+    """What creating an account reports back.
+
+    Separate from ``UserRead`` so the ordinary read of a user carries nothing
+    about e-mail. The account is made whether or not the message goes out, and
+    the difference matters: an administrator who believes somebody was told
+    their password will not tell them.
+    """
+
+    user: UserRead
+    welcome_email_sent: bool
+    welcome_email_note: str = Field(
+        description="What happened to the message, in words fit to show an administrator."
+    )
 
 
 class PasswordChange(BaseModel):

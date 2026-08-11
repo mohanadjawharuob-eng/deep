@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
@@ -82,6 +83,8 @@ from app.schemas.museum import (
 )
 from app.services import accession, activity, qrcodes, records
 from app.services import storage_locations as tree
+
+logger = logging.getLogger("archeo.museum")
 
 router = APIRouter(prefix="/museum", tags=["Museum"])
 
@@ -689,36 +692,62 @@ def list_objects_for_grid(
     )
 
 
+class _Blanked:
+    """A record with named attributes reported as empty, for everything else.
+
+    Used to get one unreadable field out of the way without hiding the record
+    it belongs to. Everything not named is read straight off the row, so the
+    identifier, the title and the ninety-nine sound fields survive.
+    """
+
+    def __init__(self, row: Any, blank: set[str]) -> None:
+        self._row = row
+        self._blank = blank
+
+    def __getattr__(self, name: str) -> Any:
+        if name in self._blank:
+            return None
+        return getattr(self._row, name)
+
+
 def _grid_row(row: MuseumObject) -> MuseumObjectRead:
-    """One record, or a refusal that says which record and which field.
+    """One record, with anything unreadable emptied and named.
 
     The grid asks for every field of every record on the page, which makes it
-    the first screen to meet a row the schema cannot describe — a value left
+    the first screen to meet a row the schema cannot describe - a value left
     empty by an old import, a column added by a migration that did not backfill,
-    an enum whose member was renamed. Unguarded, one such row raises inside the
-    response model and the whole page becomes "Internal Server Error": no row
-    number, no field name, nothing to act on, and the ninety-nine sound records
-    on the page are unreachable too.
+    a `metadata_json` holding a list where an object was expected.
 
-    So the failure names itself. It is still an error — quietly dropping the row
-    would leave somebody scrolling for an object that is in the collection and
-    not on the screen, which is worse than a page that refuses and says why.
+    There are three things to do with such a row and only one of them is right.
+    Raising takes the whole page down: one bad row in a catalogue of four
+    thousand and nobody can see any of it, which is the same mistake the
+    importer is careful not to make - one bad date is not a reason to import
+    none of them. Dropping it silently leaves somebody scrolling for an object
+    that is in the collection and not on the screen. So: show the row, empty
+    the fields that cannot be read, and say which they were, in
+    `unreadable_fields`, so the grid can mark those cells rather than implying
+    the object has no value there.
     """
     try:
         return MuseumObjectRead.model_validate(row)
     except ValidationError as error:
-        faults = "; ".join(
-            f"{'.'.join(str(part) for part in problem['loc'])}: {problem['msg']}"
-            for problem in error.errors()
-        )
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=(
-                f"Object {row.accession_number!r} cannot be shown in the grid "
-                f"because its stored record is incomplete ({faults}). Open the "
-                f"object's own record card to correct it."
-            ),
-        ) from error
+        broken = {str(problem["loc"][0]) for problem in error.errors() if problem["loc"]}
+        try:
+            repaired = MuseumObjectRead.model_validate(_Blanked(row, broken))
+        except ValidationError:
+            # Emptying them was not enough - the schema needs a value this row
+            # cannot supply. Refusing the page is still wrong, but there is
+            # nothing left to show, so name the object and move on.
+            logger.warning("Object %s cannot be shown in the grid at all", row.id)
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Object {row.accession_number!r} cannot be read at all. Open "
+                    f"its own record card, or ask for help with this message."
+                ),
+            ) from error
+        repaired.unreadable_fields = sorted(broken)
+        return repaired
 
 
 @router.get(

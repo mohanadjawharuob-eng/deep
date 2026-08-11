@@ -124,9 +124,9 @@ class TestReadingTheSheet:
         upload(client, site, as_csv([GOOD[0], ["1001", "above", "1002"]]))
 
         headers = auth_headers(client, "dir")
-        contexts = client.get(
-            f"/api/v1/contexts?site_id={site['id']}", headers=headers
-        ).json()["items"]
+        contexts = client.get(f"/api/v1/contexts?site_id={site['id']}", headers=headers).json()[
+            "items"
+        ]
         lower = next(row for row in contexts if row["context_number"] == "1002")
 
         detail = client.get(f"/api/v1/contexts/{lower['id']}", headers=headers).json()
@@ -221,9 +221,9 @@ class TestImpossibleSequences:
             ),
         )
         headers = auth_headers(client, "dir")
-        contexts = client.get(
-            f"/api/v1/contexts?site_id={site['id']}", headers=headers
-        ).json()["items"]
+        contexts = client.get(f"/api/v1/contexts?site_id={site['id']}", headers=headers).json()[
+            "items"
+        ]
         first = next(row for row in contexts if row["context_number"] == "1001")
         detail = client.get(f"/api/v1/contexts/{first['id']}", headers=headers).json()
         assert detail.get("relationships", []) == []
@@ -294,7 +294,7 @@ class TestImpossibleSequences:
     def test_contemporary_relations_do_not_count_as_a_loop(
         self, client: TestClient, director: User, site: dict
     ) -> None:
-        """"Same as" both ways is a statement, not a contradiction."""
+        """ "Same as" both ways is a statement, not a contradiction."""
         response = upload(
             client,
             site,

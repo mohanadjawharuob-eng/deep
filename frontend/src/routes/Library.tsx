@@ -12,7 +12,7 @@
  * sentence nobody writes down because there has never been anywhere to write it.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, type Page } from "../lib/api";
@@ -336,6 +336,107 @@ export function Library() {
 /* --------------------------------------------------------------------------
  * One reference
  * ----------------------------------------------------------------------- */
+type RefFile = {
+  id: string;
+  title: string;
+  original_filename?: string | null;
+  mime_type?: string | null;
+  file_size?: number | null;
+  created_at: string;
+};
+
+/**
+ * The copy, and the address.
+ *
+ * Two different things, deliberately shown side by side and never conflated.
+ * A **file** is in the archive: it will still open in ten years. A **link** is
+ * a promise somebody else has to keep, and it rots when they reorganise their
+ * site. Both are worth holding; a library that offers only one of them is
+ * missing half of what people actually have.
+ */
+function RefFiles({
+  reference,
+  files,
+  mayEdit,
+  onChanged,
+}: {
+  reference: Reference;
+  files: ReturnType<typeof useQuery<RefFile[]>>;
+  mayEdit: boolean;
+  onChanged: () => void;
+}) {
+  const chooser = useRef<HTMLInputElement>(null);
+
+  const send = useAction(async (file: File) => {
+    await api.upload(`/library/references/${reference.id}/files`, file);
+    onChanged();
+  });
+
+  const rows = files.data ?? [];
+
+  return (
+    <div className="ref-holdings">
+      {rows.length === 0 && !reference.url && (
+        <p className="muted small" style={{ margin: "0 0 8px" }}>
+          Nothing kept with this reference yet — no file, no address.
+        </p>
+      )}
+
+      {rows.map((file) => (
+        <a
+          key={file.id}
+          className="ref-file"
+          href={`/api/v1/documents/${file.id}/download`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className="truncate">{file.original_filename ?? file.title}</span>
+          <span className="muted small">
+            {file.file_size ? `${Math.round(file.file_size / 1024)} KB` : "file"}
+          </span>
+        </a>
+      ))}
+
+      {reference.url && (
+        <a className="ref-link" href={reference.url} target="_blank" rel="noreferrer">
+          <span className="truncate">{reference.url}</span>
+          {/* Said out loud, because the difference matters when the page moves. */}
+          <span className="muted small">a link, not a copy</span>
+        </a>
+      )}
+
+      {send.error && <ErrorNote message={send.error} />}
+
+      {mayEdit && (
+        <div className="row-tight" style={{ marginTop: 6 }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={send.running}
+            onClick={() => chooser.current?.click()}
+          >
+            {send.running ? "Keeping…" : "Keep a file with this…"}
+          </button>
+          <span className="muted small">
+            The offprint, the scan, the ministry file. Put a web address in the
+            reference&rsquo;s <b>URL</b> field instead when it is on somebody else&rsquo;s site.
+          </span>
+          <input
+            ref={chooser}
+            type="file"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void send.run(file);
+              event.target.value = "";
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReferencePanel({
   reference,
   mayEdit,
@@ -346,6 +447,10 @@ function ReferencePanel({
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const files = useQuery<RefFile[]>(
+    (signal) => api.get(`/library/references/${reference.id}/files`, undefined, signal),
+    [reference.id],
+  );
   const links = useQuery<RefLink[]>(
     (signal) => api.get(`/library/references/${reference.id}/links`, undefined, signal),
     [reference.id],
@@ -385,14 +490,6 @@ function ReferencePanel({
           </a>
         </p>
       )}
-      {reference.url && (
-        <p className="small truncate">
-          <a href={reference.url} target="_blank" rel="noreferrer">
-            {reference.url}
-          </a>
-        </p>
-      )}
-
       {reference.abstract && <p className="small">{reference.abstract}</p>}
       {reference.notes && (
         <div className="note-block">
@@ -402,6 +499,18 @@ function ReferencePanel({
           </p>
         </div>
       )}
+
+      {/* A bibliography that holds only the description of a reference sends
+          somebody to a shelf every time they want to read one. */}
+      <div className="overline" style={{ marginTop: 20 }}>
+        The reference itself
+      </div>
+      <RefFiles
+        reference={reference}
+        files={files}
+        mayEdit={mayEdit}
+        onChanged={() => files.reload()}
+      />
 
       {/* The part a reference manager cannot do. */}
       <div className="overline" style={{ marginTop: 20 }}>

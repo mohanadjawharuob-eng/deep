@@ -50,7 +50,11 @@ const DEFAULT_COLUMNS = [
   "storage_location_id",
 ];
 
-type Row = Record<string, unknown> & { id: string };
+type Row = Record<string, unknown> & {
+  id: string;
+  /** Fields the server could not read off the stored row. See `_grid_row`. */
+  unreadable_fields?: string[] | null;
+};
 
 /** One pending change: which row, which field, what it should become. */
 type Edit = { rowId: string; field: string; value: unknown };
@@ -354,7 +358,15 @@ export function CatalogueGrid() {
                       name={name}
                       value={valueOf(row, name)}
                       edited={isEdited(row.id, name)}
-                      locked={!mayEdit || LOCKED.has(name)}
+                      // A field the server could not read off the stored row.
+                      // Not the same as empty, and it must not be typed over
+                      // until somebody has seen what is actually in there.
+                      unreadable={(row.unreadable_fields ?? []).includes(name)}
+                      locked={
+                        !mayEdit ||
+                        LOCKED.has(name) ||
+                        (row.unreadable_fields ?? []).includes(name)
+                      }
                       active={cursor?.row === rowIndex && cursor?.col === colIndex}
                       typing={typing && cursor?.row === rowIndex && cursor?.col === colIndex}
                       row={row}
@@ -426,6 +438,7 @@ function GridCell({
   name,
   value,
   edited,
+  unreadable,
   locked,
   active,
   typing,
@@ -440,6 +453,7 @@ function GridCell({
   name: string;
   value: unknown;
   edited: boolean;
+  unreadable: boolean;
   locked: boolean;
   active: boolean;
   typing: boolean;
@@ -555,6 +569,7 @@ function GridCell({
 
   const className = [
     "grid-cell",
+    unreadable && "unreadable",
     edited && "edited",
     locked && "locked",
     active && "active",
@@ -581,7 +596,14 @@ function GridCell({
       }}
       onDoubleClick={() => begin()}
       onKeyDown={onKeyDown}
-      title={locked ? "Change this on the record card" : undefined}
+      title={
+        unreadable
+          ? "The platform cannot read what is stored here. It is not empty - " +
+            "open the record card to see and correct it."
+          : locked
+            ? "Change this on the record card"
+            : undefined
+      }
     >
       {typing ? (
         // A dropdown only where the field holds one value. Offering one for a

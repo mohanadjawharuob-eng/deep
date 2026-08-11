@@ -90,9 +90,7 @@ class TestTheInstitutionsName:
         assert body["organisation_name"] is None
         assert body["display_name"] == "Stratum"
 
-    def test_a_field_that_is_not_sent_is_not_touched(
-        self, client: TestClient, admin: User
-    ) -> None:
+    def test_a_field_that_is_not_sent_is_not_touched(self, client: TestClient, admin: User) -> None:
         """Otherwise editing the tagline silently deletes the name."""
         headers = auth_headers(client, "admin2")
         client.put(
@@ -100,7 +98,9 @@ class TestTheInstitutionsName:
             json={"organisation_name": "Museum", "tagline": "Since 1892"},
             headers=headers,
         )
-        body = client.put("/api/v1/branding", json={"tagline": "Since 1893"}, headers=headers).json()
+        body = client.put(
+            "/api/v1/branding", json={"tagline": "Since 1893"}, headers=headers
+        ).json()
 
         assert body["organisation_name"] == "Museum"
         assert body["tagline"] == "Since 1893"
@@ -123,14 +123,13 @@ class TestTheLogo:
 
         assert first != second
 
-    def test_the_same_image_twice_keeps_the_same_url(
-        self, client: TestClient, admin: User
-    ) -> None:
+    def test_the_same_image_twice_keeps_the_same_url(self, client: TestClient, admin: User) -> None:
         """Content-addressed storage: re-uploading the identical file is a no-op."""
         data = png()
-        assert upload_logo(client, data).json()["logo_url"] == upload_logo(client, data).json()[
-            "logo_url"
-        ]
+        assert (
+            upload_logo(client, data).json()["logo_url"]
+            == upload_logo(client, data).json()["logo_url"]
+        )
 
     def test_an_svg_named_as_a_png_is_refused(self, client: TestClient, admin: User) -> None:
         """The one that matters.
@@ -158,9 +157,7 @@ class TestTheLogo:
         self, client: TestClient, admin: User
     ) -> None:
         upload_logo(client, png())
-        body = client.delete(
-            "/api/v1/branding/logo", headers=auth_headers(client, "admin2")
-        ).json()
+        body = client.delete("/api/v1/branding/logo", headers=auth_headers(client, "admin2")).json()
 
         assert body["logo_url"] is None
         assert client.get("/api/v1/branding/logo").status_code == 404
@@ -176,7 +173,9 @@ class TestAvatars:
         assert response.status_code == 200, response.text
         assert response.json()["avatar_url"] == f"/api/v1/users/{student.id}/avatar"
 
-        served = client.get(f"/api/v1/users/{student.id}/avatar", headers=auth_headers(client, "stu"))
+        served = client.get(
+            f"/api/v1/users/{student.id}/avatar", headers=auth_headers(client, "stu")
+        )
         assert served.status_code == 200
 
     def test_it_needs_an_account_to_see(self, client: TestClient, student: User) -> None:
@@ -217,7 +216,9 @@ class TestAvatars:
             files={"file": ("me.png", png(), "image/png")},
             headers=headers,
         )
-        assert client.delete("/api/v1/users/me/avatar", headers=headers).json()["avatar_url"] is None
+        assert (
+            client.delete("/api/v1/users/me/avatar", headers=headers).json()["avatar_url"] is None
+        )
         assert client.get(f"/api/v1/users/{student.id}/avatar", headers=headers).status_code == 404
 
     def test_a_file_that_is_not_an_image_is_refused(

@@ -264,6 +264,11 @@ class MuseumObjectSummary(ORMModel):
 
 
 class MuseumObjectRead(MuseumObjectSummary):
+    #: Fields the schema could not read off the stored row, emptied so the rest
+    #: of the record is still usable. Set by the grid; normally absent. The
+    #: interface marks these cells rather than showing them as blank, because a
+    #: blank cell means "nobody filled this in" and this means something else.
+    unreadable_fields: list[str] | None = None
     description: str | None = None
     category_id: uuid.UUID | None = None
     culture: str | None = None

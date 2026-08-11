@@ -232,6 +232,8 @@ export function ProjectDetail() {
         </Link>
       </nav>
 
+      <DataRequests parent={{ project_id: record.id }} recordId={record.id} />
+
       <div className="card" style={{ marginBottom: "var(--space-4)" }}>
         <div className="card-body">
           <DetailGrid>

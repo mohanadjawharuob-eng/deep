@@ -119,9 +119,7 @@ CONTEXTS = [
 
 
 class TestSites:
-    def test_a_sheet_of_sites_imports(
-        self, client: TestClient, director: User, dig: dict
-    ) -> None:
+    def test_a_sheet_of_sites_imports(self, client: TestClient, director: User, dig: dict) -> None:
         batch = upload(
             client,
             as_csv(
@@ -165,9 +163,7 @@ class TestSites:
 
 
 class TestContexts:
-    def test_a_context_sheet_imports(
-        self, client: TestClient, director: User, dig: dict
-    ) -> None:
+    def test_a_context_sheet_imports(self, client: TestClient, director: User, dig: dict) -> None:
         batch = upload(client, as_csv(CONTEXTS), "excavation_context")
         assert batch.status_code == 201, batch.text
 
@@ -184,7 +180,7 @@ class TestContexts:
     def test_the_headings_people_actually_write_are_understood(
         self, client: TestClient, director: User, dig: dict
     ) -> None:
-        """"Locus" and "SU" are the same column as "Context no." on most digs."""
+        """ "Locus" and "SU" are the same column as "Context no." on most digs."""
         batch = upload(
             client,
             as_csv(
@@ -254,9 +250,7 @@ class TestFinds:
         detail = client.get(f"/api/v1/artifacts/{first['id']}", headers=headers).json()
         assert detail["context_id"] is not None
         # …and it is *that* context, not merely some context.
-        context = client.get(
-            f"/api/v1/contexts/{detail['context_id']}", headers=headers
-        ).json()
+        context = client.get(f"/api/v1/contexts/{detail['context_id']}", headers=headers).json()
         assert context["context_number"] == "1001"
 
     def test_a_context_that_does_not_exist_names_itself(
@@ -278,7 +272,9 @@ class TestFinds:
         self, client: TestClient, director: User, contexts: dict
     ) -> None:
         """Surface finds and museum backlog have none, and are still finds."""
-        batch = upload(client, as_csv([["Find no.", "Object name"], ["TED-8", "Loom weight"]]), "artifact")
+        batch = upload(
+            client, as_csv([["Find no.", "Object name"], ["TED-8", "Loom weight"]]), "artifact"
+        )
         committed = run(client, batch.json()["id"], defaults={"site_id": contexts["site"]["id"]})
         assert committed.json()["valid_rows"] == 1
 
@@ -297,9 +293,7 @@ class TestPermission:
         assert response.status_code == 403
         assert "archaeology" in response.json()["detail"].lower()
 
-    def test_and_may_still_import_a_catalogue(
-        self, client: TestClient, curator: User
-    ) -> None:
+    def test_and_may_still_import_a_catalogue(self, client: TestClient, curator: User) -> None:
         response = upload(
             client,
             as_csv([["Inventory no.", "Object name"], ["X.1", "Bowl"]]),
@@ -331,7 +325,5 @@ class TestUndo:
         assert reverted.status_code == 200, reverted.text
         assert "3 records deleted" in reverted.json()["detail"]
 
-        listed = client.get(
-            f"/api/v1/contexts?site_id={dig['site']['id']}", headers=headers
-        ).json()
+        listed = client.get(f"/api/v1/contexts?site_id={dig['site']['id']}", headers=headers).json()
         assert listed["total"] == 0

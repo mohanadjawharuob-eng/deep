@@ -124,9 +124,7 @@ class TestRecordingAFolder:
         )
         assert response.status_code == 422
 
-    def test_an_empty_path_is_refused(
-        self, client: TestClient, director: User, dig: dict
-    ) -> None:
+    def test_an_empty_path_is_refused(self, client: TestClient, director: User, dig: dict) -> None:
         assert record(client, dig["site"]["id"], path="   ").status_code == 422
 
 
@@ -164,9 +162,7 @@ class TestFinding:
 
 
 class TestChangingIt:
-    def test_a_path_can_be_corrected(
-        self, client: TestClient, director: User, dig: dict
-    ) -> None:
+    def test_a_path_can_be_corrected(self, client: TestClient, director: User, dig: dict) -> None:
         """Which is most of what happens to these: the drive gets a new letter."""
         folder = record(client, dig["site"]["id"]).json()
         updated = client.patch(
@@ -182,7 +178,7 @@ class TestChangingIt:
     def test_deleting_says_that_nothing_on_disk_was_touched(
         self, client: TestClient, director: User, dig: dict
     ) -> None:
-        """"Delete" beside a path reads like it might remove the folder."""
+        """ "Delete" beside a path reads like it might remove the folder."""
         folder = record(client, dig["site"]["id"]).json()
         response = client.delete(
             f"/api/v1/media-folders/{folder['id']}", headers=auth_headers(client, "dir")

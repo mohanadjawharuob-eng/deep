@@ -879,9 +879,9 @@ class TestFormLayout:
         ).json()
         options = layout["value_list_options"]
 
-        assert any(entry["label"].startswith("ARCH") for entry in options["collection"]), (
-            "the collection just created should be selectable"
-        )
+        assert any(
+            entry["label"].startswith("ARCH") for entry in options["collection"]
+        ), "the collection just created should be selectable"
         assert {entry["value"] for entry in options["acquisition_method"]} >= {
             "excavation",
             "donation",
@@ -1264,7 +1264,6 @@ class TestGridEndpoint:
         assert "Bowl" in exported
         assert "Lamp" not in exported
 
-
     def test_a_row_the_schema_cannot_describe_names_itself(
         self, client: TestClient, curator: User, db: Session, collection: dict
     ) -> None:
@@ -1279,6 +1278,10 @@ class TestGridEndpoint:
         Unguarded, that raises inside the response model and the page fails with
         nothing to act on — no row, no field, and the ninety-nine sound records
         on the page are unreachable too.
+
+        So the row is shown with the unreadable field emptied and *named*. A
+        blank cell means "nobody filled this in"; this means something else,
+        and the grid has to be able to tell them apart.
         """
         catalogue(client, collection["id"], title="Sound record")
         broken = catalogue(client, collection["id"], title="Broken record").json()
@@ -1292,12 +1295,18 @@ class TestGridEndpoint:
             "/api/v1/museum/objects/grid", headers=auth_headers(client, "curator")
         )
 
-        assert response.status_code == 500
-        detail = response.json()["detail"]
-        # Which record, and which field. Both, or the message is no better
-        # than the one it replaced.
-        assert stored.accession_number in detail
-        assert "metadata_json" in detail
+        assert response.status_code == 200, response.text
+        rows = {row["title"]: row for row in response.json()["items"]}
+
+        # Both records are on the page. The sound one is untouched.
+        assert set(rows) == {"Sound record", "Broken record"}
+        assert rows["Sound record"]["unreadable_fields"] is None
+
+        # The broken one is readable except for the field that is not, and it
+        # says which field that is.
+        assert rows["Broken record"]["unreadable_fields"] == ["metadata_json"]
+        assert rows["Broken record"]["accession_number"] == stored.accession_number
+        assert rows["Broken record"]["metadata_json"] is None
 
 
 class TestCsvExport:

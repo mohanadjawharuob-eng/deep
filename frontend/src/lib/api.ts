@@ -95,10 +95,40 @@ async function readError(response: Response): Promise<ApiError> {
         .filter(Boolean)
         .join("; ");
     }
+
+    // This platform's own validation handler puts "Validation failed" in
+    // `detail` and the reasons in `errors`. Reading only `detail` turned a
+    // password that was three characters short into "Validation failed.
+    // Nothing was changed." - which is true, unhelpful, and indistinguishable
+    // from a bug in the platform. The reasons are what somebody needs.
+    const reasons = (body as { errors?: unknown })?.errors;
+    if (Array.isArray(reasons) && reasons.length > 0) {
+      const spelled = reasons
+        .map((item: { field?: string; message?: string }) => {
+          // Pydantic prefixes a custom validator's message with "Value error,",
+          // which means nothing to anybody reading a form.
+          const message = (item.message ?? "").replace(/^Value error,\s*/i, "");
+          if (!message) return "";
+          const field = item.field ? humaniseField(item.field) : "";
+          // A message that already names the field reads badly with it
+          // prepended: "Password: Password must contain a digit".
+          if (!field || message.toLowerCase().startsWith(field.toLowerCase())) return message;
+          return `${field}: ${message}`;
+        })
+        .filter(Boolean)
+        .join(". ");
+      if (spelled) detail = spelled;
+    }
   } catch {
     /* A non-JSON error body is not worth failing over. */
   }
   return new ApiError(response.status, detail, body);
+}
+
+/** `full_name` -> `Full name`, so a form error names the field as the form does. */
+function humaniseField(name: string): string {
+  const words = name.split(".").pop()?.replace(/_id$/, "").replace(/_/g, " ") ?? name;
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** In-flight refresh, shared so parallel 401s cause one rotation, not several. */

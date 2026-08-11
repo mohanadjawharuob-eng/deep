@@ -2277,3 +2277,41 @@ details.card[open] > summary::after { content: "▾"; }
   padding-top: var(--space-4);
   border-top: var(--border-width) solid var(--border);
 }
+
+/* A cell whose stored value the platform could not read.
+   Drawn with the broken line every provisional thing in this platform uses -
+   an empty cell means "nobody filled this in", and this means something else
+   entirely, so the two must not look alike. */
+.grid-cell.unreadable {
+  background: var(--warn-weak);
+  border: 1px dashed var(--warn) !important;
+  cursor: help;
+}
+.grid-cell.unreadable::after {
+  content: "unreadable";
+  font-size: var(--text-xs);
+  color: var(--warn);
+  letter-spacing: 0.04em;
+}
+
+/* What a reference actually holds: the copy, and the address.
+   Deliberately different shapes. A file is in the archive and will still open
+   in ten years; a link is a promise somebody else has to keep. Drawing them
+   alike would be a claim the platform cannot back. */
+.ref-holdings { display: flex; flex-direction: column; gap: 4px; }
+.ref-file,
+.ref-link {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 5px var(--space-3);
+  border-radius: var(--radius);
+  font-size: var(--text-base);
+  text-decoration: none;
+}
+.ref-file { background: var(--surface-2); border: var(--border-width) solid var(--border); }
+.ref-file:hover { border-color: var(--accent); text-decoration: none; }
+/* Broken line: this one is only as good as somebody else's website. */
+.ref-link { border: 1px dashed var(--border-strong); color: var(--info); }
+.ref-link:hover { border-color: var(--info); text-decoration: none; }

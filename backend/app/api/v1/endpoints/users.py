@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, DbSession, RequireAdmin
+from app.core.config import settings
 from app.core.security import hash_password
 from app.models.enums import ActivityAction, Module, ResourceType, UserRole
 from app.models.user import User
@@ -19,12 +20,13 @@ from app.schemas.user import (
     ModuleAccessSummary,
     PasswordReset,
     UserCreateAdmin,
+    UserCreated,
     UserPublic,
     UserRead,
     UserUpdate,
     UserUpdateAdmin,
 )
-from app.services import access, activity, auth
+from app.services import access, activity, auth, branding, mail
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -113,14 +115,24 @@ def read_user(user_id: uuid.UUID, session: DbSession, user: CurrentUser) -> User
 
 @router.post(
     "",
-    response_model=UserRead,
+    response_model=UserCreated,
     status_code=status.HTTP_201_CREATED,
     summary="Create a user (administrator)",
+    description=(
+        "Makes the account and, unless `send_welcome_email` is false, e-mails "
+        "the person their address, username and first password.\n\n"
+        "The response says what happened to that message. **The account is "
+        "made either way** - a site with no outbound mail is a supported way "
+        "to run this, and the administrator needs to know whether to pass the "
+        "password on by hand.\n\n"
+        "The password cannot be re-sent later: only its hash is kept. Setting "
+        "a new one is how somebody who lost the message gets back in."
+    ),
     responses={409: {"description": "E-mail address or username already taken"}},
 )
 def create_user(
     payload: UserCreateAdmin, session: DbSession, admin: RequireAdmin, request: Request
-) -> User:
+) -> UserCreated:
     existing = session.scalar(
         select(User).where(
             or_(
@@ -170,7 +182,45 @@ def create_user(
         summary=f"Created user with role {user.role.value}",
         request=request,
     )
-    return user
+    session.flush()
+
+    sent, note = _welcome(session, user, payload, invited_by=admin)
+    return UserCreated(
+        user=UserRead.model_validate(user),
+        welcome_email_sent=sent,
+        welcome_email_note=note,
+    )
+
+
+def _welcome(
+    session: DbSession, user: User, payload: UserCreateAdmin, *, invited_by: User
+) -> tuple[bool, str]:
+    """Tell the new person their account exists, and report honestly.
+
+    Never raises. An account that was made is made; a message that failed to go
+    out is a thing to tell the administrator, not a reason to undo somebody's
+    account and leave them with neither.
+    """
+    if not payload.send_welcome_email:
+        return False, "No message was sent, as asked. Give them the password yourself."
+
+    organisation = branding.read(session).display_name
+    subject, body, html = mail.welcome(
+        full_name=user.full_name,
+        username=user.username,
+        password=payload.password,
+        address=settings.FRONTEND_URL,
+        organisation=organisation,
+        role=user.role.value,
+        invited_by=invited_by.full_name,
+    )
+    result = mail.send(user.email, subject, body, html=html, reply_to=invited_by.email)
+    if result.ok:
+        return True, f"Their sign-in details were e-mailed to {user.email}."
+    return False, (
+        f"The account was made, but the e-mail did not go out: {result.detail} "
+        f"Give them the password yourself."
+    )
 
 
 @router.patch(

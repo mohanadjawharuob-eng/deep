@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models import User, UserRole
+from app.services import mail
 from tests.conftest import auth_headers, make_user
 
 
@@ -124,7 +125,10 @@ class TestAdministration:
             headers=auth_headers(client, "admin"),
         )
         assert response.status_code == 201
-        assert response.json()["role"] == "researcher"
+        # Creating an account answers with the account *and* what happened to
+        # the welcome message, because those are two different outcomes and an
+        # administrator needs both.
+        assert response.json()["user"]["role"] == "researcher"
 
     def test_admin_promotes_a_user(
         self, client: TestClient, db: Session, admin: User, student: User
@@ -222,3 +226,122 @@ class TestAdministration:
             ).status_code
             == 200
         )
+
+
+# --------------------------------------------------------------------------
+# Telling somebody their account exists
+# --------------------------------------------------------------------------
+class TestWelcomeEmail:
+    """The account is made whether or not the message goes out.
+
+    Which of the two happened is the thing an administrator has to know: one
+    who believes somebody was told their password will not tell them, and the
+    person then cannot get in and does not know why.
+    """
+
+    def test_creating_an_account_says_what_happened_to_the_message(
+        self, client: TestClient, admin: User
+    ) -> None:
+        response = client.post(
+            "/api/v1/users",
+            json={
+                "full_name": "Mohand Jawhar",
+                "username": "mjawhar",
+                "email": "mjawhar@example.org",
+                "password": "TrowelAndTape7",
+                "role": "student",
+            },
+            headers=auth_headers(client, "admin"),
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+
+        assert body["user"]["username"] == "mjawhar"
+        # No SMTP in tests, which is the same as a site machine with no
+        # outbound mail. The account exists regardless, and the note says so.
+        assert body["welcome_email_sent"] is False
+        assert "account was made" in body["welcome_email_note"]
+
+        signed_in = client.post(
+            "/api/v1/auth/login",
+            json={"identifier": "mjawhar", "password": "TrowelAndTape7"},
+        )
+        assert signed_in.status_code == 200, signed_in.text
+
+    def test_the_message_can_be_declined(self, client: TestClient, admin: User) -> None:
+        response = client.post(
+            "/api/v1/users",
+            json={
+                "full_name": "Quiet Person",
+                "username": "quiet",
+                "email": "quiet@example.org",
+                "password": "TrowelAndTape7",
+                "send_welcome_email": False,
+            },
+            headers=auth_headers(client, "admin"),
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["welcome_email_sent"] is False
+        assert "as asked" in response.json()["welcome_email_note"]
+
+    def test_the_message_carries_the_details_and_says_to_change_the_password(self) -> None:
+        subject, body, html = mail.welcome(
+            full_name="Mohand Jawhar",
+            username="mjawhar",
+            password="TrowelAndTape7",
+            address="http://localhost:5173",
+            organisation="Department of Antiquities",
+            role="student",
+            invited_by="A. Director",
+        )
+
+        assert "Department of Antiquities" in subject
+        for text in (body, html):
+            assert "mjawhar" in text
+            assert "TrowelAndTape7" in text
+            assert "http://localhost:5173" in text
+            # The password has travelled through e-mail in the clear, and the
+            # message has to say so rather than imply the account is secure.
+            assert "change" in text.lower()
+
+    def test_a_name_cannot_smuggle_markup_into_the_message(self) -> None:
+        _, _, html = mail.welcome(
+            full_name="<script>alert(1)</script>",
+            username="x",
+            password="p",
+            address="http://localhost",
+            organisation="Dept & Co",
+            role="student",
+        )
+        assert "<script>" not in html
+        assert "&lt;script&gt;" in html
+        assert "&amp;" in html
+
+
+class TestValidationMessages:
+    """A refused password says which rule it broke.
+
+    The reasons live in `errors`, not in `detail` - a client that reads only
+    `detail` shows "Validation failed", which is true, useless, and
+    indistinguishable from a bug in the platform.
+    """
+
+    def test_a_weak_password_names_the_rule_it_broke(self, client: TestClient, admin: User) -> None:
+        response = client.post(
+            "/api/v1/users",
+            json={
+                "full_name": "Weak Password",
+                "username": "weak",
+                "email": "weak@example.org",
+                "password": "1234567890",
+            },
+            headers=auth_headers(client, "admin"),
+        )
+        assert response.status_code == 422
+
+        body = response.json()
+        assert body["errors"], "the reasons must be in the response, not only the log"
+        combined = " ".join(item["message"] for item in body["errors"])
+        assert "lowercase" in combined
+        assert "uppercase" in combined
+        assert any(item["field"] == "password" for item in body["errors"])

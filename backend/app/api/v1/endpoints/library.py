@@ -20,16 +20,28 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import Response
 from sqlalchemy import func, or_, select
 
 from app.api.deps import DbSession, require_module
+from app.core.config import settings
 from app.models.artifact import Artifact
 from app.models.context import ExcavationContext
-from app.models.enums import Module, ReferenceType, ResourceType
+from app.models.enums import ActivityAction, DocumentType, Module, ReferenceType, ResourceType
 from app.models.enums import ModuleLevel as Level
 from app.models.library import LibraryCollection, ReferenceLink
+from app.models.media import Document
 from app.models.museum import MuseumObject
 from app.models.project import Project
 from app.models.site import Site
@@ -49,7 +61,9 @@ from app.schemas.library import (
     ReferenceRead,
     ReferenceUpdate,
 )
-from app.services import bibtex, records
+from app.schemas.media import DocumentSummary
+from app.services import activity, bibtex, documents, records
+from app.services.storage import CATEGORY_DOCUMENTS, storage
 
 router = APIRouter(prefix="/library", tags=["Library"])
 
@@ -647,3 +661,120 @@ def export_bibtex(
         media_type="application/x-bibtex; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="stratum-library.bib"'},
     )
+
+
+# --------------------------------------------------------------------------
+# The thing itself: the PDF, the scan, the file
+# --------------------------------------------------------------------------
+#
+# A bibliography that only holds the *description* of a reference sends
+# somebody to a shelf every time they want to read one. What an archaeologist
+# actually has is a folder of PDFs and a handful of links, and the reference
+# manager they abandoned is the one that could not hold either.
+#
+# So a reference can carry files. They are ordinary Documents, checked and
+# stored exactly as any other upload, attached to the publication rather than
+# to a site - which is why they need their own route: the shared attachment
+# resolver insists on a project, site, find or context, and correctly, because
+# an *excavation* document with no record to hang from is lost. A copy of a
+# published article is not that: it belongs to the reference and to nothing
+# else.
+#
+# The link case needs no route at all. `url` has always been on the reference,
+# and the form now offers it.
+@router.get(
+    "/references/{reference_id}/files",
+    response_model=list[DocumentSummary],
+    summary="Files kept with this reference",
+)
+def list_reference_files(
+    reference_id: uuid.UUID, session: DbSession, user: Reader
+) -> list[DocumentSummary]:
+    records.get_or_404(session, Publication, reference_id, "Reference")
+    rows = session.scalars(
+        select(Document)
+        .where(Document.publication_id == reference_id)
+        .order_by(Document.created_at.desc())
+    )
+    return [DocumentSummary.model_validate(row) for row in rows]
+
+
+@router.post(
+    "/references/{reference_id}/files",
+    response_model=DocumentSummary,
+    status_code=status.HTTP_201_CREATED,
+    summary="Keep a file with this reference",
+    description=(
+        "The offprint, the scan, the ministry file. Checked and stored exactly "
+        "as any other upload - the extension and the declared type are both "
+        "ignored, and the bytes decide what it is.\n\n"
+        "For something that is on the web rather than on disk, put the address "
+        "in the reference's own `url` field instead. A link is not a copy, and "
+        "a library that pretends otherwise has holes in it the day the page "
+        "moves."
+    ),
+    responses={
+        413: {"description": "Larger than the configured limit"},
+        422: {"description": "Not a file this platform can store"},
+    },
+)
+async def upload_reference_file(
+    reference_id: uuid.UUID,
+    session: DbSession,
+    request: Request,
+    user: Writer,
+    file: Annotated[UploadFile, File(description="A PDF, a scan, a text")],
+    title: Annotated[str | None, Form(max_length=300)] = None,
+    document_type: Annotated[DocumentType | None, Form()] = None,
+) -> DocumentSummary:
+    reference = records.get_or_404(session, Publication, reference_id, "Reference")
+
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    data = bytearray()
+    while chunk := await file.read(1024 * 1024):
+        data.extend(chunk)
+        if len(data) > max_bytes:
+            raise HTTPException(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"That file is larger than the {settings.MAX_UPLOAD_SIZE_MB} MB limit",
+            )
+    payload = bytes(data)
+
+    try:
+        facts = documents.inspect(payload, file.filename)
+    except documents.DocumentError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    stored = storage.save_bytes(payload, category=CATEGORY_DOCUMENTS, extension=facts.extension)
+    document = Document(
+        title=title or file.filename or reference.title[:300],
+        document_type=document_type or documents.guess_type(facts.extension, file.filename),
+        author=reference.authors,
+        document_date=None,
+        file_path=stored.path,
+        original_filename=file.filename,
+        mime_type=facts.mime_type,
+        file_size=stored.size,
+        checksum=stored.checksum,
+        extracted_text=documents.extract_text(payload, facts.extension),
+        publication_id=reference.id,
+        researcher_id=user.id,
+        owner_id=user.id,
+        review_status=records.initial_review_status(user),
+    )
+    session.add(document)
+    session.flush()
+
+    activity.log(
+        session,
+        action=ActivityAction.CREATE,
+        user=user,
+        resource_type=ResourceType.DOCUMENT,
+        resource_id=document.id,
+        resource_label=document.title,
+        summary=f"Kept {document.title!r} with the reference {reference.title!r}",
+        request=request,
+    )
+    session.commit()
+    session.refresh(document)
+    return DocumentSummary.model_validate(document)

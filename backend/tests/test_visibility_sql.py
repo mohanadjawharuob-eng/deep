@@ -171,9 +171,9 @@ class TestSitesAgree:
             is not None
         )
 
-        assert python_says == sql_says, (
-            f"{user_key} vs {site_key}: can_view={python_says} but visibility_filter={sql_says}"
-        )
+        assert (
+            python_says == sql_says
+        ), f"{user_key} vs {site_key}: can_view={python_says} but visibility_filter={sql_says}"
 
     @pytest.mark.parametrize(("user_key", "site_key"), itertools.product(USER_KEYS, SITE_KEYS))
     def test_can_edit_matches_editable_filter(
@@ -192,9 +192,9 @@ class TestSitesAgree:
             is not None
         )
 
-        assert python_says == sql_says, (
-            f"{user_key} vs {site_key}: can_edit={python_says} but editable_filter={sql_says}"
-        )
+        assert (
+            python_says == sql_says
+        ), f"{user_key} vs {site_key}: can_edit={python_says} but editable_filter={sql_says}"
 
 
 class TestNestedRecordsAgree:

@@ -761,9 +761,7 @@ class TestAssignedWork:
 
         headers = auth_headers(client, "fielder")
         assert client.get("/api/v1/management/tasks/mine", headers=headers).json()["total"] == 0
-        with_done = client.get(
-            "/api/v1/management/tasks/mine?include_done=true", headers=headers
-        )
+        with_done = client.get("/api/v1/management/tasks/mine?include_done=true", headers=headers)
         assert with_done.json()["total"] == 1
 
     def test_being_given_a_task_notifies_you(
@@ -790,9 +788,9 @@ class TestAssignedWork:
             headers=auth_headers(client, "treasurer"),
         )
 
-        items = client.get(
-            "/api/v1/notifications", headers=auth_headers(client, "fielder")
-        ).json()["items"]
+        items = client.get("/api/v1/notifications", headers=auth_headers(client, "fielder")).json()[
+            "items"
+        ]
         # One for the assignment, and nothing for the date change. A list that
         # pings on every edit is a list people mute.
         assert len(items) == 1
@@ -807,9 +805,9 @@ class TestAssignedWork:
             headers=auth_headers(client, "treasurer"),
         )
 
-        items = client.get(
-            "/api/v1/notifications", headers=auth_headers(client, "fielder")
-        ).json()["items"]
+        items = client.get("/api/v1/notifications", headers=auth_headers(client, "fielder")).json()[
+            "items"
+        ]
         assert len(items) == 1
         assert "reassigned" in items[0]["title"]
 

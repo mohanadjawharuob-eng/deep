@@ -21,10 +21,9 @@ import enum
 import pytest
 from sqlalchemy import Enum as SAEnum
 
-from app.db.base import Base
-
 # Every model module has to be imported for its tables to be on the metadata.
 import app.models  # noqa: F401
+from app.db.base import Base
 
 
 def _enum_columns() -> list[tuple[str, str, SAEnum]]:

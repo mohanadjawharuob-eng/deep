@@ -54,9 +54,7 @@ def read_one(root: Path) -> dict:
 
 @pytest.fixture
 def director(db: Session) -> User:
-    return make_user(
-        db, email="director@example.org", username="director", role=UserRole.ADMIN
-    )
+    return make_user(db, email="director@example.org", username="director", role=UserRole.ADMIN)
 
 
 def make_project(client: TestClient, **fields) -> dict:
@@ -88,9 +86,7 @@ class TestArchiveIsWritten:
         self, client: TestClient, director: User, archive_root: Path
     ) -> None:
         project = make_project(client)
-        client.delete(
-            f"/api/v1/projects/{project['id']}", headers=auth_headers(client, "director")
-        )
+        client.delete(f"/api/v1/projects/{project['id']}", headers=auth_headers(client, "director"))
 
         data = read_one(archive_root)
         assert data["deleted_by"]["username"] == "director"
@@ -103,9 +99,7 @@ class TestArchiveIsWritten:
         self, client: TestClient, director: User, archive_root: Path
     ) -> None:
         project = make_project(client, name="North trench", code="NT-2019")
-        client.delete(
-            f"/api/v1/projects/{project['id']}", headers=auth_headers(client, "director")
-        )
+        client.delete(f"/api/v1/projects/{project['id']}", headers=auth_headers(client, "director"))
 
         name = files_in(archive_root)[0].name
         assert name.startswith("project-")
@@ -233,9 +227,7 @@ class TestListingWhatWasDeleted:
         self, client: TestClient, director: User, archive_root: Path
     ) -> None:
         project = make_project(client, name="Gone", code="GONE-1")
-        client.delete(
-            f"/api/v1/projects/{project['id']}", headers=auth_headers(client, "director")
-        )
+        client.delete(f"/api/v1/projects/{project['id']}", headers=auth_headers(client, "director"))
 
         entries = deletions.recent()
         assert len(entries) == 1

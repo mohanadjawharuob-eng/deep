@@ -398,17 +398,28 @@ function NewPerson({ onCreated }: { onCreated: () => void }) {
     password: "",
     role: "student",
   });
+  const [tellThem, setTellThem] = useState(true);
+  // What happened to the welcome message, kept after the form closes: an
+  // administrator who believes somebody was told their password will not tell
+  // them, so "the account was made but the e-mail did not go" has to survive
+  // on screen rather than flash past.
+  const [outcome, setOutcome] = useState<{ sent: boolean; note: string } | null>(null);
 
   const create = useAction(async () => {
-    await api.post("/users", {
-      full_name: form.full_name || null,
-      username: form.username.trim(),
-      email: form.email.trim(),
-      password: form.password,
-      role: form.role,
-    });
+    const result = await api.post<{ welcome_email_sent: boolean; welcome_email_note: string }>(
+      "/users",
+      {
+        full_name: form.full_name || null,
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+        send_welcome_email: tellThem,
+      },
+    );
     setOpen(false);
     setForm({ full_name: "", username: "", email: "", password: "", role: "student" });
+    setOutcome({ sent: result.welcome_email_sent, note: result.welcome_email_note });
     onCreated();
   });
 
@@ -417,6 +428,23 @@ function NewPerson({ onCreated }: { onCreated: () => void }) {
       <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
         Add a person
       </button>
+
+      {outcome && (
+        <div
+          className={`alert ${outcome.sent ? "alert-info" : "alert-warning"}`}
+          style={{ marginTop: 10 }}
+        >
+          <b>Account created.</b> {outcome.note}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            style={{ marginLeft: 8 }}
+            onClick={() => setOutcome(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {open && (
         <div className="modal-scrim" role="dialog" aria-modal="true">
@@ -508,6 +536,23 @@ function NewPerson({ onCreated }: { onCreated: () => void }) {
                   This decides what they can do in archaeology and whether they
                   administer the platform. Everything else is granted per module
                   afterwards.
+                </p>
+              </div>
+
+              <div className="field">
+                <label className="chip-check">
+                  <input
+                    type="checkbox"
+                    checked={tellThem}
+                    onChange={(event) => setTellThem(event.target.checked)}
+                  />
+                  E-mail them their sign-in details
+                </label>
+                <p className="field-help">
+                  Sends the address, their username and this password. The password
+                  travels through e-mail in the clear, so the message tells them to
+                  change it as soon as they are in. Turn this off to hand it over
+                  yourself.
                 </p>
               </div>
 
