@@ -670,14 +670,32 @@ docker compose down -v
 Then delete the project folder, and uninstall Docker Desktop like any other
 application. Nothing is left behind elsewhere on your computer.
 
-## Photographs of museum objects
+## Where things end up
 
-Open an object in the catalogue. The panel on the right, under the picture,
-has **Add a photograph…**. Choose a file and it appears.
+Everything you put in belongs to a **record**, and the record is where you look
+for it. There is no separate "my uploads" pile.
 
-If the object was catalogued from an excavated find, the picture also shows on
-that find's page — they are the same thing seen twice, and the archive should
-say so.
+| You did this | It is here |
+|---|---|
+| Imported museum objects | **Collections → Catalogue** |
+| Imported finds | **Excavations → Finds** |
+| Imported contexts | On the **site**, under Contexts |
+| Registered a tray | Same as an import: Finds, or the Catalogue |
+| Added photographs | On the record — the **Photographs** panel |
+| Asked somebody for files | **Today → Requests**, and the *Files asked for* panel on the record |
+| Files somebody sent you | On the record they were asked for, in **Photographs** |
+
+### Photographs
+
+Open a **site**, a **find**, a **project** or a **museum object**. Scroll to
+**Photographs** and press **Add photographs…**. Several at once is fine — each
+one is reported on its own, so one bad file does not lose the rest.
+
+Anything marked **unreviewed** arrived from outside, or from somebody whose
+work is checked before it counts.
+
+If an object was catalogued from an excavated find, its pictures show on the
+find's page too — the same thing seen twice, and the archive should say so.
 
 ---
 

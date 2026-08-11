@@ -17,6 +17,7 @@ import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton } from "../components/labels";
 import { DataRequests } from "../components/DataRequests";
 import { MediaFolders } from "../components/MediaFolders";
+import { RecordPhotos } from "../components/Photographs";
 import { References } from "../components/References";
 import { EditableRecord, useRecordEditor } from "../components/EditRecord";
 import {
@@ -231,6 +232,8 @@ export function ProjectDetail() {
           <span className="workspace-note">Seasons, surveys, permits, equipment and costs</span>
         </Link>
       </nav>
+
+      <RecordPhotos parent={{ project_id: record.id }} />
 
       <DataRequests parent={{ project_id: record.id }} recordId={record.id} />
 
@@ -524,6 +527,8 @@ export function SiteDetail() {
           ends in "you may not" wastes the one click they were sure about. */}
       <MatrixImport siteId={record.id} />
 
+      <RecordPhotos parent={{ site_id: record.id }} />
+
       <MediaFolders parent={{ site_id: record.id }} />
 
       <DataRequests parent={{ site_id: record.id }} recordId={record.id} />
@@ -706,6 +711,8 @@ export function ArtifactDetail() {
         recordId={record.id}
         mayEdit={can("archaeology", "contributor")}
       />
+      <RecordPhotos parent={{ artifact_id: record.id }} />
+
       <References target={{ artifact_id: record.id }} />
 
       <DataRequests parent={{ artifact_id: record.id }} recordId={record.id} />

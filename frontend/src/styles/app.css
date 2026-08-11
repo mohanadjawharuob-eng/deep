@@ -2324,3 +2324,24 @@ details.card[open] > summary::after { content: "▾"; }
 /* Broken line: this one is only as good as somebody else's website. */
 .ref-link { border: 1px dashed var(--border-strong); color: var(--info); }
 .ref-link:hover { border-color: var(--info); text-decoration: none; }
+
+/* Thumbnails on a record. Small on purpose: the interesting thing about a
+   site photograph is the site, and a gallery that competes with the record it
+   belongs to is a gallery in the wrong place. */
+.photo-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-3);
+}
+.photo-tile { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.photo-tile img,
+.photo-tile .skeleton {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface-2);
+  display: block;
+}
+.photo-tile figcaption { font-size: var(--text-sm); color: var(--text-2); }

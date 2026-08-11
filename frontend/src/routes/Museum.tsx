@@ -20,6 +20,7 @@ import {
 import { useAction, useDebounced, useQuery, useSession } from "../lib/hooks";
 import { PrintLabelButton, QrThumbnail } from "../components/labels";
 import { DataRequests } from "../components/DataRequests";
+import { RecordPhotos } from "../components/Photographs";
 import { References } from "../components/References";
 import {
   RecordCard,
@@ -589,6 +590,8 @@ export function ObjectDetail() {
       </div>
 
       <References target={{ museum_object_id: objectId }} module="museum" />
+
+      <RecordPhotos parent={{ museum_object_id: objectId }} module="museum" />
 
       <DataRequests parent={{ museum_object_id: objectId }} recordId={objectId} />
 
