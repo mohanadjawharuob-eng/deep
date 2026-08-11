@@ -133,7 +133,7 @@ const DESTINATIONS: Destination[] = [
     end: true,
     // A sun over the horizon: what is happening now, rather than what is kept.
     icon: icon("M10 3v2m0 10.5a4 4 0 1 1 0-8 4 4 0 0 1 0 8M3.5 15.5h13M4.8 6.3l1.4 1.4m9-1.4-1.4 1.4"),
-    owns: ["/", "/my-work", "/data-requests", "/activities", "/management", "/social"],
+    owns: ["/", "/my-work", "/data-requests", "/activities", "/management"],
     places: [
       { to: "/", label: "Overview", end: true },
       { to: "/my-work", label: "My work" },
@@ -146,7 +146,6 @@ const DESTINATIONS: Destination[] = [
       { to: "/management/tasks", label: "Tasks", module: "management" },
       { to: "/management/budgets", label: "Funds", module: "management" },
       { to: "/management/expenses", label: "Spending", module: "management" },
-      { to: "/social", label: "Outreach", module: "social_media" },
     ],
   },
   {
@@ -154,12 +153,13 @@ const DESTINATIONS: Destination[] = [
     label: "Excavations",
     module: "archaeology",
     icon: icon("M10 17s5.5-4.9 5.5-9a5.5 5.5 0 1 0-11 0c0 4.1 5.5 9 5.5 9Zm0-7.2a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"),
-    owns: ["/projects", "/sites", "/contexts", "/artifacts", "/map", "/import", "/tray"],
+    owns: ["/projects", "/sites", "/contexts", "/artifacts", "/map", "/photographs", "/import", "/tray"],
     places: [
       { to: "/projects", label: "Projects" },
       { to: "/sites", label: "Sites" },
       { to: "/artifacts", label: "Finds" },
       { to: "/map", label: "Map" },
+      { to: "/photographs", label: "Photographs" },
       { to: "/tray?type=artifact", label: "Register a tray" },
       { to: "/import?type=excavation_context", label: "Import" },
     ],
@@ -174,6 +174,7 @@ const DESTINATIONS: Destination[] = [
       { to: "/museum/collections", label: "Collections" },
       { to: "/museum", label: "Catalogue", end: true },
       { to: "/museum/grid", label: "Grid" },
+      { to: "/photographs", label: "Photographs" },
       { to: "/tray?type=museum_object", label: "Register a tray" },
       { to: "/import?type=museum_object", label: "Import" },
     ],
@@ -188,6 +189,23 @@ const DESTINATIONS: Destination[] = [
     icon: icon("M10 5.5C8.5 4.5 6.5 4 4 4v11c2.5 0 4.5.5 6 1.5 1.5-1 3.5-1.5 6-1.5V4c-2.5 0-4.5.5-6 1.5zM10 5.5v11"),
     owns: ["/library"],
     places: [],
+  },
+  {
+    to: "/social",
+    // "Social media", not "Outreach". I folded this into Today under a name
+    // I preferred, and it became unfindable - somebody looking for the thing
+    // they call social media will not recognise a word I chose instead. The
+    // critique argued for cutting this module; that was a recommendation, and
+    // it was declined.
+    label: "Social media",
+    module: "social_media",
+    // A speech bubble.
+    icon: icon("M4 4.5h12v9H9l-4 3v-3H4zM7 7.5h6M7 10.5h4"),
+    owns: ["/social"],
+    places: [
+      { to: "/social", label: "Posts", end: true },
+      { to: "/social/accounts", label: "Channels" },
+    ],
   },
   {
     to: "/storage",

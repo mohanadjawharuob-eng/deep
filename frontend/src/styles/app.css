@@ -2345,3 +2345,25 @@ details.card[open] > summary::after { content: "▾"; }
   display: block;
 }
 .photo-tile figcaption { font-size: var(--text-sm); color: var(--text-2); }
+
+/* The whole wall. Larger than the strip on a record, because here the picture
+   is what you came for - but still captioned, because a gallery of
+   unattributed images is a screensaver and this is an archive. */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-5);
+}
+.gallery-tile { margin: 0; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.gallery-tile img,
+.gallery-tile .skeleton {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface-2);
+  display: block;
+}
+.gallery-tile figcaption { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gallery-tile figcaption .badge { align-self: flex-start; }

@@ -68,6 +68,7 @@ import {
   NewActivity,
 } from "./routes/Activities";
 import { BatchEntry } from "./routes/Batch";
+import { Gallery } from "./routes/Gallery";
 import { Requests } from "./routes/Requests";
 import { SendFiles } from "./routes/Send";
 import { ImportBatch, ImportUpload } from "./routes/Import";
@@ -115,6 +116,7 @@ export function App() {
         <Route index element={<Dashboard />} />
         <Route path="search" element={<Search />} />
         <Route path="map" element={<MapView />} />
+        <Route path="photographs" element={<Gallery />} />
 
         <Route path="projects" element={<Projects />} />
         {/* Before the :projectId route, or "new" is read as an id. */}

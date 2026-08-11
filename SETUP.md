@@ -687,9 +687,14 @@ for it. There is no separate "my uploads" pile.
 
 ### Photographs
 
-Open a **site**, a **find**, a **project** or a **museum object**. Scroll to
-**Photographs** and press **Add photographs…**. Several at once is fine — each
-one is reported on its own, so one bad file does not lose the rest.
+**Excavations → Photographs** (or **Collections → Photographs**) shows every
+picture in the platform, newest first, saying underneath what each one is of.
+Search it, or tick **Waiting for review** to see what has arrived and not yet
+been checked.
+
+To add one: open a **site**, a **find**, a **project** or a **museum object**,
+scroll to **Photographs**, press **Add photographs…**. Several at once is fine
+— each is reported on its own, so one bad file does not lose the rest.
 
 Anything marked **unreviewed** arrived from outside, or from somebody whose
 work is checked before it counts.
