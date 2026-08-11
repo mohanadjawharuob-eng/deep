@@ -60,7 +60,7 @@ around €12 a year.
 
 ### The one-click way
 
-**Windows** — double-click **`Share on WiFi.cmd`**.
+**Windows** — open `Stratum.cmd` and press **Share on the office network**.
 **macOS or Linux** — run `bash share.sh`.
 
 It works out this machine's address on the network, records it in the
@@ -340,7 +340,7 @@ logged out first, though anyone mid-edit will need to press Save again.
 unhealthy`, which is a symptom and never a reason. The reason is in the
 backend's own log, and there is a button for it:
 
-> **Double-click `Show Log.cmd`** (Windows), or run `bash logs.sh`
+> **Open `Stratum.cmd` and press “Show the log”** (Windows), or run `bash logs.sh`
 > (macOS and Linux).
 
 It changes nothing, and it writes the same text to `stratum-log.txt` next to

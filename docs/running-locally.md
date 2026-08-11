@@ -55,12 +55,19 @@ your machine.
 
 ---
 
-## The short way: one button
+## The short way: one window
 
 After the first-time setup below, you never need to remember any of these
 commands again.
 
-**Windows** — double-click **`Start Stratum.cmd`** in the project folder.
+**Windows** — double-click **`Stratum.cmd`** in the project folder. A window
+opens saying whether the platform is running, with a button for everything it
+can be told to do: start and stop, add photographs, share it on the office
+network, check e-mail, show the log, update. Press **Start Stratum**.
+
+(If your computer blocks PowerShell's graphics — some locked-down office
+machines do — `Start Stratum.cmd` still works and does the same job in a plain
+console window.)
 
 **macOS or Linux** — run `bash start.sh` in the project folder.
 
@@ -70,15 +77,15 @@ up running last week's code, waits until the backend actually answers, starts
 the website, and opens your browser at it.
 
 Leave the window open while you use the platform. Closing it stops the
-website; the backend keeps running in Docker. **`Stop Stratum.cmd`** (or
-`bash stop.sh`) shuts that down too. Neither deletes any data.
+website; the backend keeps running in Docker. **Stop Stratum** in the window
+(or `bash stop.sh`) shuts that down too. Neither deletes any data.
 
 If you have edited a file in the project folder, the launcher says so and does
 **not** update — your work is never overwritten.
 
 ### Letting colleagues use it too
 
-**`Share on WiFi.cmd`** (or `bash share.sh`) instead of the start button.
+**Share on the office network** (or `bash share.sh`) instead of the start button.
 
 It prints an address like `http://192.168.1.50`. Anyone on the same WiFi types
 that into a browser — **they install nothing at all**, and everyone shares one
@@ -96,14 +103,20 @@ See [Letting other people use it](deploying.md) for the detail.
 
 ### Put it on the desktop
 
-Right-click `Start Stratum.cmd` → **Show more options** → **Send to** →
-**Desktop (create shortcut)**. Then it really is one double-click.
+In the Stratum window, press **Put Stratum on the desktop**. That is all — it
+makes a shortcut with the platform's own icon on it.
 
 ---
 
 ## Getting a newer version
 
-*(The launcher above does this for you. This section is for doing it by hand.)*
+**The short way:** open `Stratum.cmd`, press **Update to the newest version**,
+wait for it to say *"Updated. Close this window and press Start."*, close that
+window, and press **Start Stratum**. It refuses to run if you have edited
+anything in the project folder, so your work is never overwritten, and it never
+touches your records, photographs or settings.
+
+*The rest of this section is the same thing done by hand.*
 
 **You never need to download the project again.** `git pull` brings the changes
 into the folder you already have.
@@ -326,7 +339,7 @@ That sentence is a symptom, not a reason. It means the backend started and
 then stopped, and it never says why. **The reason is always in the backend's
 own log**, and there is a button for it:
 
-> **Double-click `Show Log.cmd`** (Windows), or run `bash logs.sh`
+> **Open `Stratum.cmd` and press “Show the log”** (Windows), or run `bash logs.sh`
 > (macOS and Linux).
 
 It changes nothing. It prints what each part of the platform said about

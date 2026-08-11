@@ -8,9 +8,9 @@ REM Use "Start Stratum.cmd" instead when you are working alone - it is quicker
 REM to start and rebuilds as you change things.
 
 title Stratum - sharing on this network
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\share.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\scripts\share.ps1"
 
 if errorlevel 1 (
     echo.

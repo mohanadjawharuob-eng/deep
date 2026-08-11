@@ -17,8 +17,8 @@ REM remembers what it has already sent - so run it again after a day's
 REM photography and only the new ones go up.
 
 title Stratum - add photographs
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\photos.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\scripts\photos.ps1"
 
 pause

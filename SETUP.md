@@ -403,7 +403,69 @@ a collection is not the same job as running the institution's accounts.
 
 ---
 
-## Everyday use, after the first time
+## Everyday use — the Stratum window
+
+There used to be eight files in the project folder with names like
+the **Share on the office network** button, and using the platform meant remembering which one did
+what. Now there is one:
+
+> **Double-click `Stratum.cmd`.**
+
+A window opens. Across the top it says whether the platform is **Running**,
+**Stopped**, or **Half running** — so the first question, *is it even on?*, is
+answered before you click anything. Under that, one button each for:
+
+| Button | What it does |
+|---|---|
+| **Start Stratum** | Starts everything and opens it in your browser. Becomes **Stop Stratum** while it is running. |
+| **Open Stratum** | Shows it in the browser again if you closed the tab. |
+| **Add photographs** | Sends a folder of pictures into a record. |
+| **Where the files are kept** | Put photographs, or the database, on another disk. |
+| **Share on the office network** | Let other computers in the building open it. |
+| **Check e-mail sending** | Sends you a test message. |
+| **Show the log** | What happened. Safe to send on when you ask for help — it never reads your settings file. |
+| **Update to the newest version** | Fetches changes and rebuilds. See below. |
+| **Save the offline copies** | Installers for Docker and Node, to keep on a memory stick. |
+| **Put Stratum on the desktop** | A shortcut with its own icon. Press this once. |
+
+Nothing was removed. The old files are still there, in the **tools** folder,
+and `Start Stratum.cmd` and `Stop Stratum.cmd` are still in the main folder as
+a plain-console fallback — the window uses PowerShell's graphics, and a few
+locked-down office computers block it.
+
+### Getting the newest version, and starting again
+
+This is the whole of it:
+
+1. Double-click **`Stratum.cmd`**.
+2. Press **Update to the newest version**. A console window opens, fetches the
+   changes, lists what changed, and rebuilds. Wait for *"Updated. Close this
+   window and press Start."*
+3. Close that window.
+4. Press **Start Stratum**.
+
+Two things it will not do, deliberately:
+
+- **It will not touch your edits.** If anything in the project folder has been
+  changed it stops and lists the files rather than overwriting them. Your
+  settings file (`.env`) is never in that list — it is deliberately untracked,
+  so it is never at risk.
+- **It will not erase data.** Updating rebuilds the program. Records,
+  photographs and settings are untouched, and if a new version needs to change
+  the database it does that by itself on the next start.
+
+If you would rather type it, the same thing in a terminal in the project
+folder:
+
+```
+cd path\to\the\project
+git pull
+docker compose build
+```
+
+then double-click `Stratum.cmd` and press **Start**.
+
+### If you prefer the commands
 
 | To do this | Do this |
 |---|---|
@@ -501,7 +563,7 @@ error text says what is wrong far more reliably than a description of it.
 
 ## Bringing in a folder of photographs
 
-**Double-click `Add Photos.cmd`.** It asks for a folder, works out from the
+**Open `Stratum.cmd` and press “Add photographs”.** It asks for a folder, works out from the
 folder names what each photograph belongs to, shows you the counts, and waits
 before uploading anything.
 
@@ -540,7 +602,7 @@ By default everything sits inside Docker's own storage, which on Windows is a
 virtual disk on `C:` however much room you have elsewhere. That is the wrong
 place for a season of drone imagery.
 
-**Double-click `Where Data Goes.cmd`.** A folder picker opens twice: once for the
+**Open `Stratum.cmd` and press “Where the files are kept”.** A folder picker opens twice: once for the
 photographs and files, once for the backups. It writes the two settings, and if
 there are already files stored it offers to copy them across first — switching
 without moving them leaves every photograph on disk and no longer found, which
@@ -569,7 +631,7 @@ the worse of the two.
 
 It is also the small part. Fifty thousand objects is a few hundred megabytes of
 database and several hundred gigabytes of photographs — and the photographs are
-what `Where Data Goes.cmd` moves.
+what “Where the files are kept” moves.
 
 If the database itself must leave `C:`, move Docker's whole disk using Docker's
 own mechanism, which is safe:

@@ -8,8 +8,8 @@ REM It also writes the same text to "stratum-log.txt" next to this file, so
 REM the whole thing can be attached to a message rather than retyped.
 
 title Stratum - log
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\logs.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\scripts\logs.ps1"
 
 pause

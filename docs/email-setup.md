@@ -170,7 +170,8 @@ see:
 
 Settings are read when it starts, so it will not notice the change until then.
 
-- **Stop Stratum.cmd**, then **Start Stratum.cmd** (or `Share on WiFi.cmd`).
+- Press **Stop Stratum** in the Stratum window, then **Start Stratum** (or
+  **Share on the office network**).
 
 That is everything.
 

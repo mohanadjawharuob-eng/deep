@@ -12,8 +12,8 @@ REM It also explains what to do about the database, which is a different
 REM problem and is deliberately not moved by this.
 
 title Stratum - where the data goes
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\datafolder.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\scripts\datafolder.ps1"
 
 pause

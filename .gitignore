@@ -37,3 +37,9 @@ dist/
 *.swp
 .DS_Store
 Thumbs.db
+
+# --- The launcher ------------------------------------------------------------
+# Both are made on the machine that runs it, not checked in: the window's icon
+# is drawn at startup, and the error note only exists when something went wrong.
+.stratum-icon.ico
+stratum-launcher-error.txt

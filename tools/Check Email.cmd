@@ -7,8 +7,8 @@ REM never prints the password - only how many characters long it is - so the
 REM output is safe to paste into a message.
 
 title Stratum - e-mail check
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\checkemail.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\scripts\checkemail.ps1"
 
 pause

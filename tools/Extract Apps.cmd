@@ -1,5 +1,5 @@
 @echo off
-REM Double-click this file to lift the four offline apps out of this project.
+REM Double-click this file (or use the button in the Stratum window) to lift the four offline apps out of this project.
 REM
 REM They were never part of the archaeology platform - they are four
 REM self-contained web pages that arrived in the same folder from an earlier
@@ -11,9 +11,9 @@ REM it - a security default worth keeping - so this asks PowerShell to run the
 REM real script next door.
 
 title Extract the offline apps
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\extract-apps.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\scripts\extract-apps.ps1"
 
 if errorlevel 1 (
     echo.
