@@ -2582,3 +2582,32 @@ details.card[open] > summary::after { content: "▾"; }
 .viewer-facts dd { margin: 0; font-size: var(--text-base); min-width: 0; }
 .viewer-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .stack-tight { display: flex; flex-direction: column; gap: var(--space-3); }
+
+
+/* --- Collecting a delivery -------------------------------------------- */
+/* The one page somebody outside the institution sees. No navigation, no
+   sign-in, nothing about the archive beyond the bundle they were sent. */
+.collect-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6) var(--space-4);
+  background: var(--bg);
+}
+.collect-card {
+  max-width: 34rem;
+  width: 100%;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg, var(--radius));
+  padding: var(--space-6);
+  text-align: center;
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+}
+.collect-from { letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+.collect-title { margin: 0; font-size: var(--text-2xl, 1.5rem); text-wrap: balance; }
+.collect-note { margin: 0; color: var(--text-2); white-space: pre-wrap; }
+.collect-foot { margin: 0; }
+.btn-lg { padding: var(--space-3) var(--space-6); font-size: var(--text-md, 1rem); }

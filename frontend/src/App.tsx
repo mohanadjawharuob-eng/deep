@@ -60,6 +60,9 @@ import {
 } from "./routes/Management";
 import { AdminUsers } from "./routes/Admin";
 import { CustomFieldsAdmin } from "./routes/CustomFields";
+import { Collect } from "./routes/Collect";
+import { SendOutgoing, SentOutgoing } from "./routes/Deliveries";
+import { Sheets } from "./routes/Sheets";
 import { NewPost } from "./routes/NewPost";
 import { Appearance, MyProfile } from "./routes/Appearance";
 import { Outreach, PostScreen } from "./routes/Social";
@@ -96,10 +99,13 @@ export function App() {
   // to send files for one record. Checked before the session is even waited
   // for — a photographer following a link from their mailbox should not be
   // shown a sign-in form, and the page needs nothing a session would provide.
-  if (location.pathname.startsWith("/send/")) {
+  if (location.pathname.startsWith("/send/") || location.pathname.startsWith("/collect/")) {
     return (
       <Routes>
         <Route path="send/:token" element={<SendFiles />} />
+        {/* The other direction: files prepared for somebody outside, who has
+            no account and should not be shown a sign-in form to fetch them. */}
+        <Route path="collect/:token" element={<Collect />} />
       </Routes>
     );
   }
@@ -122,6 +128,9 @@ export function App() {
         <Route path="map" element={<MapView />} />
         <Route path="photographs" element={<Gallery />} />
         <Route path="media" element={<Media />} />
+        <Route path="sheets" element={<Sheets />} />
+        <Route path="outgoing" element={<SendOutgoing />} />
+        <Route path="sent" element={<SentOutgoing />} />
 
         <Route path="projects" element={<Projects />} />
         {/* Before the :projectId route, or "new" is read as an id. */}

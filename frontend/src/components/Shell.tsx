@@ -212,10 +212,15 @@ const DESTINATIONS: Destination[] = [
     label: "Media",
     // A stack of pictures.
     icon: icon("M6 3.5h11v11H6zM3 6.5v10h10M9 11l2.5-2.5L14 11l1.5-1.5"),
-    owns: ["/media", "/photographs"],
+    owns: ["/media", "/photographs", "/sheets", "/outgoing", "/sent"],
     places: [
       { to: "/media", label: "Folders" },
       { to: "/photographs", label: "Everything" },
+      // Spreadsheets are files too, and the room they live in is here rather
+      // than behind the importer: a sheet matters long after the import that
+      // read it, and nobody looks for last season's register under "Import".
+      { to: "/sheets", label: "Sheets" },
+      { to: "/sent", label: "Sent out" },
     ],
   },
   {

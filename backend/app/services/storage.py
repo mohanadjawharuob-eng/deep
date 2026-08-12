@@ -36,6 +36,13 @@ CATEGORY_THUMBNAILS = "thumbnails"
 CATEGORY_DOCUMENTS = "documents"
 CATEGORY_MODELS = "models"
 CATEGORY_QR = "qr"
+#: Spreadsheets: the originals as they arrived, and the copies rebuilt from
+#: the records they made. Both live here; which is which is on the batch.
+CATEGORY_SHEETS = "sheets"
+#: Bundles prepared for somebody to collect. Named for a person rather than
+#: content-addressed, because the whole point is that it can be found on the
+#: disk by somebody who is not the platform.
+CATEGORY_DELIVERIES = "deliveries"
 
 _UNSAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 

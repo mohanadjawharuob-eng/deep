@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     contexts,
     customfields,
     datarequests,
+    deliveries,
     documents,
     exports,
     floorplans,
@@ -28,6 +29,7 @@ from app.api.v1.endpoints import (
     library,
     management,
     mediafolders,
+    mirror,
     models3d,
     museum,
     notifications,
@@ -73,6 +75,8 @@ api_router.include_router(exports.router)
 api_router.include_router(floorplans.router)
 api_router.include_router(formlayouts.router)
 api_router.include_router(customfields.router)
+api_router.include_router(deliveries.router)
+api_router.include_router(mirror.router)
 api_router.include_router(imports.router)
 
 # Media

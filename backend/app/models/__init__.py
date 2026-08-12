@@ -19,6 +19,7 @@ from app.models.audit import ActivityLog, Comment, Notification, Revision
 from app.models.context import ContextRelationship, ExcavationContext
 from app.models.customfield import CustomField
 from app.models.datarequest import DataRequest
+from app.models.delivery import Delivery
 from app.models.enums import (
     AcquisitionMethod,
     ActivityAction,
@@ -176,6 +177,7 @@ __all__ = [
     "Folder",
     "FolderKind",
     "DocumentType",
+    "Delivery",
     "ExcavationContext",
     "GeometryKind",
     "GisFeature",

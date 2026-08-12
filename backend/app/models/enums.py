@@ -894,3 +894,24 @@ class FolderKind(str, enum.Enum):
     GENERAL = "general"
     FACEBOOK = "facebook"
     INSTAGRAM = "instagram"
+
+
+class DeliveryStatus(str, enum.Enum):
+    """Where a bundle of files stands on its way to somebody.
+
+    ``EXPIRED`` is a state rather than a deletion. The record of what was sent
+    to whom is exactly the thing an institution needs years later - a rights
+    query, a ministry asking what it was given - and it must outlive the files
+    themselves.
+    """
+
+    #: Being written to disk. Brief, and its own state because a bundle of four
+    #: hundred photographs takes long enough that somebody will reload.
+    PREPARING = "preparing"
+    READY = "ready"
+    #: The recipient has downloaded it at least once.
+    COLLECTED = "collected"
+    #: Past its date. The record stays; the link stops working.
+    EXPIRED = "expired"
+    #: Could not be written. The reason is on the record.
+    FAILED = "failed"

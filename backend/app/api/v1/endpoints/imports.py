@@ -25,6 +25,7 @@ Four steps, and the separation between them is the feature:
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import (
@@ -37,7 +38,8 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import select
+from fastapi.responses import FileResponse
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.permissions import has_module_access
@@ -59,8 +61,9 @@ from app.schemas.imports import (
     ImportMappingUpdate,
     ImportPreview,
     ImportRowResult,
+    ShelfUpdate,
 )
-from app.services import accession, activity, importer, records, spreadsheets
+from app.services import accession, activity, importer, records, sheets, spreadsheets
 from app.services.storage import storage
 
 router = APIRouter(prefix="/imports", tags=["Import"])
@@ -293,25 +296,63 @@ async def create_batch(
     return _detail(session, batch, sheet=sheet)
 
 
-@router.get("", response_model=Page[ImportBatchSummary], summary="List imports")
+@router.get(
+    "",
+    response_model=Page[ImportBatchSummary],
+    summary="The sheet room",
+    description=(
+        "Every spreadsheet the platform holds, with the state of each.\n\n"
+        "`mine=true` narrows it to your own, which is what the import screen "
+        "wants. The room itself shows everybody's: a file somebody else "
+        "loaded is still the institution's document, and a colleague looking "
+        "for last season's finds register should not have to know who "
+        "uploaded it."
+    ),
+)
 def list_batches(
     session: DbSession,
     user: Importer,
+    mine: Annotated[bool, Query(description="Only sheets you uploaded")] = False,
+    record_type: Annotated[str | None, Query()] = None,
+    state: Annotated[
+        str | None,
+        Query(description="received, imported, superseded, archived or failed"),
+    ] = None,
+    include_archived: Annotated[bool, Query()] = False,
+    q: Annotated[str | None, Query(description="Match the filename")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[ImportBatchSummary]:
-    statement = (
-        select(ImportBatch)
-        .where(ImportBatch.owner_id == user.id)
-        .order_by(ImportBatch.created_at.desc())
-    )
+    statement = select(ImportBatch).order_by(ImportBatch.created_at.desc())
+    if mine:
+        statement = statement.where(ImportBatch.owner_id == user.id)
+    if record_type:
+        statement = statement.where(ImportBatch.record_type == record_type)
+    if q:
+        statement = statement.where(func.lower(ImportBatch.filename).like(f"%{q.lower()}%"))
+    # Archived sheets are put away, not deleted - out of the working list and
+    # one filter from being back.
+    if not include_archived and state != "archived":
+        statement = statement.where(ImportBatch.is_archived.is_(False))
     rows, total = records.paginate(session, statement, limit, offset)
+    items = [_summary(session, row) for row in rows]
+    # The state is computed from several columns, so it is filtered here rather
+    # than in SQL. A room holds tens of sheets, not tens of thousands.
+    if state:
+        items = [item for item in items if item.state == state]
+        total = len(items)
     return Page[ImportBatchSummary](
-        items=[ImportBatchSummary.model_validate(row) for row in rows],
-        total=total,
-        limit=limit,
-        offset=offset,
+        items=items, total=total, limit=limit, offset=offset
     )
+
+
+def _summary(session: DbSession, batch: ImportBatch) -> ImportBatchSummary:
+    payload = ImportBatchSummary.model_validate(batch)
+    payload.state = batch.shelf_state
+    owner = session.get(User, batch.owner_id)
+    payload.owner_label = (owner.full_name or owner.username) if owner else None
+    payload.has_current_copy = bool(batch.refreshed_path)
+    return payload
 
 
 @router.get("/{batch_id}", response_model=ImportBatchDetail, summary="Read one import")
@@ -740,6 +781,153 @@ _MODELS: dict[str, tuple[Any, ResourceType]] = {
     "excavation_context": (ExcavationContext, ResourceType.CONTEXT),
     "artifact": (Artifact, ResourceType.ARTIFACT),
 }
+
+
+# --------------------------------------------------------------------------
+# The sheet room
+#
+# A spreadsheet that arrived is a document, not only a step in an import.
+# Everything below treats it as one: it can be downloaded as it came, brought
+# up to date from the records it made, put away, or marked as replaced.
+# --------------------------------------------------------------------------
+@router.get(
+    "/{batch_id}/original",
+    summary="Download the sheet exactly as it arrived",
+    description=(
+        "Byte for byte as uploaded. This is the evidence - what was actually "
+        "received, before anybody mapped a column or corrected a row - and it "
+        "is never rewritten."
+    ),
+    response_class=FileResponse,
+)
+def download_original(batch_id: uuid.UUID, session: DbSession, user: Importer) -> FileResponse:
+    batch = records.get_or_404(session, ImportBatch, batch_id, "Sheet")
+    try:
+        path = storage.absolute_path(batch.stored_path)
+    except Exception as exc:  # pragma: no cover - a missing file is a disk fault
+        raise HTTPException(
+            status.HTTP_410_GONE,
+            detail=(
+                f"The stored copy of {batch.filename!r} is not on disk. Restore "
+                "from a backup, or upload the file again."
+            ),
+        ) from exc
+    return FileResponse(path, filename=batch.filename)
+
+
+@router.post(
+    "/{batch_id}/refresh",
+    response_model=ImportBatchSummary,
+    summary="Bring the sheet up to date from the records",
+    description=(
+        "Rebuilds the sheet from the records it created, as they stand now, "
+        "**in the sheet's own columns and headings**. That last part is the "
+        "point: a register that comes back with columns called "
+        "`inventory_number` and `period_id` is a register somebody has to "
+        "re-key before sending it to a ministry.\n\n"
+        "The original is untouched. Built on request rather than on every "
+        "edit - a sheet nobody has opened since 2019 does not need rebuilding "
+        "because somebody fixed a typo."
+    ),
+    responses={409: {"description": "There is nothing to bring up to date"}},
+)
+def refresh_sheet(
+    batch_id: uuid.UUID, session: DbSession, request: Request, user: Importer
+) -> ImportBatchSummary:
+    batch = records.get_or_404(session, ImportBatch, batch_id, "Sheet")
+    _require_import_access(user, batch.record_type)
+
+    try:
+        payload = sheets.rebuild(session, batch, by=user.full_name or user.username)
+    except sheets.SheetError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    stored = storage.save_bytes(payload, category="sheets", extension=".xlsx")
+    batch.refreshed_path = stored.path
+    batch.refreshed_at = datetime.now(UTC)
+    session.add(batch)
+
+    activity.log(
+        session,
+        action=ActivityAction.UPDATE,
+        user=user,
+        resource_label=batch.filename,
+        summary=f"Brought {batch.filename!r} up to date from the records it made",
+        request=request,
+    )
+    session.flush()
+    return _summary(session, batch)
+
+
+@router.get(
+    "/{batch_id}/current.xlsx",
+    summary="Download the sheet brought up to date",
+    description=(
+        "The copy built by `POST /refresh`. Ask for that first if there is "
+        "none, or if the one on file is older than the edits you care about."
+    ),
+    response_class=FileResponse,
+    responses={404: {"description": "No up-to-date copy has been built yet"}},
+)
+def download_current(batch_id: uuid.UUID, session: DbSession, user: Importer) -> FileResponse:
+    batch = records.get_or_404(session, ImportBatch, batch_id, "Sheet")
+    if not batch.refreshed_path:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail=(
+                "No up-to-date copy of this sheet has been built yet. Use "
+                "'Bring it up to date' first."
+            ),
+        )
+    stem = batch.filename.rsplit(".", 1)[0]
+    return FileResponse(
+        storage.absolute_path(batch.refreshed_path), filename=f"{stem} (up to date).xlsx"
+    )
+
+
+@router.patch(
+    "/{batch_id}/shelf",
+    response_model=ImportBatchSummary,
+    summary="Put a sheet away, or say what replaced it",
+    description=(
+        "Archiving takes a sheet out of the working list and deletes nothing - "
+        "it is still downloadable, and the records it made are untouched.\n\n"
+        "Marking one as superseded points at the sheet that replaced it, so "
+        "the room shows one current file and its history rather than four "
+        "files with confusingly similar names."
+    ),
+)
+def update_shelf(
+    batch_id: uuid.UUID,
+    payload: ShelfUpdate,
+    session: DbSession,
+    request: Request,
+    user: Importer,
+) -> ImportBatchSummary:
+    batch = records.get_or_404(session, ImportBatch, batch_id, "Sheet")
+
+    if payload.superseded_by_id is not None:
+        if payload.superseded_by_id == batch.id:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A sheet cannot replace itself.",
+            )
+        records.get_or_404(session, ImportBatch, payload.superseded_by_id, "Sheet")
+
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(batch, key, value)
+    session.add(batch)
+
+    activity.log(
+        session,
+        action=ActivityAction.UPDATE,
+        user=user,
+        resource_label=batch.filename,
+        summary=f"Changed where {batch.filename!r} sits in the sheet room",
+        request=request,
+    )
+    session.flush()
+    return _summary(session, batch)
 
 
 @router.delete(

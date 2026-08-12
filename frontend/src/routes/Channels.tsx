@@ -12,10 +12,10 @@
  * filing, and unfiling it puts it back where it was.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api } from "../lib/api";
+import { ApiError, api } from "../lib/api";
 import { useAction, useQuery, useSession } from "../lib/hooks";
 import { ErrorNote, Loading, PageHeader } from "../components/ui";
 import { Media, type Folder } from "./Media";
@@ -57,15 +57,34 @@ export function Channels() {
 
   // Made on first sight rather than by a form. Nobody should have to fill in a
   // record to say that their museum is on Instagram.
+  //
+  // A conflict here means the folder already exists, which is the state this
+  // was trying to reach — so it is a success, not an error. Treating it as an
+  // error put two red 409s in the console on every visit to the screen and
+  // would have shown a failure to anybody who opened it twice quickly.
   const ensure = useAction(async (kind: string, name: string) => {
-    await api.post("/folders", { name, kind });
+    try {
+      await api.post("/folders", { name, kind });
+    } catch (cause) {
+      if (!(cause instanceof ApiError) || cause.status !== 409) throw cause;
+    }
     folders.reload();
   });
 
+  // One attempt per channel per mount. Without the ref, React's development
+  // double-invoke fires two creates before either reply lands, and the second
+  // one conflicts with the first.
+  const attempted = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (folders.loading || !mayEdit) return;
-    const missing = CHANNELS.find((channel) => !roots[channel.kind]);
-    if (missing && !ensure.running) void ensure.run(missing.kind, missing.name);
+    const missing = CHANNELS.find(
+      (channel) => !roots[channel.kind] && !attempted.current.has(channel.kind),
+    );
+    if (missing && !ensure.running) {
+      attempted.current.add(missing.kind);
+      void ensure.run(missing.kind, missing.name);
+    }
   }, [folders.loading, roots, mayEdit, ensure.running]);
 
   if (folders.loading) return <Loading rows={4} />;

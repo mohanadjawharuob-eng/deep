@@ -42,6 +42,18 @@ class ImportBatchSummary(ORMModel):
     failed_count: int
     created_at: datetime
 
+    # --- the room --------------------------------------------------------
+    #: One word for where this sheet stands: received, imported, superseded,
+    #: archived or failed. Computed rather than stored, because every part of
+    #: it is recorded elsewhere and a stored state goes out of step.
+    state: str | None = None
+    is_archived: bool = False
+    superseded_by_id: uuid.UUID | None = None
+    refreshed_at: datetime | None = None
+    #: Whether a copy rebuilt from the current records exists to download.
+    has_current_copy: bool = False
+    owner_label: str | None = None
+
 
 class ImportBatchDetail(ImportBatchSummary):
     columns: list[str] = Field(default_factory=list)
@@ -100,3 +112,16 @@ class ImportPreview(BaseModel):
     invalid_rows: int
     #: Failures first: they are what has to be acted on.
     rows: list[ImportRowResult] = Field(default_factory=list)
+
+
+class ShelfUpdate(BaseModel):
+    """Where a sheet sits in the room.
+
+    Neither of these touches the file or the records it made. Archiving is
+    putting a document away; superseding is saying which document replaced it.
+    """
+
+    is_archived: bool | None = None
+    superseded_by_id: uuid.UUID | None = Field(
+        default=None, description="The sheet that replaced this one"
+    )

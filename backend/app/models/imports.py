@@ -13,9 +13,10 @@ indistinguishable from ordinary cataloguing the moment it finishes.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -77,7 +78,51 @@ class ImportBatch(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     created_ids: Mapped[list | None] = mapped_column(JSONB)
     note: Mapped[str | None] = mapped_column(Text)
 
+    # --- The sheet room --------------------------------------------------
+    # A spreadsheet that arrived is a document in its own right, not only a
+    # step in an import. Somebody will ask for "the finds register as Ahmad
+    # sent it in March" long after the records it made have been corrected
+    # forty times, and the honest answer is the file itself.
+    #
+    # Which is why the platform keeps two: the original, byte for byte, and a
+    # copy rebuilt from the records as they stand now. Overwriting the first
+    # with the second would destroy the only evidence of what was actually
+    # received.
+
+    #: The sheet this one replaces. Set when a corrected version of the same
+    #: file arrives, so the room shows one current sheet and its history rather
+    #: than four files with confusingly similar names.
+    superseded_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("import_batches.id", ondelete="SET NULL")
+    )
+    #: Put away. Still downloadable, out of the way of the working list.
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    #: Where the rebuilt copy lives, and when it was last rebuilt. Both null
+    #: until somebody asks for one - building it for every sheet on every edit
+    #: would be work nobody asked for on files nobody opens.
+    refreshed_path: Mapped[str | None] = mapped_column(String(500))
+    refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     owner_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     owner: Mapped[User] = relationship("User", foreign_keys=[owner_id])
+
+    @property
+    def shelf_state(self) -> str:
+        """One word for where this sheet stands, for a person reading a list.
+
+        Deliberately computed rather than stored: every part of it is already
+        recorded somewhere, and a stored state is a state that goes out of step
+        with the facts it was meant to summarise.
+        """
+        if self.superseded_by_id is not None:
+            return "superseded"
+        if self.is_archived:
+            return "archived"
+        if self.status is ImportStatus.COMMITTED:
+            return "imported"
+        if self.status is ImportStatus.FAILED:
+            return "failed"
+        return "received"

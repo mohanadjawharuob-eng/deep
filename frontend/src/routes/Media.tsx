@@ -263,6 +263,12 @@ export function Media({
                   </option>
                 ))}
               </select>
+              <Link
+                className="btn btn-sm"
+                to={`/outgoing?photographs=${[...chosen].join(",")}`}
+              >
+                Send these to somebody
+              </Link>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"

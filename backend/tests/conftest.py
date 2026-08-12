@@ -54,7 +54,11 @@ def _test_database_url() -> str:
     if explicit:
         return explicit
     url = make_url(settings.sqlalchemy_url)
-    return str(url.set(database=f"{url.database}_test"))
+    # ``str(url)`` masks the password as ``***``. Parsed back, that is a URL
+    # carrying three asterisks as the password — which works against a server
+    # set to ``trust`` and fails against every server that checks, so the
+    # suite passes on one machine and cannot connect on the next.
+    return url.set(database=f"{url.database}_test").render_as_string(hide_password=False)
 
 
 TEST_URL = _test_database_url()
