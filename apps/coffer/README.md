@@ -32,5 +32,15 @@ user's data across untouched — but it has a sharp edge:
 > lose grants, allowances, splits, cross-currency transfers and pocket
 > currencies by opening the wrong bookmark.
 
-The version this replaced is kept as the git tag **`coffer-deep-v1`**, which
-is browsable and restorable and cannot be opened by a browser.
+The version this replaced is kept in history, not in a folder. It is the state
+of `apps/coffer/` at commit **`369149d`** ("Give each app its own scope so all
+four can be installed"), and there is a local tag `coffer-deep-v1` on it:
+
+```
+git show 369149d:apps/coffer/index.html > /tmp/coffer-old.html   # read it
+git checkout 369149d -- apps/coffer                              # restore it
+```
+
+The tag is local only — the credentials these sessions push with accept
+branches and refuse tags — so the commit above is the durable reference. To
+publish the label yourself: `git push origin coffer-deep-v1`.
