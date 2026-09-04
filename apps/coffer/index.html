@@ -6,10 +6,15 @@
 <script>
   /* Read the saved theme before anything paints. Doing this from the main
      script, which runs at the end of the body, means a visible flash of the
-     wrong colours on every launch. */
+     wrong colours on every launch.
+
+     The key is derived the same way the app derives it — see STORE_SUFFIX
+     below — because two copies of this app are served from one origin and
+     localStorage is scoped to the site, not the folder. */
   (function () {
     try {
-      var raw = localStorage.getItem("coffer.v2");
+      var raw = localStorage.getItem(
+        /(^|\/)deep\//.test(location.pathname) ? "coffer.deep.v2" : "coffer.v2");
       var t = raw && JSON.parse(raw).settings && JSON.parse(raw).settings.theme;
       if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
     } catch (e) { /* no preference stored, or storage blocked: follow the system */ }
@@ -1047,9 +1052,22 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-04h";   // shown in Settings, so "did it update?" is answerable
-  var KEY = "coffer.v2";
-  var LEGACY_KEY = "coffer.v1";
+  var BUILD = "2026-09-04i";   // shown in Settings, so "did it update?" is answerable
+  /* Two copies of this app are served from one GitHub Pages origin —
+     /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
+     the SITE, not the folder. So the two shared one ledger: a demo loaded in
+     one overwrote the real book in the other, and an older build next door
+     could drop every field it did not know about on its next save.
+
+     The suffix is derived from where the app is being served from rather than
+     hard-coded per copy, so index.html stays byte-identical between the two
+     and there is no line for anyone to forget to change. Anything not under
+     /deep/ keeps the original key, so no existing install loses sight of its
+     data; the deep copy starts empty, which is what makes it a safe place to
+     load the sample and show somebody around. */
+  var STORE_SUFFIX = /(^|\/)deep\//.test(location.pathname) ? ".deep" : "";
+  var KEY = "coffer" + STORE_SUFFIX + ".v2";
+  var LEGACY_KEY = "coffer" + STORE_SUFFIX + ".v1";
   var CAT_VARS = ["--c1", "--c2", "--c3", "--c4", "--c5", "--c6", "--c7", "--c8"];
   var ACCOUNT_TYPES = ["Checking", "Savings", "Cash", "Credit Card", "Investment"];
   // "once" is a lump sum on a date — project work, a grant, a bonus. Forcing
@@ -1360,7 +1378,8 @@
      They are therefore also NOT in a normal backup unless you ask for it; see
      the backup card, which says so plainly rather than losing them quietly.
      ------------------------------------------------- */
-  var PHOTO_DB = "coffer-photos", PHOTO_STORE = "receipts", photoDb = null;
+  // receipts are per-ledger too, or the demo would show someone your receipts
+  var PHOTO_DB = "coffer-photos" + STORE_SUFFIX, PHOTO_STORE = "receipts", photoDb = null;
 
   function withPhotos(fn, onFail) {
     if (photoDb) { fn(photoDb); return; }
@@ -4609,8 +4628,9 @@
       "</p><div class=\"btn-row\">" +
       '<button class="btn primary" data-act="account-add">Add an account</button>' +
       '<button class="btn" data-act="load-sample">Load sample data</button>' +
-      "</div><p class=\"hint\" style=\"margin-top:0.8rem\">Sample data fills three months of a fictional budget so you can see " +
-      "every screen working. You can erase it in one click from Settings.</p></div></div>";
+      "</div><p class=\"hint\" style=\"margin-top:0.8rem\">The sample is three months of a made-up freelancer \u2014 two " +
+      "currencies, pockets, a grant, a holding, a contract that ends \u2014 so every screen has something on it to " +
+      "look at. It is also in Settings, for when you want to show somebody.</p></div></div>";
   }
 
   /* ============================================================
@@ -5280,6 +5300,10 @@
       '<div class="card-head" style="padding:0"><h3>' + esc(a.name) + "</h3>" +
       '<span class="sub">' + esc(a.type || "Investment") + "</span>" +
       '<button class="ibtn" data-act="account-edit" data-id="' + a.id + '" aria-label="Edit">\u22ef</button>' +
+      // a holding you sold or entered by mistake had no way out of this screen:
+      // the card offered edit, value, fund and payout, and nothing else
+      '<button class="ibtn danger" data-act="account-del" data-id="' + a.id +
+        '" aria-label="Delete ' + esc(a.name) + '" title="Delete">\u2715</button>' +
       "</div>" +
       '<div class="tile-fig" style="margin-top:0.4rem">' + fmt(worth) + "</div>" +
       // Never valued means the gain is unknown, not nought. "Up $0 (+0.0%)"
@@ -7628,6 +7652,17 @@
       "</div><p class=\"hint\" style=\"margin-top:0.75rem\">Back up gives you the text and a file — copy the text if " +
       "your browser blocks downloads. Restoring replaces everything currently in this browser, after a confirmation.</p></div></div>";
 
+    /* The sample was only reachable from the empty screen, which meant that
+       once you had a ledger there was no way back to it — and showing somebody
+       how the app works is exactly the moment you want one. Back it up first,
+       which is why the button sits under the card that does that. */
+    html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Showing someone around</h3>' +
+      '<span class="sub">' + (STORE_SUFFIX ? "demo copy" : "your ledger") + "</span></div><div class=\"card-body\">" +
+      '<p class="hint" style="margin-bottom:0.7rem">Three months of a made-up freelancer: two currencies, pockets, ' +
+      "a grant, a holding, a contract that ends. Every screen has something true on it to point at. " +
+      "<b>It replaces what is here</b>, so back up first if this is your own book.</p>" +
+      '<button class="btn" data-act="load-sample">Load the sample ledger</button></div></div>';
+
     /* appearance */
     var dref = defaultAccountRef();
     html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Where a quick log lands</h3>' +
@@ -8529,6 +8564,14 @@
         return t.accountId === id || t.toAccountId === id;
       });
       var linkedRecur = state.recurring.filter(function (r) { return r.accountId === id; });
+      /* A payout lands in a CASH account and only points back here through
+         investId, so it is not in `linked` and must not be: the money really
+         did arrive, and deleting the holding is no reason to erase income.
+         The link is cleared instead, and the confirmation says so. */
+      var payouts = state.transactions.filter(function (t) {
+        return t.investId === id && t.accountId !== id && t.toAccountId !== id;
+      });
+      var marks = isInvestment(a) ? marksOf(a).length : 0;
 
       var msg = linked.length || linkedRecur.length
         ? "This will also remove <b>" + linked.length + (linked.length === 1 ? " transaction" : " transactions") + "</b>" +
@@ -8536,6 +8579,18 @@
           " attached to it. You can undo this straight afterwards. " +
           (a.closed ? "" : "To keep all of that and just stop using the account, close it instead.")
         : "Nothing is attached to this account.";
+
+      if (isInvestment(a)) {
+        msg += " " + (marks
+          ? "Its <b>" + marks + "</b> " + (marks === 1 ? "valuation goes" : "valuations go") +
+            " with it, so the net-worth history it drew disappears too."
+          : "It has never been valued.");
+        if (payouts.length) {
+          msg += " The <b>" + payouts.length + "</b> " + (payouts.length === 1 ? "payout" : "payouts") +
+            " it made stay in your ledger \u2014 that money did arrive \u2014 but stop being counted " +
+            "as a return on anything.";
+        }
+      }
 
       confirmAction({
         title: "Delete " + a.name + "?",
@@ -8545,13 +8600,17 @@
         var snapAcc = state.accounts.slice();
         var snapTx = state.transactions.slice();
         var snapRec = state.recurring.slice();
+        // snapshot before unlinking, so undo puts the investId back too
+        var snapLinks = payouts.map(function (t) { return { t: t, investId: t.investId }; });
         state.accounts = state.accounts.filter(function (x) { return x.id !== id; });
         state.transactions = state.transactions.filter(function (t) { return t.accountId !== id && t.toAccountId !== id; });
+        payouts.forEach(function (t) { delete t.investId; });
         state.recurring = state.recurring.filter(function (r) { return r.accountId !== id; });
         if (filters.account === id) filters.account = "all";
         save(); render();
         toast(a.name + " deleted.", function () {
           state.accounts = snapAcc; state.transactions = snapTx; state.recurring = snapRec;
+          snapLinks.forEach(function (L) { L.t.investId = L.investId; });
         });
       });
     },
@@ -9132,7 +9191,25 @@
     /* ---- investments ---- */
     "worth-tab": function (id) { worthTab = id; view = "worth"; render(); },
 
+    /* Buying a holding does not make you richer. The figure you put in used to
+       become the new account's `opening`, which totalAssets() counts — so
+       adding an investment you had just paid $5,000 for raised your net worth
+       by $5,000, out of nothing, while the account it actually came out of sat
+       unchanged. The money now moves: a transfer out of an account you name,
+       exactly as "Put money in" already does, so net worth holds still and the
+       runway correctly drops (freeAssets() leaves investments out).
+
+       An opening figure is still right for one case — a holding you have had
+       for years, funded before this ledger existed — so that stays on offer,
+       named for what it is rather than being the only option. */
     "invest-add": function () {
+      var flat = accountOptionsFlat().filter(function (o) {
+        return !isInvestment(accountById(parseRef(o.value).accountId));
+      });
+      var payFrom = flat.length
+        ? (defaultAccountRef() && flat.filter(function (o) { return o.value === defaultAccountRef(); })[0]
+            ? defaultAccountRef() : flat[0].value)
+        : "";
       openModal({
         title: "Add an investment",
         message: "Money you put in is a transfer, not spending, so it never lands in your burn rate. " +
@@ -9142,23 +9219,51 @@
           { key: "type", label: "Kind", type: "select", options: typeOptions("Investment"),
             catKind: "free", newLabel: "New kind\u2026", newPlaceholder: "e.g. Pension, Crypto",
             value: "Investment" },
-          { key: "opening", label: "Already put in", type: "number", value: 0,
-            hint: "what it has cost you so far" },
+          { key: "opening", label: "Put in", type: "number", value: 0,
+            hint: "what it has cost you" },
+          { key: "from", label: "Paid from", type: "select",
+            options: [{ value: "", label: "\u2014 held before this ledger, nothing to move \u2014" }].concat(accountOptions()),
+            value: payFrom,
+            hint: "the money comes out of here, so your net worth does not move \u2014 you are holding it differently" },
+          { key: "date", label: "Bought on", type: "date", value: today() },
           { key: "worth", label: "Worth now", type: "number", value: 0,
             hint: "leave at nought if you have not valued it" }
         ].concat(currencyField()),
         confirmLabel: "Add",
-        validate: function (v) { if (!v.name.trim()) return "Give it a name."; },
+        validate: function (v) {
+          if (!v.name.trim()) return "Give it a name.";
+          if (v.from && !(v.opening > 0)) {
+            return "Say how much went in, or set \u201CPaid from\u201D to held before this ledger.";
+          }
+        },
         onConfirm: function (v) {
           var cur = v.currency || baseCode(), rt = rateFor(cur);
+          var moved = v.from && v.opening > 0;
           var a = { id: uid(), name: v.name.trim(), group: null, kind: "investment",
-            type: v.type || "Investment", opening: v.opening,
+            type: v.type || "Investment",
+            // paid for out of an account: nothing pre-existed, the transfer is
+            // the whole story. Held from before: the opening IS the story.
+            opening: moved ? 0 : v.opening,
             currency: cur, rate: rt, marks: [] };
           if (v.worth > 0) a.marks.push({ on: today(), value: v.worth, currency: cur, rate: rt });
           state.accounts.push(a);
+          if (moved) {
+            var ref = parseRef(v.from);
+            warnIfOverAllocated(v.from, "expense", toBase(v.opening, cur, rt));
+            state.transactions.push({
+              id: uid(), date: v.date || today(), desc: "Into " + a.name,
+              type: "transfer", category: "Transfer", amount: v.opening,
+              accountId: ref.accountId, pocketId: ref.pocketId || null,
+              toAccountId: a.id, toPocketId: null,
+              investId: a.id, currency: cur, rate: rt
+            });
+          }
           worthTab = "invest"; view = "worth";
           save(); render();
-          toast(a.name + " added.");
+          toast(moved
+            ? a.name + " added \u2014 " + fmt(toBase(v.opening, cur, rt)) + " moved out of " +
+              accountName(parseRef(v.from).accountId, parseRef(v.from).pocketId) + ", not spent."
+            : a.name + " added.");
         }
       });
     },
@@ -10263,16 +10368,17 @@
 
     "load-sample": function () {
       confirmAction({
-        title: "Load sample data?",
-        message: "Fills the ledger with three months of a fictional household budget so you can see every screen working. " +
-          "Anything already here will be replaced.",
+        title: "Load the sample ledger?",
+        message: "Three months of a made-up freelancer paid in two currencies, with pockets, a grant, a holding and " +
+          "a contract that runs out \u2014 so every screen has something true on it to explain. " +
+          "<b>Anything already here will be replaced.</b>",
         confirmLabel: "Load it",
         danger: false
       }, function () {
         state = sampleData();
         viewMonth = thisMonth();
         save(); render();
-        toast("Sample data loaded — erase it any time from Settings.");
+        toast("Sample ledger loaded \u2014 restore a backup from Settings to put yours back.");
       });
     },
 
@@ -10754,98 +10860,271 @@
     inp.focus();
   }
 
-  /* ---------------- sample data ---------------- */
+  /* ---------------- sample data ----------------------------------------------
+     A whole person, not a feature list. The old sample was a salaried job, one
+     currency and three accounts, which left more than half the app with
+     nothing to point at: no pockets, no grant, no allowance, no holding, no
+     split, no exchange. This is a freelancer paid in two currencies with a
+     grant to account for and a move being saved up for — so every screen has
+     something true on it to explain.
+
+     Deliberately NOT anyone's real ledger. Figures are plausible and round. */
 
   function sampleData() {
     var s = blank();
-    var current = { id: uid(), name: "Everyday", type: "Checking", opening: 1850 };
-    var savings = { id: uid(), name: "Savings", type: "Savings", opening: 4200 };
-    var cash = { id: uid(), name: "Cash", type: "Cash", opening: 120 };
-    s.accounts = [current, savings, cash];
+    var mk0 = thisMonth(), mk1 = monthShift(mk0, -1), mk2 = monthShift(mk0, -2);
+    var elapsed = new Date().getDate();
+    var LBP = 89000;
 
-    var plan = [
-      ["Salary", "income", "Salary", 3450, 25, current.id],
-      ["Rent", "expense", "Housing", 1250, 1, current.id],
-      ["Council tax", "expense", "Housing", 165, 3, current.id],
-      ["Electricity & gas", "expense", "Utilities", 96, 6, current.id],
-      ["Broadband", "expense", "Utilities", 34, 8, current.id],
-      ["Phone", "expense", "Utilities", 18, 8, current.id],
-      ["Big shop", "expense", "Groceries", 118, 4, current.id],
-      ["Big shop", "expense", "Groceries", 104, 12, current.id],
-      ["Big shop", "expense", "Groceries", 96, 19, current.id],
-      ["Corner shop", "expense", "Groceries", 22, 24, cash.id],
-      ["Train pass", "expense", "Transport", 88, 2, current.id],
-      ["Fuel", "expense", "Transport", 52, 16, current.id],
-      ["Gym", "expense", "Health", 29, 5, current.id],
-      ["Pharmacy", "expense", "Health", 14, 21, cash.id],
-      ["Dinner out", "expense", "Dining & Fun", 62, 14, current.id],
-      ["Cinema", "expense", "Dining & Fun", 24, 22, current.id],
-      ["Coffee run", "expense", "Dining & Fun", 16, 9, cash.id],
-      ["Streaming", "expense", "Dining & Fun", 16, 11, current.id]
-    ];
-    var extras = [
-      [-2, ["New tyres", "expense", "Transport", 310, 18, current.id]],
-      [-2, ["Freelance invoice", "income", "Freelance", 480, 20, current.id]],
-      [-1, ["Winter coat", "expense", "Shopping", 145, 7, current.id]],
-      [-1, ["Birthday present", "expense", "Shopping", 45, 17, cash.id]],
-      [0, ["Dentist", "expense", "Health", 78, 10, current.id]]
-    ];
+    // A rate set today and one set six weeks ago, so the staleness warning has
+    // something to warn about — it is a real part of the app to explain.
+    s.settings.rates = {
+      LBP: { rate: LBP, setOn: today() },
+      EUR: { rate: 0.92, setOn: new Date(Date.now() - 44 * 86400000).toISOString().slice(0, 10) }
+    };
+    s.categories.expense = ["Housing", "Groceries", "Transport", "Utilities",
+      "Dining & Fun", "Health", "Shopping", "Household", "Fees", "Other"];
+    s.categories.income = ["Salary", "Freelance", "Teaching", "Investment", "Gift", "Other income"];
 
-    function push(mk, row) {
-      var day = Math.min(row[4], daysInMonth(mk));
-      s.transactions.push({
-        id: uid(),
-        date: mk + "-" + String(day).padStart(2, "0"),
-        desc: row[0], type: row[1], category: row[2],
-        amount: row[3], accountId: row[5]
-      });
+    /* ---- where the money sits ---- */
+    var rentPk = { id: uid(), name: "Rent set aside", opening: 950, currency: "USD", rate: 1, status: "earmarked" };
+    var taxPk  = { id: uid(), name: "Tax", opening: 1400, currency: "USD", rate: 1, status: "committed" };
+    var bank = { id: uid(), name: "Bank", group: "Bank of Beirut", type: "Checking",
+      opening: 4100, currency: "USD", rate: 1, pockets: [rentPk, taxPk] };
+
+    var movePk = { id: uid(), name: "Cyprus move", opening: 2500, currency: "USD", rate: 1, status: "earmarked" };
+    var savings = { id: uid(), name: "Savings", group: "Bank of Beirut", type: "Savings",
+      opening: 6800, currency: "USD", rate: 1, pockets: [movePk] };
+
+    // an account held in lira, so the opening figure is in lira
+    var wallet = { id: uid(), name: "Lira wallet", type: "Cash",
+      opening: 12000000, currency: "LBP", rate: LBP, pockets: [] };
+
+    // bought with money that left an account, which is why it has no opening
+    var fund = { id: uid(), name: "Index fund", kind: "investment", type: "Investment",
+      opening: 0, currency: "USD", rate: 1, marks: [
+        { on: mk1 + "-15", value: 3120, currency: "USD", rate: 1 },
+        { on: mk0 + "-0" + Math.min(9, Math.max(1, elapsed)), value: 3340, currency: "USD", rate: 1 }
+      ] };
+    // held since before this ledger, so the opening IS the story
+    var gold = { id: uid(), name: "Gold coins", kind: "investment", type: "Gold",
+      opening: 2200, currency: "USD", rate: 1, marks: [
+        { on: mk1 + "-20", value: 2650, currency: "USD", rate: 1 }
+      ] };
+
+    s.accounts = [bank, savings, wallet, fund, gold];
+    s.settings.defaultAccountRef = acctRef(bank.id, null);
+
+    /* ---- a grant: not this person's money ---- */
+    var grantPk = { id: uid(), name: "Heritage grant", opening: 0, currency: "USD", rate: 1, status: "committed" };
+    bank.pockets.push(grantPk);
+    var grant = {
+      id: uid(), name: "Heritage grant", funder: "Beit Foundation",
+      total: 9000, currency: "USD", rate: 1,
+      awardedOn: mk2 + "-12", endsOn: monthShift(mk0, 8) + "-30",
+      ref: acctRef(bank.id, grantPk.id), closed: false,
+      lines: [
+        { id: uid(), name: "Travel", amount: 2500, note: null },
+        { id: uid(), name: "Fieldwork", amount: 3200, note: "two survey trips" },
+        { id: uid(), name: "Printing", amount: 1300, note: null },
+        { id: uid(), name: "Fees", amount: 2000, note: null }
+      ]
+    };
+    s.grants = [grant];
+
+    var tx = [];
+    function push(o) { tx.push(o); return o; }
+
+    /* Nothing may be dated in the future, which on the 3rd of a month left the
+       current month with four entries and every screen in the demo looking
+       empty — the one thing a demo cannot afford. Early in a month the current
+       month's days are squeezed into the days that have actually happened, so
+       there is always a month's worth to point at; from the 12th the calendar
+       is left alone, because by then it fills itself. */
+    function dayOf(mk, d) {
+      // ceil, not round: the last entry of the month has to land ON today, or
+      // "Spent today" — the first card anyone looks at — is empty in the demo
+      if (mk === mk0 && elapsed < 12) d = Math.max(1, Math.min(elapsed, Math.ceil(d / 28 * elapsed)));
+      return mk + "-" + String(Math.min(d, daysInMonth(mk))).padStart(2, "0");
     }
+    function day(mk, d) { return dayOf(mk, d); }
+    function ok(mk, d) { return mk !== mk0 || elapsed < 12 || d <= elapsed; }
 
-    [-2, -1, 0].forEach(function (offset) {
-      var mk = monthShift(thisMonth(), offset);
-      var elapsed = offset === 0 ? new Date().getDate() : 99;
-      plan.forEach(function (row) {
-        if (row[4] > elapsed) return; // don't log the current month's future
-        push(mk, row);
+    // the award arriving: assets and restricted rise together, net worth holds
+    push({ id: uid(), date: grant.awardedOn, desc: "Heritage grant awarded", type: "income",
+      category: "Gift", accountId: bank.id, pocketId: grantPk.id, amount: 9000,
+      grantId: grant.id, grantAward: true, currency: "USD", rate: 1 });
+
+    /* ---- what comes in ---- */
+    // a retainer that ends: the outlook should show the cliff, not a flat line
+    [[mk2, 25], [mk1, 25], [mk0, 25]].forEach(function (p) {
+      if (!ok(p[0], p[1])) return;
+      push({ id: uid(), date: day(p[0], p[1]), desc: "Studio retainer", type: "income",
+        category: "Freelance", accountId: bank.id, amount: 2400, currency: "USD", rate: 1 });
+    });
+    // paid in lira, with a transport allowance inside it
+    [[mk2, 3], [mk1, 3], [mk0, 3]].forEach(function (p) {
+      if (!ok(p[0], p[1])) return;
+      push({ id: uid(), date: day(p[0], p[1]), desc: "University teaching", type: "income",
+        category: "Teaching", accountId: wallet.id, amount: 27000000, currency: "LBP", rate: LBP });
+    });
+    push({ id: uid(), date: day(mk1, 18), desc: "Competition prize", type: "income",
+      category: "Other income", accountId: bank.id, amount: 1800, oneOff: true, currency: "USD", rate: 1 });
+
+    /* ---- changing lira for dollars, at the rate actually given ---- */
+    // 20,000,000 lira out is $224.72 at the stored rate; $215 came back, so the
+    // exchange cost $9.72 and net worth falls by exactly that
+    if (ok(mk0, 6)) {
+      push({ id: uid(), date: day(mk0, 6), desc: "Changed at Hamra", type: "transfer",
+        category: "Transfer", amount: 20000000, accountId: wallet.id, pocketId: null,
+        toAccountId: bank.id, toPocketId: null, currency: "LBP", rate: LBP,
+        toAmount: 215, toCurrency: "USD", toRate: 1 });
+    }
+    push({ id: uid(), date: day(mk1, 8), desc: "Changed at Hamra", type: "transfer",
+      category: "Transfer", amount: 18000000, accountId: wallet.id, pocketId: null,
+      toAccountId: bank.id, toPocketId: null, currency: "LBP", rate: LBP,
+      toAmount: 196, toCurrency: "USD", toRate: 1 });
+
+    /* ---- money held differently, not spent ---- */
+    push({ id: uid(), date: day(mk2, 14), desc: "Into Index fund", type: "transfer",
+      category: "Transfer", amount: 3000, accountId: savings.id, pocketId: null,
+      toAccountId: fund.id, toPocketId: null, investId: fund.id, currency: "USD", rate: 1 });
+    push({ id: uid(), date: day(mk1, 28), desc: "Index fund payout", type: "income",
+      category: "Investment", accountId: bank.id, amount: 46, investId: fund.id,
+      currency: "USD", rate: 1 });
+
+    /* ---- the month in, month out ---- */
+    var monthly = [
+      // desc, category, amount, day, account, pocket
+      // Rent is paid OUT of the pocket it was set aside in the month before —
+      // otherwise the pocket just accumulates for ever and demonstrates
+      // nothing. In and out each month, so it sits at one month's rent.
+      ["Rent", "Housing", 950, 1, "bank", "rent"],
+      ["Electricity", "Utilities", 68, 6, "bank"],
+      ["Internet", "Utilities", 42, 8, "bank"],
+      ["Phone", "Utilities", 18, 8, "bank"],
+      ["Health insurance", "Health", 210, 12, "bank"],
+      ["Gym", "Health", 30, 5, "bank"],
+      ["Big shop", "Groceries", 96, 4, "bank"],
+      ["Big shop", "Groceries", 88, 19, "bank"],
+      ["Corner shop", "Groceries", 900000, 11, "wallet"],
+      ["Service to studio", "Transport", 600000, 7, "wallet"],
+      ["Service to studio", "Transport", 600000, 21, "wallet"],
+      ["Petrol", "Transport", 54, 16, "bank"],
+      ["Dinner out", "Dining & Fun", 58, 14, "bank"],
+      ["Coffee", "Dining & Fun", 300000, 9, "wallet"],
+      ["Streaming", "Dining & Fun", 14, 11, "bank"]
+    ];
+    var accById = { bank: bank, wallet: wallet, savings: savings };
+    [mk2, mk1, mk0].forEach(function (mk) {
+      monthly.forEach(function (r) {
+        if (!ok(mk, r[3])) return;
+        var a = accById[r[4]];
+        var foreign = a.id === wallet.id;
+        push({ id: uid(), date: day(mk, r[3]), desc: r[0], type: "expense", category: r[1],
+          accountId: a.id, pocketId: r[5] === "rent" ? rentPk.id : null, amount: r[2],
+          currency: foreign ? "LBP" : "USD", rate: foreign ? LBP : 1 });
       });
-      // a monthly move into savings
-      if (offset < 0 || elapsed >= 26) {
-        s.transactions.push({
-          id: uid(), date: mk + "-26", desc: "To savings", type: "transfer",
-          category: "Transfer", accountId: current.id, toAccountId: savings.id, amount: 300
-        });
+      // one payment, two costs — the shop trip that was half household
+      if (ok(mk, 23)) {
+        push({ id: uid(), date: day(mk, 23), desc: "Monoprix run", type: "expense",
+          category: "Groceries", accountId: bank.id, amount: 124, currency: "USD", rate: 1,
+          splits: [{ category: "Groceries", amount: 79 }, { category: "Household", amount: 45 }] });
+      }
+      // setting the rent aside before it is due
+      if (ok(mk, 26)) {
+        push({ id: uid(), date: day(mk, 26), desc: "Rent set aside", type: "transfer",
+          category: "Transfer", amount: 950, accountId: bank.id, pocketId: null,
+          toAccountId: bank.id, toPocketId: rentPk.id, currency: "USD", rate: 1 });
       }
     });
-    extras.forEach(function (pair) {
-      var mk = monthShift(thisMonth(), pair[0]);
-      var elapsed = pair[0] === 0 ? new Date().getDate() : 99;
-      if (pair[1][4] <= elapsed) push(mk, pair[1]);
+
+    /* ---- things that happened once ---- */
+    var oneOffs = [
+      [mk2, ["Laptop screen repair", "Shopping", 340, 17, true, false]],
+      [mk2, ["Client trip to Larnaca", "Transport", 420, 22, false, true]],
+      [mk1, ["Dentist", "Health", 180, 9, true, false]],
+      [mk1, ["Winter coat", "Shopping", 130, 24, false, false]],
+      [mk0, ["Print shop deposit", "Fees", 90, 10, false, false]]
+    ];
+    oneOffs.forEach(function (pair) {
+      var mk = pair[0], r = pair[1];
+      if (!ok(mk, r[3])) return;
+      var t = { id: uid(), date: day(mk, r[3]), desc: r[0], type: "expense", category: r[1],
+        accountId: bank.id, amount: r[2], currency: "USD", rate: 1 };
+      if (r[4]) t.oneOff = true;
+      // a client trip you are owed back for: out of your balance, out of your burn
+      if (r[5]) t.refundable = true;
+      push(t);
     });
 
-    s.budgets = { Groceries: 400, "Dining & Fun": 160, Transport: 180, Shopping: 120, Health: 80 };
+    /* ---- someone else's money, spent on their errand ---- */
+    [[mk2, 20, "Survey trip — flights", 640, "Travel", "Transport"],
+     [mk1, 6, "Field assistant", 900, "Fieldwork", "Fees"],
+     [mk1, 27, "Archive scans", 310, "Printing", "Fees"],
+     [mk0, 4, "Survey trip — hotel", 480, "Travel", "Housing"]].forEach(function (r) {
+      if (!ok(r[0], r[1])) return;
+      var line = grant.lines.filter(function (L) { return L.name === r[4]; })[0];
+      push({ id: uid(), date: day(r[0], r[1]), desc: r[2], type: "expense", category: r[5],
+        accountId: bank.id, pocketId: grantPk.id, amount: r[3],
+        grantId: grant.id, grantLineId: line ? line.id : null, currency: "USD", rate: 1 });
+    });
+
+    s.transactions = tx;
+
+    /* ---- what was meant to happen ---- */
+    s.budgets = { Groceries: 420, Transport: 180, "Dining & Fun": 200,
+      Health: 260, Shopping: 150, Utilities: 140, Household: 80 };
+
     s.goals = [
-      { id: uid(), name: "Emergency fund", target: 7500, saved: 4200, due: null },
-      { id: uid(), name: "Trip to Japan", target: 3200, saved: 640, due: monthShift(thisMonth(), 11) + "-01" }
+      { id: uid(), name: "Cyprus move", target: 6000, saved: 0,
+        holdsIn: acctRef(savings.id, movePk.id), due: monthShift(mk0, 7) + "-01" },
+      { id: uid(), name: "New laptop", target: 1900, saved: 620, due: monthShift(mk0, 4) + "-01" }
     ];
+
     s.debts = [
-      { id: uid(), name: "Credit card", balance: 1840, rate: 22.9, minPayment: 55 },
-      { id: uid(), name: "Car loan", balance: 4600, rate: 6.4, minPayment: 155 }
+      { id: uid(), name: "Credit card", balance: 1240, rate: 24.9, minPayment: 45 },
+      { id: uid(), name: "Family loan", balance: 3000, rate: 0, minPayment: 200 }
     ];
+
+    var teaching = { id: uid(), name: "University teaching", type: "income", category: "Teaching",
+      accountId: wallet.id, amount: 27000000, currency: "LBP", rate: LBP,
+      frequency: "monthly", nextDate: nextRecur(3),
+      // paid at so much a day and spent on getting there: it draws the
+      // Transport budget down before your own money does
+      allowance: { category: "Transport", rate: 5, currency: "USD", per: "day" } };
+
     s.recurring = [
-      { id: uid(), name: "Rent", type: "expense", category: "Housing", accountId: current.id, amount: 1250, frequency: "monthly", nextDate: nextRecur(1) },
-      { id: uid(), name: "Broadband", type: "expense", category: "Utilities", accountId: current.id, amount: 34, frequency: "monthly", nextDate: nextRecur(8) },
-      { id: uid(), name: "Gym", type: "expense", category: "Health", accountId: current.id, amount: 29, frequency: "monthly", nextDate: nextRecur(5) },
-      { id: uid(), name: "Streaming", type: "expense", category: "Dining & Fun", accountId: current.id, amount: 16, frequency: "monthly", nextDate: nextRecur(11) },
-      { id: uid(), name: "Salary", type: "income", category: "Salary", accountId: current.id, amount: 3450, frequency: "monthly", nextDate: nextRecur(25) },
-      { id: uid(), name: "Car insurance", type: "expense", category: "Transport", accountId: current.id, amount: 420, frequency: "yearly", nextDate: nextRecur(14) }
+      { id: uid(), name: "Studio retainer", type: "income", category: "Freelance",
+        accountId: bank.id, amount: 2400, frequency: "monthly", nextDate: nextRecur(25),
+        // a contract with an end: the outlook has to show the cliff
+        endsOn: monthShift(mk0, 5) + "-31", currency: "USD", rate: 1 },
+      teaching,
+      { id: uid(), name: "Rent", type: "expense", category: "Housing", accountId: bank.id,
+        amount: 950, frequency: "monthly", nextDate: nextRecur(1), currency: "USD", rate: 1 },
+      { id: uid(), name: "Health insurance", type: "expense", category: "Health", accountId: bank.id,
+        amount: 210, frequency: "monthly", nextDate: nextRecur(12), currency: "USD", rate: 1 },
+      { id: uid(), name: "Internet", type: "expense", category: "Utilities", accountId: bank.id,
+        amount: 42, frequency: "monthly", nextDate: nextRecur(8), currency: "USD", rate: 1 },
+      { id: uid(), name: "Gym", type: "expense", category: "Health", accountId: bank.id,
+        amount: 30, frequency: "monthly", nextDate: nextRecur(5), currency: "USD", rate: 1 },
+      { id: uid(), name: "Car insurance", type: "expense", category: "Transport", accountId: bank.id,
+        amount: 480, frequency: "yearly", nextDate: nextRecur(14), currency: "USD", rate: 1 }
     ];
+
+    // days actually gone in this month, at the rate they were converted at
+    s.allowanceDays[allowanceKey(teaching, mk0)] = { days: Math.min(14, Math.max(1, elapsed - 2)), rate: 1 };
+
     s.quick = [
-      { id: uid(), label: "Taxi", category: "Transport", type: "expense", accountId: current.id, amount: 0 },
-      { id: uid(), label: "Coffee", category: "Dining & Fun", type: "expense", accountId: cash.id, amount: 3.2 },
-      { id: uid(), label: "Corner shop", category: "Groceries", type: "expense", accountId: cash.id, amount: 0 },
-      { id: uid(), label: "Bus fare", category: "Transport", type: "expense", accountId: cash.id, amount: 2.4 }
+      { id: uid(), label: "Service", category: "Transport", type: "expense",
+        accountId: wallet.id, amount: 300000, currency: "LBP" },
+      { id: uid(), label: "Coffee", category: "Dining & Fun", type: "expense",
+        accountId: wallet.id, amount: 300000, currency: "LBP" },
+      { id: uid(), label: "Taxi", category: "Transport", type: "expense", accountId: bank.id, amount: 0 },
+      { id: uid(), label: "Corner shop", category: "Groceries", type: "expense", accountId: bank.id, amount: 0 }
     ];
-    s.extraDebtPayment = 120;
+
+    s.extraDebtPayment = 100;
     return s;
   }
 

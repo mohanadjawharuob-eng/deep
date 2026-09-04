@@ -19,18 +19,36 @@ not copied:**
   copy. Bump `coffer-vN` here when you copy a new `index.html` in, or the
   phone keeps serving the old one.
 
-## One origin, one set of data
+## One origin, two separate books
 
-`…github.io/deep/` and `…github.io/Apps/` are the **same origin**, so both
-copies read and write the same `localStorage` key, `coffer.v2`. That is
-deliberate — it is why moving the apps out of `deep/apps/` carried every
-user's data across untouched — but it has a sharp edge:
+`…github.io/deep/` and `…github.io/Apps/` are the **same origin**, and browsers
+scope `localStorage` to the site rather than the folder. So these two copies
+used to share one ledger: loading the sample here replaced the real book there.
 
-> **Never leave an old build of Coffer runnable on this site.** An older
-> `load()` does not know about the fields added since, and drops every one of
-> them the next time it saves. A stale copy in a folder next door is a way to
-> lose grants, allowances, splits, cross-currency transfers and pocket
-> currencies by opening the wrong bookmark.
+They no longer do. The key is derived from the path, in `index.html`:
+
+```js
+var STORE_SUFFIX = /(^|\/)deep\//.test(location.pathname) ? ".deep" : "";
+var KEY = "coffer" + STORE_SUFFIX + ".v2";
+```
+
+- `/Apps/coffer/` → `coffer.v2` — the key the real data is already in, so
+  nothing moved.
+- `/deep/apps/coffer/` → `coffer.deep.v2` — its own book, empty to begin with.
+
+`LEGACY_KEY` and the IndexedDB store for receipts take the same suffix. Because
+it is *derived* rather than written differently in each copy, `index.html`
+stays byte-identical between the two and there is no line for anyone to forget
+when copying it across.
+
+**This copy is therefore the good place to demo.** Load the sample ledger from
+Settings, show somebody around, and the real book next door is untouched.
+
+The sharp edge that remains: **never leave an old build of Coffer runnable
+under this path.** An older `load()` does not know about the fields added
+since, and drops every one of them the next time it saves — so an out-of-date
+copy here can still lose grants, allowances, splits, cross-currency transfers
+and pocket currencies from *this* book.
 
 The version this replaced is kept in history, not in a folder. It is the state
 of `apps/coffer/` at commit **`369149d`** ("Give each app its own scope so all
