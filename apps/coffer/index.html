@@ -813,7 +813,10 @@
      both rather than pushing them apart. */
   /* the pencil beside a pocket figure: present, but never louder than the money */
   .ibtn.tiny { width: 24px; height: 24px; font-size: 0.72rem; margin-left: 0.35rem; vertical-align: middle; }
-  .split-fig { white-space: nowrap; }
+  /* .ibtn is display:grid, so inside a plain inline span each button became its
+     own block and every pocket row grew a line per tool. The figure and its
+     tools are one row. */
+  .split-fig { white-space: nowrap; display: inline-flex; align-items: center; justify-content: flex-end; }
 
   .grant-foot, .grant-line-foot {
     display: flex; justify-content: space-between; margin-top: 0.35rem;
@@ -870,7 +873,10 @@
   .row.muted .row-title, .row.muted .row-fig { color: var(--faint); }
   .row.muted .row-fig { font-variant-numeric: tabular-nums; }
   .split-tag { font-size: 0.68rem; color: var(--dim); }
-  .split-fig { font-family: var(--serif); font-size: 0.95rem; font-weight: 400; white-space: nowrap; }
+  .split-fig {
+    font-family: var(--serif); font-size: 0.95rem; font-weight: 400; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: flex-end;
+  }
   .pair { display: flex; align-items: stretch; justify-content: space-between; gap: 1rem; }
   .pair > div:first-child, .pair > div:last-child { flex: 1; min-width: 0; }
   .pair-rule { width: 1px; background: var(--line); flex: none; }
@@ -1052,7 +1058,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-04i";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-05a";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -2283,7 +2289,9 @@
         base: base,
         monthly: monthlyEquivalent(base, r.frequency),
         confidence: r.type === "income" ? confidenceOf(r) : 1,
-        renews: r.type === "income" && r.renews != null ? clamp(num(r.renews), 0, 100) : null
+        renews: r.type === "income" && r.renews != null ? clamp(num(r.renews), 0, 100) : null,
+        // how far a renewal is expected to run — see the walk below
+        renewUntil: r.type === "income" ? (r.renewUntil || null) : null
       };
     });
   }
@@ -2354,10 +2362,25 @@
             }
             /* A contract with a stated chance of carrying on keeps paying at
                that fraction past its end date. Unset means UNSAID, not nought:
-               nothing softens the cliff unless you say it should. */
-            if (L.renews != null && L.renews > 0 && !off[L.id]) {
+               nothing softens the cliff unless you say it should.
+
+               But a renewal is a contract too, and this used to pay its
+               fraction to the edge of the horizon — eighteen months of income
+               from a job that ended, at 45%, which flatters every figure built
+               on it. `renewUntil` is how far the renewal is expected to run;
+               past it the line stops for good. Left empty it still runs on,
+               because that is what was said. */
+            var renewOver = L.renewUntil && L.renewUntil < mkStart;
+            if (L.renews != null && L.renews > 0 && !off[L.id] && !renewOver) {
               hasIncome = true;
               income += L.monthly * L.confidence * (L.renews / 100);
+            }
+            /* The month the renewal itself runs out is worth marking too, but
+               it is not the contract ending a second time — say so, or the
+               outlook lists the same name twice with no way to tell them
+               apart. */
+            if (L.renewUntil && monthOf(L.renewUntil) === monthShift(mk, -1)) {
+              events.push({ kind: "ended", name: L.name + " (its renewal)", renews: null });
             }
             return;
           }
@@ -5156,6 +5179,14 @@
           '<span class="split-fig">' + fmt(pb) +
           '<button class="ibtn tiny" data-act="pocket-edit" data-id="' + a.id + "|" + pk.id +
           '" aria-label="Edit ' + esc(pk.name) + '" title="Edit">\u270e</button>' +
+          /* Removing a pocket keeps every entry filed in it — they move to
+             Unallocated — so this is not the dangerous button it looks like.
+             It existed only inside accountsCard(), which stopped being called
+             during the Worth rebuild, so there was no way to undo a pocket. */
+          (held
+            ? ""
+            : '<button class="ibtn tiny danger" data-act="pocket-del" data-id="' + a.id + "|" + pk.id +
+              '" aria-label="Remove ' + esc(pk.name) + '" title="Remove, keeping its entries">\u2715</button>') +
           "</span></div>";
       }).join("") +
       (Math.abs(left) > 0.005
@@ -5403,7 +5434,9 @@
     return '<div class="card pad" style="margin-bottom:0.75rem">' +
       '<div class="card-head" style="padding:0"><h3>' + esc(g.name) + "</h3>" +
       (g.funder ? '<span class="sub">' + esc(g.funder) + "</span>" : "") +
-      '<button class="ibtn" data-act="grant-edit" data-id="' + g.id + '" aria-label="Edit">\u22ef</button></div>' +
+      '<button class="ibtn" data-act="grant-edit" data-id="' + g.id + '" aria-label="Edit">\u22ef</button>' +
+      '<button class="ibtn danger" data-act="grant-del" data-id="' + g.id +
+        '" aria-label="Delete ' + esc(g.name) + '" title="Delete">\u2715</button></div>' +
       '<div class="tile-fig" style="margin-top:0.4rem;color:var(--' + tone + ')">' +
       fmt(left, { round: true }) + "</div>" +
       '<p class="band-sub">left of ' + fmt(total, { round: true }) +
@@ -7491,6 +7524,12 @@
 
   function renderInsights() {
     var html = '<div class="dateline"><span>Insights</span>' + monthStepper() + "</div>";
+    // this whole tab answers "how am I doing" a card at a time; the report is
+    // the same answer in one piece, in a form you can send to somebody
+    if (state.transactions.length) {
+      html += '<div class="btn-row" style="margin-bottom:0.9rem">' +
+        '<button class="btn sm primary" data-act="report-write">Write a report</button></div>';
+    }
 
     if (state.transactions.length < 2) {
       return html + '<div class="card pad"><p class="empty" style="margin:0;padding:0">' +
@@ -9119,6 +9158,59 @@
       });
     },
 
+    /* A grant is the one kind of money that is not yours, and the ledger only
+       knows that because the grant record says so. Delete the record and keep
+       its entries and the arithmetic inverts: the award becomes your income,
+       its unspent balance rejoins your net worth, and its spending starts
+       counting against your own budgets. So the entries go with it — every one
+       of them was somebody else's money moving — and the pocket that held it
+       goes too, once it is empty. All of it is one undo. */
+    "grant-del": function (id) {
+      var g = grantById(id);
+      if (!g) return;
+      var ref = parseRef(g.ref || "");
+      var acc = accountById(ref.accountId);
+      var pk = acc && ref.pocketId ? pocketById(acc, ref.pocketId) : null;
+      var rows = state.transactions.filter(function (t) { return t.grantId === g.id; });
+      var award = rows.filter(function (t) { return t.grantAward; })
+        .reduce(function (n, t) { return n + txBase(t); }, 0);
+      var spent = rows.filter(function (t) { return !t.grantAward; })
+        .reduce(function (n, t) { return n + txBase(t); }, 0);
+      // anything else filed in that pocket is yours and must survive
+      var strangers = pk ? state.transactions.filter(function (t) {
+        return t.grantId !== g.id && (t.pocketId === pk.id || t.toPocketId === pk.id);
+      }).length : 0;
+
+      confirmAction({
+        title: "Delete " + g.name + "?",
+        message: "Its <b>" + rows.length + "</b> " + (rows.length === 1 ? "entry goes" : "entries go") +
+          " with it \u2014 the " + fmt(award, { round: true }) + " award and " +
+          fmt(spent, { round: true }) + " spent from it. That is right: none of it was your money, so " +
+          "none of it should stay in your ledger as though it were." +
+          (pk
+            ? strangers
+              ? " The pocket <b>" + esc(pk.name) + "</b> stays, because " + strangers +
+                " of your own " + (strangers === 1 ? "entry sits" : "entries sit") + " in it."
+              : " The pocket <b>" + esc(pk.name) + "</b> goes too."
+            : "") +
+          " If you only want it out of the way, close it instead \u2014 that keeps every figure.",
+        confirmLabel: "Delete the grant"
+      }, function () {
+        var snapTx = state.transactions.slice();
+        var snapGrants = state.grants.slice();
+        var pkIdx = pk ? acc.pockets.indexOf(pk) : -1;
+        state.transactions = state.transactions.filter(function (t) { return t.grantId !== g.id; });
+        state.grants = state.grants.filter(function (x) { return x.id !== g.id; });
+        if (pk && !strangers) acc.pockets.splice(pkIdx, 1);
+        save(); render();
+        toast(g.name + " deleted \u2014 and the money that was never yours with it.", function () {
+          state.transactions = snapTx;
+          state.grants = snapGrants;
+          if (pk && !strangers) acc.pockets.splice(pkIdx, 0, pk);
+        });
+      });
+    },
+
     "grant-line-add": function (id) {
       var g = grantById(id);
       if (!g) return;
@@ -9504,6 +9596,16 @@
       var r = parseRef(ref), a = accountById(r.accountId);
       var p = a && pocketById(a, r.pocketId);
       if (!p) return;
+      /* A grant's pocket is what keeps its money out of the runway. Removing it
+         would free that money without anybody saying the grant had ended, so
+         the grant is what has to go first — and deleting one says so. */
+      var heldGrant = grants().filter(function (g) {
+        return !g.closed && parseRef(g.ref || "").pocketId === p.id;
+      })[0];
+      if (heldGrant) {
+        toast(heldGrant.name + " is held in this pocket \u2014 close or delete the grant first.");
+        return;
+      }
       var filed = state.transactions.filter(function (t) { return t.pocketId === p.id; });
       confirmAction({
         title: "Remove " + p.name + "?",
@@ -9512,7 +9614,7 @@
             "They stay in " + esc(a.name) + " and keep their amounts — they just stop being filed under a pocket, " +
             "so the money moves to Unallocated. Nothing is deleted."
           : "Nothing is filed in it yet.",
-        confirmLabel: "Remove pocket"
+        confirmLabel: "Remove it for good"
       }, function () {
         var idx = a.pockets.indexOf(p);
         a.pockets.splice(idx, 1);
@@ -9725,7 +9827,10 @@
           { key: "startedOn", label: "Running since", type: "date",
             hint: "optional \u2014 when this first started paying" },
           { key: "renews", label: "Chance it carries on", type: "number", min: 0,
-            hint: "% likely past its end date. Left empty, the projection stops dead there." }
+            hint: "% likely past its end date. Left empty, the projection stops dead there." },
+          { key: "renewUntil", label: "And if it does, until", type: "date",
+            hint: "how far a renewal would run. Left empty it runs to the edge of the " +
+              "projection, which flatters every figure built on it." }
         ].concat(allowanceFields(null)) : []).concat(currencyField());
       }
       function open(k) {
@@ -9736,6 +9841,10 @@
           validate: function (v) {
             if (!v.name.trim()) return "Give it a name.";
             if (v.amount <= 0) return "Enter an amount above zero.";
+            if (v.until && v.nextDate && v.until < v.nextDate) return "It cannot end before its next date.";
+            if (v.renewUntil && v.until && v.renewUntil < v.until) {
+              return "A renewal cannot run out before the contract it carries on from.";
+            }
             // changing the type needs the matching category list
             if (v.type !== k) { reopen(v.type); return " "; }
           },
@@ -9751,6 +9860,9 @@
               // empty means "not said", which is not the same as nought
               renews: v.type === "income" && String(v.renews || "").trim() !== ""
                 ? clamp(num(v.renews), 0, 100) : null,
+              // meaningless without a renewal chance, so it is not kept alone
+              renewUntil: v.type === "income" && v.renewUntil && String(v.renews || "").trim() !== ""
+                ? v.renewUntil : null,
               allowance: v.type === "income" ? readAllowance(v) : null,
               currency: v.currency || baseCode(), rate: rateFor(v.currency || baseCode())
             });
@@ -9804,6 +9916,10 @@
           { key: "renews", label: "Chance it carries on", type: "number", min: 0,
             value: r.renews == null ? "" : r.renews,
             hint: "% likely past its end date. Left empty, the projection stops dead there." },
+          { key: "renewUntil", label: "And if it does, until", type: "date",
+            value: r.renewUntil || "",
+            hint: "how far a renewal would run. Left empty it runs to the edge of the " +
+              "projection, which flatters every figure built on it." },
           { key: "allowCat", label: "Part of it is for", type: "select",
             options: [{ value: "", label: "\u2014 nothing, it is all pay \u2014" }].concat(catOptions("expense")),
             value: al.category || "",
@@ -9819,6 +9935,9 @@
           if (!v.name.trim()) return "Give it a name.";
           if (v.amount <= 0) return "Enter an amount above zero.";
           if (v.until && v.nextDate && v.until < v.nextDate) return "It cannot end before its next date.";
+          if (v.renewUntil && v.until && v.renewUntil < v.until) {
+            return "A renewal cannot run out before the contract it carries on from.";
+          }
           if (v.allowCat && !(v.allowRate > 0)) return "Give the " + v.allowCat + " allowance a day rate.";
         },
         onConfirm: function (v) {
@@ -9830,6 +9949,8 @@
             r.payer = (v.payer || "").trim() || null;
             r.startedOn = v.startedOn || null;
             r.renews = String(v.renews || "").trim() !== "" ? clamp(num(v.renews), 0, 100) : null;
+            // it says how long a renewal lasts, so it means nothing without one
+            r.renewUntil = r.renews != null && v.renewUntil ? v.renewUntil : null;
             r.allowance = (v.allowCat && v.allowRate > 0)
               ? { category: v.allowCat, rate: v.allowRate, currency: v.allowCur || baseCode(), per: "day" }
               : null;
@@ -10294,6 +10415,52 @@
       backupDialog("coffer-backup-" + today() + ".json", JSON.stringify(state, null, 2));
     },
 
+    /* Shown before it is saved, because a report you cannot read on the phone
+       you wrote it on is a file, not a report. */
+    "report-write": function () {
+      var text = buildReport();
+      closeModal();
+      overlay.innerHTML = '<div class="scrim" data-scrim="1">' +
+        '<div class="modal" style="max-width:680px;min-width:0" role="dialog" aria-modal="true" aria-label="Your report">' +
+        '<div class="modal-head"><h3>Where the money is</h3>' +
+        "<p>Everything the app knows, written down. Nothing left this device to make it.</p></div>" +
+        '<div class="modal-body">' +
+        '<div id="reportView" style="font-size:0.86rem;line-height:1.6;max-height:56vh;overflow-y:auto;' +
+        'min-width:0;max-width:100%;padding:0.9rem;background:var(--surface);' +
+        'border:1px solid var(--rule);border-radius:10px">' +
+        reportHtml(text) + "</div>" +
+        // the readable one is on screen; the markdown is what gets copied or saved
+        '<textarea id="reportText" readonly aria-hidden="true" tabindex="-1" ' +
+        'style="position:absolute;left:-9999px;width:1px;height:1px">' + esc(text) + "</textarea></div>" +
+        '<div class="modal-foot">' +
+        '<button class="btn quiet" data-mclose="1">Close</button>' +
+        '<button class="btn" data-act="report-copy">Copy</button>' +
+        '<button class="btn primary" data-act="report-save">Save it</button>' +
+        "</div></div></div>";
+      overlay.querySelector("[data-mclose]").addEventListener("click", closeModal);
+      overlay.querySelector("[data-scrim]").addEventListener("mousedown", function (e) {
+        if (e.target === e.currentTarget) closeModal();
+      });
+      escHandler = function (e) { if (e.key === "Escape") closeModal(); };
+      document.addEventListener("keydown", escHandler);
+    },
+
+    "report-copy": function () {
+      var el = document.getElementById("reportText");
+      var text = el ? el.value : buildReport();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { toast("Report copied."); },
+          function () { toast("Could not copy \u2014 select the text and copy it by hand."); });
+      } else {
+        toast("Copying is not available here \u2014 select the text and copy it by hand.");
+      }
+    },
+
+    "report-save": function () {
+      download("coffer-report-" + today() + ".md", buildReport(), "text/markdown");
+      toast("Report saved.");
+    },
+
     "export-csv": function () {
       var rows = [["Date", "Description", "Type", "Category", "Account", "To account",
                    "Amount (" + baseCode() + ")", "Currency", "Original amount", "Rate", "Part of"]];
@@ -10675,6 +10842,315 @@
   };
 
   var pendingSuggestions = [];
+
+  /* ---------------- the written report ---------------------------------------
+     Every figure on every screen is derived, which makes them easy to check and
+     hard to carry around. This writes the lot down as prose you can send to an
+     accountant, keep for a visa application, or read once a quarter to see
+     whether the year is going the way you thought.
+
+     It states its own basis everywhere, and where the data is too thin to
+     support a sentence it says so rather than producing a number. Nothing here
+     computes anything new: every figure comes from the same function the
+     screen uses, or the report and the app would disagree. */
+
+  function reportPeriod() {
+    var dates = state.transactions.map(function (t) { return t.date; }).sort();
+    return { from: dates[0] || null, to: dates[dates.length - 1] || null, n: dates.length };
+  }
+
+  function reportLine(label, value) { return "- **" + label + ":** " + value; }
+  /* A category or an account can be called anything, and a name carrying a
+     pipe would split a table row in two. Escaped on the way into a cell — the
+     renderer unescapes nothing, so it reads back as typed. */
+  function cell(text) { return String(text == null ? "" : text).replace(/\|/g, "\\|"); }
+
+  function buildReport() {
+    var L = [];
+    var cur = baseCode();
+    var per = reportPeriod();
+    var mk = thisMonth();
+    var rw = runway();
+    var b = rw.basis;
+
+    L.push("# Where the money is");
+    L.push("");
+    L.push("Written " + longDate(today()) + " from " + per.n +
+      (per.n === 1 ? " entry" : " entries") +
+      (per.from ? ", " + longDate(per.from) + " to " + longDate(per.to) : "") +
+      ". Every figure is in " + cur + ", converted at the rate each entry was logged at.");
+    L.push("");
+
+    if (!per.n) {
+      L.push("There is nothing logged yet, so there is nothing to report. Add an account and " +
+        "log a few weeks before asking this again — a report from three entries would be " +
+        "a shape, not a picture.");
+      return L.join("\n");
+    }
+
+    /* ---- what you are worth ---- */
+    var assets = totalAssets(), debt = totalDebt(), restricted = restrictedTotal();
+    L.push("## What you are worth");
+    L.push("");
+    L.push(reportLine("Net worth", fmt(netWorth())));
+    L.push(reportLine("Everything you hold", fmt(assets)));
+    if (debt > 0.005) L.push(reportLine("Owed to other people", fmt(debt)));
+    if (restricted > 0.005) {
+      L.push(reportLine("Held for someone else", fmt(restricted) +
+        " — grant money, out of the figure above because it is not yours"));
+    }
+    L.push(reportLine("Reachable this month", fmt(freeAssets()) +
+      " — what is left once investments and money you have marked as spoken for are set aside"));
+    var months = recentMonths(4, monthShift(mk, -1)).filter(function (m) { return monthTx(m).length; });
+    if (months.length >= 2) {
+      // the same three pieces the Worth chart uses; totalDebt() is a stated
+      // figure with no history, so it is held constant, exactly as there
+      var end0 = lastDayOf(months[0]);
+      var thenW = totalAssets(end0) - totalDebt() - restrictedTotal(end0);
+      var moved = netWorth() - thenW;
+      L.push("");
+      L.push((Math.abs(moved) < 0.005 ? "It has not moved" : moved > 0 ? "It is up " + fmt(moved) : "It is down " + fmt(-moved)) +
+        " since " + monthName(months[0], true) + ".");
+    }
+    L.push("");
+
+    /* ---- month by month ---- */
+    L.push("## Month by month");
+    L.push("");
+    L.push("| Month | In | Out | Net | True burn |");
+    L.push("|---|---:|---:|---:|---:|");
+    var shown = recentMonths(6, mk).filter(function (m) { return monthTx(m).length; });
+    shown.forEach(function (m) {
+      var sum = monthSummary(m);
+      L.push("| " + cell(monthName(m, true)) + " | " + fmt(sum.income) + " | " + fmt(sum.expense) +
+        " | " + fmt(sum.net, { signed: true }) + " | " + fmt(trueBurnFor(m)) + " |");
+    });
+    L.push("");
+    L.push("*Out* is everything that left. *True burn* takes off one-offs, money you are owed " +
+      "back and anything spent from a grant — it is the number a runway can be built on, and " +
+      "the other is not.");
+    L.push("");
+
+    /* ---- how long it lasts ---- */
+    L.push("## How long it lasts");
+    L.push("");
+    if (!(b.rate > 0)) {
+      L.push("Nothing has been spent in a completed month yet, so there is no burn rate and no " +
+        "runway. This is the one figure worth waiting for rather than estimating.");
+    } else {
+      L.push(reportLine("Spending, month in month out", fmt(b.rate) + " a month, averaged over the " +
+        b.months + (b.months === 1 ? " month" : " months") + " that have entries" +
+        (b.months < 3 ? " — thin, so treat it as a direction rather than a figure" : "")));
+      L.push(reportLine("Runway at that rate", rw.months == null ? "unknown"
+        : rw.months.toFixed(1) + " months, on " + fmt(rw.free) + " reachable"));
+      var pf = projectForward(12, { holdGoals: true });
+      if (pf.hasSchedule) {
+        L.push(reportLine("Walked forward with what is actually booked",
+          pf.crossing ? "runs out in " + monthName(pf.crossing, true)
+            : "still in hand twelve months out"));
+        var ends = [];
+        pf.points.forEach(function (pt) {
+          pt.events.forEach(function (e) {
+            if (e.kind === "ended") ends.push(e.name + " stops paying, " + monthName(pt.mk, true));
+          });
+        });
+        if (ends.length) {
+          L.push("");
+          L.push("Income that runs out inside the year:");
+          ends.forEach(function (x) { L.push("- " + x); });
+        }
+      } else {
+        L.push("");
+        L.push("No income is booked ahead, so the walk forward has nothing to walk with. " +
+          "The runway above assumes today repeats, which for contract work it does not.");
+      }
+    }
+    L.push("");
+
+    /* ---- where it goes ---- */
+    L.push("## Where it goes");
+    L.push("");
+    var totals = {}, monthsSeen = {};
+    state.transactions.forEach(function (t) {
+      if (t.type !== "expense" || isPending(t) || isGrantSpend(t)) return;
+      txParts(t).forEach(function (pt) {
+        totals[pt.category] = (totals[pt.category] || 0) + pt.base;
+        (monthsSeen[pt.category] = monthsSeen[pt.category] || {})[monthOf(t.date)] = 1;
+      });
+    });
+    var league = Object.keys(totals).map(function (c) {
+      return { cat: c, total: totals[c], per: totals[c] / Math.max(Object.keys(monthsSeen[c]).length, 1) };
+    }).sort(function (x, y) { return y.total - x.total; });
+    var grand = league.reduce(function (n, r) { return n + r.total; }, 0);
+    if (league.length) {
+      L.push("| Category | All time | Share | A month |");
+      L.push("|---|---:|---:|---:|");
+      league.slice(0, 10).forEach(function (r) {
+        L.push("| " + cell(r.cat) + " | " + fmt(r.total) + " | " + Math.round(r.total / grand * 100) +
+          "% | " + fmt(r.per) + " |");
+      });
+      L.push("");
+      var top = league[0];
+      L.push(top.cat + " is the biggest single thing you spend on, at " +
+        Math.round(top.total / grand * 100) + "% of everything that has left.");
+      L.push("");
+    }
+
+    /* ---- what you meant to spend ---- */
+    var rows = budgetRows(mk).filter(function (r) { return r.limit > 0; });
+    if (rows.length) {
+      L.push("## Against what you meant to spend");
+      L.push("");
+      L.push("For " + monthName(mk, true) + ":");
+      L.push("");
+      rows.forEach(function (r) {
+        var over = r.spent - r.limit;
+        L.push("- **" + r.category + ":** " + fmt(r.spent) + " of " + fmt(r.limit) +
+          (over > 0.005 ? " — over by " + fmt(over) : " — " + fmt(r.limit - r.spent) + " left") +
+          (r.prepaid > 0.005 ? " (after " + fmt(r.prepaidUsed) + " of an allowance)" : ""));
+      });
+      var blown = rows.filter(function (r) { return r.spent > r.limit + 0.005; });
+      L.push("");
+      L.push(blown.length
+        ? blown.length + (blown.length === 1 ? " budget is" : " budgets are") + " over this month."
+        : "Every budget is inside its limit this month.");
+      L.push("");
+    }
+
+    /* ---- money that is not yours to spend ---- */
+    var invs = investments().filter(function (a) { return !a.closed; });
+    var live = grants().filter(function (g) { return !g.closed; });
+    if (invs.length || live.length || committedTotal() > 0.005) {
+      L.push("## Not this month's money");
+      L.push("");
+      if (committedTotal() > 0.005) {
+        L.push(reportLine("Set aside and spoken for", fmt(committedTotal()) +
+          " — yours, but out of the runway on purpose"));
+      }
+      invs.forEach(function (a) {
+        var cost = investCost(a), worth = investValue(a), got = investReturns(a);
+        var m = latestMark(a);
+        L.push(reportLine(a.name, fmt(worth) + " on " + fmt(cost) + " put in" +
+          (got > 0.005 ? ", " + fmt(got) + " paid back" : "") +
+          (m ? " — valued " + longDate(m.on) : " — never valued, so this is only what it cost")));
+      });
+      live.forEach(function (g) {
+        L.push(reportLine(g.name + (g.funder ? " (" + g.funder + ")" : ""),
+          fmt(grantLeft(g)) + " left of " + fmt(grantTotal(g)) +
+          (g.endsOn ? ", to be spent by " + longDate(g.endsOn) : "")));
+      });
+      L.push("");
+    }
+
+    /* ---- promises ---- */
+    if (state.goals.length || state.debts.length) {
+      L.push("## Promises");
+      L.push("");
+      state.goals.forEach(function (g) {
+        var need = goalNeed(g);
+        L.push(reportLine(g.name, fmt(goalSaved(g)) + " of " + fmt(g.target) +
+          (need.done ? " — done"
+            : need.overdue ? " — past its date, " + fmt(need.left) + " short"
+            : need.months == null ? " — no date set, so nothing is being asked of you monthly"
+            : " — " + fmt(need.need) + " a month to land on " + longDate(g.due))));
+      });
+      state.debts.forEach(function (d) {
+        L.push(reportLine(d.name, fmt(d.balance) + " owed" +
+          (num(d.rate) > 0 ? " at " + d.rate + "%" : " at no interest") +
+          (num(d.minPayment) > 0 ? ", " + fmt(d.minPayment) + " a month minimum" : "")));
+      });
+      L.push("");
+    }
+
+    /* ---- what the report cannot tell you ---- */
+    var caveats = [];
+    if (b.months && b.months < 3) caveats.push("The burn rate rests on " + b.months +
+      (b.months === 1 ? " month" : " months") + " of data. Three is where it starts meaning something.");
+    var owed = state.transactions.filter(isPending);
+    if (owed.length) {
+      caveats.push(owed.length + (owed.length === 1 ? " expense is" : " expenses are") +
+        " still owed back to you, worth " + fmt(owed.reduce(function (n, t) { return n + txBase(t); }, 0)) +
+        ". They have left your balance but are kept out of your spending until you mark them settled.");
+    }
+    var stale = Object.keys(state.settings.rates || {}).filter(rateIsStale);
+    if (stale.length) {
+      caveats.push("The rate for " + stale.join(", ") + " was set over a month ago. Entries already " +
+        "logged keep the rate they were logged at, so nothing here has moved — but anything " +
+        "new will use the old figure until you update it.");
+    }
+    if (!state.plan) caveats.push("No plan has been imported, so there is nothing here about what " +
+      "you meant to do beyond the budgets above.");
+    if (caveats.length) {
+      L.push("## What this cannot tell you");
+      L.push("");
+      caveats.forEach(function (c) { L.push("- " + c); });
+      L.push("");
+    }
+
+    L.push("---");
+    L.push("");
+    L.push("Written by Coffer, build " + BUILD + ". Nothing left this device to make it.");
+    return L.join("\n");
+  }
+
+  /* The file wants Markdown; the screen wants to be readable. This renders the
+     one into the other — headings, bold, bullets, tables, rules — so the report
+     can be read on the phone that wrote it without hashes and asterisks all
+     over it. Everything is escaped BEFORE any markup is added, because every
+     figure in here is built from names the user typed. */
+  function reportHtml(text) {
+    var out = [], rows = null;
+
+    function flushTable() {
+      if (!rows) return;
+      var head = rows[0], body = rows.slice(2);   // row 1 is the |---| divider
+      out.push('<div class="tscroll" style="margin:0.5rem 0"><table style="width:100%;' +
+        'border-collapse:collapse;font-size:0.82rem"><thead><tr>' +
+        head.map(function (c) {
+          return '<th style="text-align:left;padding:0.35rem 0.5rem;border-bottom:1px solid var(--rule-mid);' +
+            'color:var(--dim);font-weight:600">' + inline(c) + "</th>";
+        }).join("") + "</tr></thead><tbody>" +
+        body.map(function (r) {
+          return "<tr>" + r.map(function (c, i) {
+            return '<td style="padding:0.35rem 0.5rem;border-bottom:1px solid var(--rule);' +
+              (i ? "text-align:right;font-family:var(--serif)" : "") + '">' + inline(c) + "</td>";
+          }).join("") + "</tr>";
+        }).join("") + "</tbody></table></div>");
+      rows = null;
+    }
+    // escaped first, then the only markup we honour inside a line
+    function inline(t) {
+      return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\*(.+?)\*/g, "<i>$1</i>");
+    }
+
+    String(text).split("\n").forEach(function (line) {
+      var t = line.trim();
+      if (/^\|.*\|$/.test(t)) {
+        rows = rows || [];
+        rows.push(t.replace(/^\||\|$/g, "").split("|").map(function (c) { return c.trim(); }));
+        return;
+      }
+      flushTable();
+      if (!t) return;
+      if (/^---+$/.test(t)) { out.push('<hr style="border:0;border-top:1px solid var(--rule);margin:1rem 0" />'); return; }
+      if (/^## /.test(t)) {
+        out.push('<h4 style="margin:1.1rem 0 0.4rem;font-size:0.95rem">' + inline(t.slice(3)) + "</h4>");
+        return;
+      }
+      if (/^# /.test(t)) {
+        out.push('<h3 style="margin:0 0 0.5rem;font-size:1.15rem">' + inline(t.slice(2)) + "</h3>");
+        return;
+      }
+      if (/^- /.test(t)) {
+        out.push('<div style="margin:0.2rem 0 0.2rem 0.9rem;text-indent:-0.9rem">· ' +
+          inline(t.slice(2)) + "</div>");
+        return;
+      }
+      out.push('<p style="margin:0.5rem 0">' + inline(t) + "</p>");
+    });
+    flushTable();
+    return out.join("");
+  }
 
   function download(name, content, mime) {
     try {
@@ -11097,8 +11573,12 @@
     s.recurring = [
       { id: uid(), name: "Studio retainer", type: "income", category: "Freelance",
         accountId: bank.id, amount: 2400, frequency: "monthly", nextDate: nextRecur(25),
-        // a contract with an end: the outlook has to show the cliff
-        endsOn: monthShift(mk0, 5) + "-31", currency: "USD", rate: 1 },
+        /* A contract with an end, so the outlook shows the cliff. The field is
+           `until` — `endsOn` belongs to grants, and writing it here meant the
+           sample's headline feature quietly never happened. */
+        until: lastDayOf(monthShift(mk0, 5)), renews: 45,
+        renewUntil: lastDayOf(monthShift(mk0, 11)),
+        currency: "USD", rate: 1 },
       teaching,
       { id: uid(), name: "Rent", type: "expense", category: "Housing", accountId: bank.id,
         amount: 950, frequency: "monthly", nextDate: nextRecur(1), currency: "USD", rate: 1 },
