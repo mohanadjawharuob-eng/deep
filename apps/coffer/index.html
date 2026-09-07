@@ -1058,7 +1058,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-05a";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-07a";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -5649,7 +5649,7 @@
       (cause ? " \u2014 after " + cause + " stops." : ".");
   }
 
-  function outlookChart(pr, ghostPoints) {
+  function outlookChart(pr, ghostPoints, tone) {
     var pts = pr.points.map(function (x) {
       return {
         label: monthName(x.mk),
@@ -5661,7 +5661,9 @@
     var markIdx = pr.crossing == null ? null : pr.points.map(function (x) { return x.mk; }).indexOf(pr.crossing);
     return areaChart(pts, {
       cssHeight: 132, height: 42, baseZero: true,
-      color: pr.crossing == null ? "var(--calm)" : "var(--alert)",
+      /* The headline's own tone, so a green area cannot sit under an amber
+         sentence saying the line only holds up because the goals go unfed. */
+      color: "var(--" + (tone || (pr.crossing == null ? "calm" : "alert")) + ")",
       mark: markIdx,
       ghost: ghostPoints || null,
       aria: "Projected balance over the next " + pr.horizon + " months"
@@ -5937,7 +5939,7 @@
       o.hits = o.blocked ? [] : goalsHitBy(o.raid);
       // a monthly commitment larger than the surplus eats into what the goals
       // were being fed, which slows all of them at once
-      o.divertDelays = [];
+      o.divertDelays = o.divertDelays || [];
       if (!o.blocked && o.monthly > 0) {
         var over = Math.max(0, o.monthly - Math.max(0, surplus));
         if (over > 0) {
@@ -5959,7 +5961,9 @@
         ? fmt(spare, { round: true }) + " is spare once your goals and your cushion are covered"
         : spare > 0
           ? "Only " + fmt(spare, { round: true }) + " is spare, so " +
-            fmt(total - spare, { round: true }) + " of this digs into what you have put aside"
+            fmt(total - spare, { round: true }) + " of this comes out of your " + floorMonths() +
+            "-month cushion" + (total - spare > savingsFloor() + 0.005
+              ? " and then out of what your goals have put by" : "")
           : "Nothing is spare once your goals and your cushion are covered",
       monthly: 0, fromIncome: 0, fromSavings: total, paid: total, blocked: false
     });
@@ -5988,17 +5992,75 @@
     // 3. some now, the rest as you earn it — the bite, quantified both ways
     var earnedOverN = surplusOver(n, flow);
     var bite = Math.max(0, total - earnedOverN);
-    route({
-      id: "split", label: "Some now, the rest monthly",
-      detail: bite <= 0.005
-        ? "What you earn covers it over " + n + " months without touching savings"
-        : fmt(bite, { round: true }) + " out of savings now, then " +
-          fmt((total - bite) / n, { round: true }) + " a month for " + n,
-      monthly: (total - bite) / n, months: n,
-      fromIncome: total - bite, fromSavings: bite, paid: total, blocked: false
-    });
+    /* With no surplus at all the "rest monthly" part is nought a month, which
+       makes this the same act as paying out of savings, described twice and
+       badged twice. One option, once. */
+    if (bite < total - 0.005) {
+      route({
+        id: "split", label: "Some now, the rest monthly",
+        detail: bite <= 0.005
+          ? "What you earn covers it over " + n + " months without touching savings"
+          : fmt(bite, { round: true }) + " out of savings now, then " +
+            fmt((total - bite) / n, { round: true }) + " a month for " + n,
+        monthly: (total - bite) / n, months: n,
+        fromIncome: total - bite, fromSavings: bite, paid: total, blocked: false
+      });
+    }
 
-    // 4. instalments, with whatever the plan charges on top
+    /* 4. Move a goal instead of the money.
+
+       Every route above measures the purchase against savings the goals have
+       declared untouchable, so with goals set beyond your income the tool can
+       only ever answer "no" — and it never asks the obvious question, which is
+       whether the goal should move. A goal is a promise to yourself with a
+       date on it, not a bill. Pausing the one that costs the most per month
+       for a few months pays for this out of income, touches no savings, and
+       the only cost is that the goal lands later. That trade is the decision
+       the person is actually making, so it belongs on screen beside the
+       others rather than being ruled out before they see it. */
+    var movable = state.goals.filter(function (g) {
+      var need = goalNeed(g);
+      return g.due && !need.done && need.need > 0;
+    }).sort(function (x, y) { return goalNeed(y).need - goalNeed(x).need; })[0];
+    if (movable) {
+      var mNeed = goalNeed(movable);
+      var pace = mNeed.need;
+      /* What pausing it actually frees is NOT the goal's pace: the surplus it
+         is paused into may already be negative, and the first thing the freed
+         money does is close that gap. Reading `pace` as the monthly saving
+         said one month where two were needed — the flattering answer, and the
+         exact mistake this route exists to stop the rest of the card making. */
+      var freed = surplus + pace;
+      var pauseFor = freed > 0.005 ? Math.ceil(total / freed) : null;
+      /* Paused and then resumed at the same rate, a goal lands exactly as many
+         months later as it was paused. (goalDelay models money diverted away
+         for good, which reports every full pause as breaking the goal.) */
+      var slipped = pauseFor == null ? null : {
+        name: movable.name, slip: pauseFor, broken: false,
+        nowOn: mNeed.months == null ? null
+          : monthShift(thisMonth(), Math.ceil(mNeed.months) + pauseFor)
+      };
+      route({
+        id: "slip", label: "Put " + movable.name + " back",
+        phrase: "pausing " + movable.name +
+          (pauseFor ? " for " + pauseFor + (pauseFor === 1 ? " month" : " months") : ""),
+        detail: pauseFor == null
+          ? "Even with nothing going into " + movable.name + " there is no money left over each month"
+          : "Stop the " + fmt(pace, { round: true }) + " a month going into " + movable.name +
+            " and " + fmt(freed, { round: true }) + " a month is free, which covers this in " +
+            pauseFor + (pauseFor === 1 ? " month" : " months") +
+            " out of income, touching nothing you have saved" +
+            (slipped.nowOn
+              ? " \u2014 " + movable.name + " lands in " + monthName(slipped.nowOn, true) + " instead"
+              : ""),
+        monthly: 0, months: pauseFor,
+        // the cost of this route is the goal moving, and nothing else
+        divertDelays: slipped ? [slipped] : [],
+        fromIncome: total, fromSavings: 0, paid: total, blocked: pauseFor == null
+      });
+    }
+
+    // 5. instalments, with whatever the plan charges on top
     var paid = total * (1 + (num(a.markup) || 0) / 100);
     route({
       id: "spread", label: n + " monthly payments",
@@ -6007,9 +6069,17 @@
           ? " — " + fmt(paid, { round: true }) + " all in, " +
             fmt(paid - total, { round: true }) + " more than the price"
           : "") +
-        (paid > earnedOverN
-          ? ", which is " + fmt(paid - earnedOverN, { round: true }) + " more than you earn over those " + n
-          : ""),
+        /* "$500 more than you earn over those 6" is true and unreadable when
+           what you earn over those six months is nothing. Say that instead. */
+        /* "nothing is spare over those 6 months" sat under a line reading
+           "Spare to spend today $1,426". One is a flow and one is a pile;
+           say which. */
+        (earnedOverN <= 0.005
+          ? ", and your month leaves nothing over, so every payment comes out of what you have saved"
+          : paid > earnedOverN
+            ? ", which is " + fmt(paid - earnedOverN, { round: true }) +
+              " more than you have spare over those " + n + " months"
+            : ""),
       monthly: paid / n, months: n,
       fromIncome: Math.min(paid, earnedOverN),
       fromSavings: Math.max(0, paid - earnedOverN),
@@ -6058,9 +6128,12 @@
     if (c.broken) return { tone: "bad", text: "breaks a goal" };
     // the pill always answers "what does it cost"; the cushion warning has
     // room to explain itself in the breakdown
-    if (r.underFloor) return { tone: "bad", text: fmt(r.raid, { round: true }) + " out of promises" };
+    /* "out of promises" was a word this app invented for goals-plus-cushion,
+       defined nowhere on screen, and it was the badge on most of the cards.
+       Say which of the two it actually lands on. */
+    if (r.underFloor) return { tone: "bad", text: "into your safety cushion" };
     if (c.worst) return { tone: "warn", text: c.worst.name + " slips " + Math.round(c.worst.slip) + "mo" };
-    if (r.raid > 0.005) return { tone: "warn", text: fmt(r.raid, { round: true }) + " out of promises" };
+    if (r.raid > 0.005) return { tone: "warn", text: fmt(r.raid, { round: true }) + " from your goals" };
     if (r.fromSavings > 0.005) return { tone: "ok", text: "out of spare money" };
     return { tone: "ok", text: "out of what you earn" };
   }
@@ -6079,13 +6152,28 @@
     });
   }
 
-  function affordSentence(best) {
+  function affordSentence(best, flow) {
     if (!best) return "There is no way to pay for this that leaves your plans standing.";
     var c = routeCost(best);
-    var lead = best.label.toLowerCase();
+    /* Lower-casing the label put "put cyprus move back" on screen. A route
+       that names a goal carries its own phrase for this slot. */
+    var lead = best.phrase || best.label.toLowerCase();
+    /* "Yes" is the reassuring half of a sentence that says otherwise. When the
+       month does not balance AND the cheapest route still costs something,
+       nothing here is a yes — the most an answer can be is the least it costs.
+       A route that takes only money nothing is waiting on costs nothing, and
+       calling that "the least it can cost you" is gloom for its own sake: the
+       standing shortfall has its own notice directly below. */
+    /* Reaching into savings counts as a cost here even when nothing is waiting
+       on the money: in a month that does not balance, the pile is going down
+       anyway and nothing is putting it back. Only a route paid out of income,
+       or out of spending less, is a plain yes. */
+    var costly = best.underFloor || !!c.worst || best.fromSavings > 0.005;
+    var soften = costly && flow && flow.surplus < -0.005;
+    var yes = soften ? "The least it can cost you is " : "Yes — ";
     if (c.broken) return "The kindest route is " + lead + ", and it still breaks " + c.worst.name + ".";
     if (best.fromSavings <= 0.005 && !c.worst) {
-      return "Yes — " + lead +
+      return yes + lead +
         (best.months && best.monthly > 0
           ? ", " + fmt(best.monthly, { round: true }) + " a month for " + best.months
           : "") +
@@ -6097,10 +6185,20 @@
         (Math.round(c.worst.slip) === 1 ? " month" : " months") + ".";
     }
     if (best.fromSavings > 0.005) {
-      return "Yes, but " + fmt(best.fromSavings, { round: true }) +
-        " of it comes out of savings rather than out of what you earn.";
+      return soften
+        ? "The least it can cost you is " + fmt(best.fromSavings, { round: true }) +
+          " out of savings rather than out of what you earn."
+        : "Yes, but " + fmt(best.fromSavings, { round: true }) +
+          " of it comes out of savings rather than out of what you earn.";
     }
-    return "Yes — " + lead + ", though it pushes " + c.worst.name + " back " +
+    /* A phrase that already names the goal and the pause does not want the
+       slip said again after it: "pausing Cyprus move for 2 months, though it
+       pushes Cyprus move back 2 months" is one fact stated twice. */
+    if (best.phrase && c.worst.nowOn && best.phrase.indexOf(c.worst.name) >= 0) {
+      return yes + lead + ", which lands it in " + monthName(c.worst.nowOn, true) +
+        " instead and takes nothing out of your savings.";
+    }
+    return yes + lead + ", though it pushes " + c.worst.name + " back " +
       Math.round(c.worst.slip) + (Math.round(c.worst.slip) === 1 ? " month" : " months") + ".";
   }
 
@@ -6148,22 +6246,65 @@
       '<button class="ibtn" data-act="afford-clear" aria-label="Clear this question">×</button></div>' +
       '<div class="card-body">';
 
-    html += '<p class="lead" style="color:var(--' + tone + ')">' + esc(affordSentence(best)) + "</p>";
+    html += '<p class="lead" style="color:var(--' + tone + ')">' + esc(affordSentence(best, flow)) + "</p>";
 
-    // the two figures every route is judged against, stated once
-    html += '<div class="split" style="margin-top:0.8rem">' +
-      '<div class="split-row"><span>Spare after goals and cushion</span><span class="fig">' +
-      fmt(routes.spare, { round: true }) + "</span></div>" +
-      '<div class="split-row"><span>Left over each month</span><span class="fig">' +
-      fmt(flow.surplus, { round: true }) + "</span></div></div>" +
-      '<p class="hint">' + fmt(flow.income, { round: true }) + " expected in, less " +
-      fmt(flow.out, { round: true }) +
+    /* Before anything about the purchase: if the month does not balance on its
+       own, that is the finding, and burying it under four ways to fund a trip
+       answers a question nobody asked. */
+    if (flow.surplus < -0.005) {
+      var afterPlan = flow.income - flow.out;
+      html += '<p class="notice warn" style="margin:0.8rem 0 0">' +
+        "<b>Before this purchase.</b> Your goals need " + fmt(flow.goals, { round: true }) +
+        " a month and you have " + fmt(afterPlan, { round: true }) + " once your budget is paid \u2014 " +
+        "you are <b>" + fmt(-flow.surplus, { round: true }) + " short every month</b> already. " +
+        "Nothing below fixes that; it only says what this would cost on top.</p>";
+    }
+
+    /* Spare money cannot be minus eleven hundred dollars, and "left over" that
+       is negative is a contradiction. Both said the true thing backwards.
+
+       The sum and its answer belong in one block: the month's figure was
+       printed first and then derived underneath it, so a reader met "$252"
+       three rows before anything that said where it came from. */
+    var spareNeg = routes.spare < -0.005, surNeg = flow.surplus < -0.005;
+    html += '<p class="label" style="margin-top:1rem">Your month as it stands</p>' +
+      '<div class="split" style="margin-top:0.4rem">' +
+      '<div class="split-row"><span>Expected in</span><span class="fig">' +
+      fmt(flow.income, { round: true }) + "</span></div>" +
+      '<div class="split-row"><span>Your budget and usual spending</span><span class="fig">\u2212' +
+      fmt(flow.out, { round: true }) + "</span></div>" +
+      (flow.goals > 0
+        ? '<div class="split-row"><span>What your goals need</span><span class="fig">\u2212' +
+          fmt(flow.goals, { round: true }) + "</span></div>"
+        : "") +
+      '<div class="split-row"><span><b>' + (surNeg ? "Short every month" : "Left over each month") +
+      '</b></span><span class="fig"' + (surNeg ? ' style="color:var(--warn)"' : "") + "><b>" +
+      fmt(Math.abs(flow.surplus), { round: true }) + "</b></span></div></div>" +
       (flow.basis.budgeted > 0
-        ? " of plan (" + fmt(flow.basis.budgeted, { round: true }) + " budgeted, " +
-          fmt(flow.basis.unbudgeted, { round: true }) + " from how you actually spend)"
-        : " from how you actually spend") +
-      (flow.goals > 0 ? ", less " + fmt(flow.goals, { round: true }) + " your goals need" : "") + ".</p>";
+        ? '<p class="hint">Of that spending, ' + fmt(flow.basis.budgeted, { round: true }) +
+          " is what you budgeted and " + fmt(flow.basis.unbudgeted, { round: true }) +
+          " is what you actually spend on things you have not budgeted.</p>"
+        : "");
 
+    // and separately, the stock: what could be spent today without breaking
+    // a promise. A month's flow and a pile of savings answer different
+    // questions and sat side by side in one block as though they did not.
+    html += '<div class="split" style="margin-top:0.6rem">' +
+      '<div class="split-row"><span>' +
+      (spareNeg ? "Short of your goals and cushion" : "Spare to spend today") +
+      '</span><span class="fig"' + (spareNeg ? ' style="color:var(--warn)"' : "") + ">" +
+      fmt(Math.abs(routes.spare), { round: true }) + (spareNeg ? " short" : "") + "</span></div></div>" +
+      '<p class="hint">' + (spareNeg
+        ? "Your goals and your " + floorMonths() + "-month cushion together want more than you can reach."
+        : "What you could reach without touching your goals or your " + floorMonths() +
+          "-month cushion.") + "</p>";
+
+    /* Prose above names the route it recommends; the list below highlights it.
+       Nothing said the two were the same thing, so the reader had to guess
+       which row the sentence meant. */
+    html += '<p class="label" style="margin-top:1rem">Ways to pay for it</p>' +
+      '<p class="hint" style="margin-top:0.2rem">The highlighted one costs you least. ' +
+      "Tap another to see what that one would cost instead.</p>";
     html += '<div class="afford-rows">' + routes.map(function (r) {
       var v = routeVerdict(r);
       var on = showing && r.id === showing.id;
@@ -6192,7 +6333,7 @@
     if (r.fromSavings > 0.005) {
       rows.push(["Out of savings", fmt(r.fromSavings, { round: true }) +
         (r.raid > 0.005 && r.raid < r.fromSavings - 0.005
-          ? " (" + fmt(r.raid, { round: true }) + " of it promised)" : "")]);
+          ? " (" + fmt(r.raid, { round: true }) + " of it already spoken for)" : "")]);
     }
     if (r.overpay > 0.5) rows.push(["Cost of spreading it", fmt(r.overpay, { round: true })]);
 
@@ -6226,14 +6367,15 @@
     // when something is switched off, show where the line was as a ghost;
     // otherwise show where it goes once your goals are actually funded, which
     // is the gap between what you have and what is already promised
-    var ghost = null, ghostIs = null;
+    var ghost = null, ghostIs = null, goalsCross = null;
     if (anyOff) {
       ghost = projectForward(PROJECT_MONTHS, {}).points.map(function (x) { return x.balance; });
       ghostIs = "where you were before leaving income out";
     } else if (goalsMonthlyNeed() > 0) {
-      ghost = projectForward(PROJECT_MONTHS, { off: outlookOff, holdGoals: true })
-        .points.map(function (x) { return x.balance; });
+      var gp = projectForward(PROJECT_MONTHS, { off: outlookOff, holdGoals: true });
+      ghost = gp.points.map(function (x) { return x.balance; });
       ghostIs = "what is left once your goals are fed";
+      goalsCross = gp.crossing;
     }
 
     /* Green means a healthy state and nothing else. Not running out inside the
@@ -6244,17 +6386,29 @@
     var tone = pr.crossing != null
       ? (projectedMonths(pr) >= 6 ? "warn" : "alert")
       : (endCover >= floorMonths() ? "calm" : "warn");
+    /* This line leaves goals out, so it read "you stay above water" in green
+       directly above a card saying the month is short every month. Staying up
+       only by not keeping your promises is not a healthy state, and green
+       means a healthy state and nothing else. */
+    if (tone === "calm" && goalsCross != null) tone = "warn";
     var html = '<div class="card pad">' +
       '<span class="label">The next ' + pr.horizon + ' months</span>' +
-      '<p class="lead" style="color:var(--' + tone + ')">' + esc(outlookSentence(pr)) + "</p>" +
+      '<p class="lead" style="color:var(--' + tone + ')">' + esc(
+        // an amber sentence that reads like good news is worse than either
+        goalsCross != null && pr.crossing == null
+          ? outlookSentence(pr).replace(/\.\s*$/, "") + " \u2014 but only by leaving your goals unfed."
+          : outlookSentence(pr)) + "</p>" +
       '<p class="band-sub">Starting from ' + fmt(pr.start, { round: true }) + ' reachable, at ' +
       fmt(pr.burn, { round: true }) + " a month" +
       (pr.basis && pr.basis.partial
         ? " · burn from only " + pr.basis.months + " month" + (pr.basis.months === 1 ? "" : "s") + " of data"
         : "") + "</p>" +
-      '<div style="margin-top:0.9rem">' + outlookChart(pr, ghost) + "</div>" +
+      '<div style="margin-top:0.9rem">' + outlookChart(pr, ghost, tone) + "</div>" +
       (ghostIs ? '<p class="band-sub" style="margin-top:0.5rem">The dashed line is ' + esc(ghostIs) +
-        ".</p>" : "") +
+        "." + (goalsCross != null
+          ? " Fed in full they run you out in " + esc(monthName(goalsCross, true)) +
+            ", which the solid line does not show because it leaves them out."
+          : "") + "</p>" : "") +
       '<div class="btn-row" style="margin-top:0.9rem">' +
       '<button class="btn sm primary" data-act="afford-open">Can I afford something?</button></div>' +
       "</div>";
