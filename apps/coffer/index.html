@@ -808,9 +808,6 @@
     gap: 0.6rem; font-size: 0.78rem;
   }
   .split-row.muted { color: var(--dim); }
-  /* One row per way of paying. The verdict pill is the column the eye runs
-     down, so it sits on the same line as the name and the detail hangs under
-     both rather than pushing them apart. */
   /* the pencil beside a pocket figure: present, but never louder than the money */
   .ibtn.tiny { width: 24px; height: 24px; font-size: 0.72rem; margin-left: 0.35rem; vertical-align: middle; }
   /* .ibtn is display:grid, so inside a plain inline span each button became its
@@ -829,17 +826,75 @@
   }
   .grant-line-top .fig { font-family: var(--serif); font-weight: 400; white-space: nowrap; }
 
-  .afford-rows { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.9rem; }
+  /* "Can I afford it": the answer, what it costs, then the alternatives as a
+     table you run your eye down. It was five stacked paragraphs — each route
+     a sentence and a half — and nobody reads five paragraphs to decide about
+     a trip. The two columns are the only two currencies a route has: money
+     out of savings, and a promise moving. */
+  .afford-alarm {
+    display: flex; align-items: baseline; gap: 0.45rem;
+    background: var(--warn-bg); color: var(--warn);
+    border-radius: 12px; padding: 0.5rem 0.65rem;
+    font-size: 0.78rem; font-weight: 600; line-height: 1.35;
+  }
+  .afford-verdict { font-size: 1.05rem; font-weight: 600; line-height: 1.25; margin: 0.75rem 0 0; }
+  .afford-because { font-size: 0.78rem; color: var(--dim); line-height: 1.45; margin: 0.3rem 0 0; }
+
+  .afford-cost { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; margin-top: 0.85rem; }
+  .afford-cost > div { background: var(--tint); border-radius: 12px; padding: 0.55rem 0.55rem 0.6rem; min-width: 0; }
+  .afford-cost .k {
+    font-size: 0.6rem; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--faint); line-height: 1.3;
+  }
+  .afford-cost .v {
+    font-family: var(--serif); font-weight: 400; font-size: 1.02rem; margin-top: 0.25rem;
+    line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* prose in a figure slot drops back to the UI stack — the display serif is
+     for numbers, and "Nothing" at that size just breaks */
+  .afford-cost .v.words { font-family: var(--ui); font-size: 0.84rem; font-weight: 600; }
+  .afford-cost .v.warn { color: var(--warn); }
+  .afford-cost .n {
+    font-size: 0.66rem; color: var(--faint); margin-top: 0.15rem; line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .afford-head, .afford-row { display: grid; grid-template-columns: 1fr 3.8rem 4.2rem; gap: 0 0.35rem; }
+  .afford-head {
+    padding: 0 0.7rem 0.3rem; font-size: 0.6rem; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .afford-head span + span { text-align: right; }
+  .afford-rows { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 14px; }
   .afford-row {
-    display: grid; grid-template-columns: 1fr auto; gap: 0.3rem 0.6rem;
-    align-items: center; text-align: left; width: 100%;
-    padding: 0.7rem 0.85rem; border: 1px solid var(--rule); border-radius: 14px;
+    align-items: baseline; text-align: left; width: 100%;
+    padding: 0.62rem 0.7rem; border: 0; border-top: 1px solid var(--rule);
     background: transparent; color: inherit; cursor: pointer; font: inherit;
   }
-  .afford-row.on { background: var(--tint); border-color: var(--rule-strong); }
-  .afford-row.off { opacity: 0.55; cursor: default; }
-  .afford-name { font-size: 0.86rem; font-weight: 600; min-width: 0; }
-  .afford-detail { grid-column: 1 / -1; font-size: 0.74rem; color: var(--dim); line-height: 1.45; }
+  .afford-row:first-child { border-top: 0; }
+  .afford-row.on { background: var(--tint); }
+  .afford-row.off { opacity: 0.5; cursor: default; }
+  .afford-name { grid-row: 1; font-size: 0.82rem; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  /* With a healthy month every route costs nothing and four rows read "— —",
+     which tells you nothing about which to pick. What separates them then is
+     when you get the thing and what you hand over each month. */
+  .afford-pace {
+    grid-column: 1 / 2; grid-row: 2; font-size: 0.7rem; color: var(--faint);
+    margin-top: 0.1rem; line-height: 1.35;
+  }
+  .afford-tag {
+    font-size: 0.58rem; letter-spacing: 0.07em; text-transform: uppercase;
+    font-weight: 700; color: var(--faint); margin-left: 0.35rem; white-space: nowrap;
+  }
+  .afford-col {
+    grid-row: 1; font-family: var(--serif); font-weight: 400; font-size: 0.82rem;
+    text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .afford-col.words { font-family: var(--ui); font-size: 0.72rem; font-weight: 600; }
+  .afford-col.mute { color: var(--faint); }
+  .afford-col.warn { color: var(--warn); }
+  .afford-col.bad { color: var(--alert); }
+  .afford-detail { font-size: 0.76rem; color: var(--dim); line-height: 1.5; margin: 0.6rem 0.15rem 0; }
   /* A filter you reach for constantly should be one tap, not a select. Same
      pill vocabulary as the sub-nav, scrolling sideways rather than wrapping. */
   .chiprow {
@@ -1058,7 +1113,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-07a";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-08a";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -5956,15 +6011,15 @@
 
     // 1. straight out of money nothing is waiting on
     route({
-      id: "spare", label: "Out of spare money",
+      id: "spare", label: "Out of spare money", phrase: "taking it out of spare money",
       detail: spare >= total
-        ? fmt(spare, { round: true }) + " is spare once your goals and your cushion are covered"
+        ? fmt(spare, { round: true }) + " is spare once your goals and your cushion are covered."
         : spare > 0
-          ? "Only " + fmt(spare, { round: true }) + " is spare, so " +
-            fmt(total - spare, { round: true }) + " of this comes out of your " + floorMonths() +
+          ? "Only " + fmt(spare, { round: true }) + " is spare; the other " +
+            fmt(total - spare, { round: true }) + " comes out of your " + floorMonths() +
             "-month cushion" + (total - spare > savingsFloor() + 0.005
-              ? " and then out of what your goals have put by" : "")
-          : "Nothing is spare once your goals and your cushion are covered",
+              ? ", and then out of what your goals have put by." : ".")
+          : "Nothing is spare once your goals and your cushion are covered.",
       monthly: 0, fromIncome: 0, fromSavings: total, paid: total, blocked: false
     });
 
@@ -5973,16 +6028,15 @@
     //    seller monthly without their instalment plan, which is its own route.
     var monthsFromIncome = firstMonthFromIncome(total, flow);
     route({
-      id: "income", label: "Save up and buy it",
+      id: "income", label: "Save up and buy it", phrase: "saving up for it",
       detail: surplus <= 0
-        ? "You have no surplus once your plan and your goals are paid"
+        ? "You have no surplus once your plan and your goals are paid."
         : monthsFromIncome == null
-          ? "Your income does not add up to it inside five years \u2014 at " +
-            fmt(surplus, { round: true }) + " a month now, and less once your contracts end"
+          ? "Your income does not add up to it inside five years, at " +
+            fmt(surplus, { round: true }) + " a month now and less once your contracts end."
           : "Put by " + fmt(total / monthsFromIncome, { round: true }) + " a month of your " +
-            fmt(surplus, { round: true }) + " surplus and buy it in " +
-            monthName(monthShift(thisMonth(), monthsFromIncome), true) +
-            ", touching nothing you have saved",
+            fmt(surplus, { round: true }) + " surplus, and buy it in " +
+            monthName(monthShift(thisMonth(), monthsFromIncome), true) + ".",
       monthly: monthsFromIncome ? total / monthsFromIncome : 0,
       months: monthsFromIncome,
       fromIncome: total, fromSavings: 0, paid: total,
@@ -5998,10 +6052,11 @@
     if (bite < total - 0.005) {
       route({
         id: "split", label: "Some now, the rest monthly",
+        phrase: "paying some now and the rest monthly",
         detail: bite <= 0.005
-          ? "What you earn covers it over " + n + " months without touching savings"
+          ? "What you earn covers it over " + n + " months without touching savings."
           : fmt(bite, { round: true }) + " out of savings now, then " +
-            fmt((total - bite) / n, { round: true }) + " a month for " + n,
+            fmt((total - bite) / n, { round: true }) + " a month for " + n + " months.",
         monthly: (total - bite) / n, months: n,
         fromIncome: total - bite, fromSavings: bite, paid: total, blocked: false
       });
@@ -6045,14 +6100,10 @@
         phrase: "pausing " + movable.name +
           (pauseFor ? " for " + pauseFor + (pauseFor === 1 ? " month" : " months") : ""),
         detail: pauseFor == null
-          ? "Even with nothing going into " + movable.name + " there is no money left over each month"
+          ? "Even with nothing going into " + movable.name + " there is no money left over each month."
           : "Stop the " + fmt(pace, { round: true }) + " a month going into " + movable.name +
-            " and " + fmt(freed, { round: true }) + " a month is free, which covers this in " +
-            pauseFor + (pauseFor === 1 ? " month" : " months") +
-            " out of income, touching nothing you have saved" +
-            (slipped.nowOn
-              ? " \u2014 " + movable.name + " lands in " + monthName(slipped.nowOn, true) + " instead"
-              : ""),
+            "; that frees " + fmt(freed, { round: true }) + " a month, which covers this in " +
+            pauseFor + (pauseFor === 1 ? " month" : " months") + ".",
         monthly: 0, months: pauseFor,
         // the cost of this route is the goal moving, and nothing else
         divertDelays: slipped ? [slipped] : [],
@@ -6064,22 +6115,21 @@
     var paid = total * (1 + (num(a.markup) || 0) / 100);
     route({
       id: "spread", label: n + " monthly payments",
-      detail: fmt(paid / n, { round: true }) + " a month for " + n +
+      phrase: "paying " + n + " monthly instalments",
+      detail: fmt(paid / n, { round: true }) + " a month for " + n + " months" +
         (paid - total > 0.5
-          ? " — " + fmt(paid, { round: true }) + " all in, " +
-            fmt(paid - total, { round: true }) + " more than the price"
-          : "") +
+          ? ", " + fmt(paid, { round: true }) + " all in" : "") +
         /* "$500 more than you earn over those 6" is true and unreadable when
            what you earn over those six months is nothing. Say that instead. */
         /* "nothing is spare over those 6 months" sat under a line reading
            "Spare to spend today $1,426". One is a flow and one is a pile;
            say which. */
         (earnedOverN <= 0.005
-          ? ", and your month leaves nothing over, so every payment comes out of what you have saved"
+          ? ". Your month leaves nothing over, so every payment comes out of what you have saved."
           : paid > earnedOverN
             ? ", which is " + fmt(paid - earnedOverN, { round: true }) +
-              " more than you have spare over those " + n + " months"
-            : ""),
+              " more than you have spare over those " + n + " months."
+            : "."),
       monthly: paid / n, months: n,
       fromIncome: Math.min(paid, earnedOverN),
       fromSavings: Math.max(0, paid - earnedOverN),
@@ -6093,12 +6143,13 @@
       var tooSlow = trimMonths > AFFORD_MAX_HORIZON;
       route({
         id: "trim", label: "Trim " + a.budgetCat,
+        phrase: "trimming " + a.budgetCat + " by " + fmt(cut, { round: true }) + " a month",
         detail: tooSlow
           ? fmt(cut, { round: true }) + " a month less on " + a.budgetCat + " would take " +
-            trimMonths + " months — too far out to be a plan"
+            trimMonths + " months, too far out to be a plan."
           : fmt(cut, { round: true }) + " a month less on " + a.budgetCat + " covers it in " +
-            trimMonths + (trimMonths === 1 ? " month" : " months") + ", lifting your surplus to " +
-            fmt(surplus + cut, { round: true }),
+            trimMonths + (trimMonths === 1 ? " month" : " months") + ", and lifts your surplus to " +
+            fmt(surplus + cut, { round: true }) + ".",
         // the cut pays for it, so nothing is diverted from anything else
         monthly: 0, months: trimMonths,
         fromIncome: total, fromSavings: 0, paid: total, blocked: tooSlow
@@ -6122,22 +6173,6 @@
     };
   }
 
-  function routeVerdict(r) {
-    if (r.blocked) return { tone: "mute", text: "not open to you" };
-    var c = routeCost(r);
-    if (c.broken) return { tone: "bad", text: "breaks a goal" };
-    // the pill always answers "what does it cost"; the cushion warning has
-    // room to explain itself in the breakdown
-    /* "out of promises" was a word this app invented for goals-plus-cushion,
-       defined nowhere on screen, and it was the badge on most of the cards.
-       Say which of the two it actually lands on. */
-    if (r.underFloor) return { tone: "bad", text: "into your safety cushion" };
-    if (c.worst) return { tone: "warn", text: c.worst.name + " slips " + Math.round(c.worst.slip) + "mo" };
-    if (r.raid > 0.005) return { tone: "warn", text: fmt(r.raid, { round: true }) + " from your goals" };
-    if (r.fromSavings > 0.005) return { tone: "ok", text: "out of spare money" };
-    return { tone: "ok", text: "out of what you earn" };
-  }
-
   // Cheapest first: nothing broken, then least out of savings, then least delay.
   function rankRoutes(routes) {
     return routes.filter(function (r) { return !r.blocked; }).slice().sort(function (x, y) {
@@ -6150,56 +6185,6 @@
       if (Math.abs(x.fromSavings - y.fromSavings) > 0.5) return x.fromSavings - y.fromSavings;
       return x.paid - y.paid;
     });
-  }
-
-  function affordSentence(best, flow) {
-    if (!best) return "There is no way to pay for this that leaves your plans standing.";
-    var c = routeCost(best);
-    /* Lower-casing the label put "put cyprus move back" on screen. A route
-       that names a goal carries its own phrase for this slot. */
-    var lead = best.phrase || best.label.toLowerCase();
-    /* "Yes" is the reassuring half of a sentence that says otherwise. When the
-       month does not balance AND the cheapest route still costs something,
-       nothing here is a yes — the most an answer can be is the least it costs.
-       A route that takes only money nothing is waiting on costs nothing, and
-       calling that "the least it can cost you" is gloom for its own sake: the
-       standing shortfall has its own notice directly below. */
-    /* Reaching into savings counts as a cost here even when nothing is waiting
-       on the money: in a month that does not balance, the pile is going down
-       anyway and nothing is putting it back. Only a route paid out of income,
-       or out of spending less, is a plain yes. */
-    var costly = best.underFloor || !!c.worst || best.fromSavings > 0.005;
-    var soften = costly && flow && flow.surplus < -0.005;
-    var yes = soften ? "The least it can cost you is " : "Yes — ";
-    if (c.broken) return "The kindest route is " + lead + ", and it still breaks " + c.worst.name + ".";
-    if (best.fromSavings <= 0.005 && !c.worst) {
-      return yes + lead +
-        (best.months && best.monthly > 0
-          ? ", " + fmt(best.monthly, { round: true }) + " a month for " + best.months
-          : "") +
-        ", and nothing you are saving for moves.";
-    }
-    if (best.fromSavings > 0.005 && c.worst) {
-      return "Only by taking " + fmt(best.fromSavings, { round: true }) +
-        " out of savings, which pushes " + c.worst.name + " back " + Math.round(c.worst.slip) +
-        (Math.round(c.worst.slip) === 1 ? " month" : " months") + ".";
-    }
-    if (best.fromSavings > 0.005) {
-      return soften
-        ? "The least it can cost you is " + fmt(best.fromSavings, { round: true }) +
-          " out of savings rather than out of what you earn."
-        : "Yes, but " + fmt(best.fromSavings, { round: true }) +
-          " of it comes out of savings rather than out of what you earn.";
-    }
-    /* A phrase that already names the goal and the pause does not want the
-       slip said again after it: "pausing Cyprus move for 2 months, though it
-       pushes Cyprus move back 2 months" is one fact stated twice. */
-    if (best.phrase && c.worst.nowOn && best.phrase.indexOf(c.worst.name) >= 0) {
-      return yes + lead + ", which lands it in " + monthName(c.worst.nowOn, true) +
-        " instead and takes nothing out of your savings.";
-    }
-    return yes + lead + ", though it pushes " + c.worst.name + " back " +
-      Math.round(c.worst.slip) + (Math.round(c.worst.slip) === 1 ? " month" : " months") + ".";
   }
 
   function affordCard() {
@@ -6246,119 +6231,181 @@
       '<button class="ibtn" data-act="afford-clear" aria-label="Clear this question">×</button></div>' +
       '<div class="card-body">';
 
-    html += '<p class="lead" style="color:var(--' + tone + ')">' + esc(affordSentence(best, flow)) + "</p>";
-
     /* Before anything about the purchase: if the month does not balance on its
        own, that is the finding, and burying it under four ways to fund a trip
-       answers a question nobody asked. */
+       answers a question nobody asked. One line, because it is an alarm and
+       not an explanation — the arithmetic behind it is further down. */
     if (flow.surplus < -0.005) {
-      var afterPlan = flow.income - flow.out;
-      html += '<p class="notice warn" style="margin:0.8rem 0 0">' +
-        "<b>Before this purchase.</b> Your goals need " + fmt(flow.goals, { round: true }) +
-        " a month and you have " + fmt(afterPlan, { round: true }) + " once your budget is paid \u2014 " +
-        "you are <b>" + fmt(-flow.surplus, { round: true }) + " short every month</b> already. " +
-        "Nothing below fixes that; it only says what this would cost on top.</p>";
+      html += '<div class="afford-alarm"><span>⚠</span><span>' +
+        fmt(-flow.surplus, { round: true }) + " short every month already, before this.</span></div>";
     }
 
-    /* Spare money cannot be minus eleven hundred dollars, and "left over" that
-       is negative is a contradiction. Both said the true thing backwards.
+    // the answer, and the one consequence that comes with it
+    var head = affordHeadline(best, flow);
+    html += '<p class="afford-verdict" style="color:var(--' + tone + ')">' + esc(head.lead) + "</p>" +
+      '<p class="afford-because">' + esc(head.sub) + "</p>";
 
-       The sum and its answer belong in one block: the month's figure was
-       printed first and then derived underneath it, so a reader met "$252"
-       three rows before anything that said where it came from. */
+    /* What it costs, in the three figures a decision actually turns on. These
+       were four rows of prose inside the chosen route's breakdown, below five
+       paragraphs, which is nowhere near the top of the card.
+
+       The sentence above always describes the cheapest route, because that is
+       the answer to the question asked. The tiles describe whichever route is
+       being looked at. Tap a second route and only the tiles move, so they
+       have to say whose figures they are. */
+    if (showing) {
+      html += '<p class="label" style="margin-top:0.95rem">' +
+        (best && showing.id === best.id
+          ? "What that costs"
+          : "What " + esc(showing.phrase || showing.label.toLowerCase()) + " costs") + "</p>" +
+        affordCostTiles(showing);
+    }
+
+    /* Where you stand: a flow and a pile, which answer different questions and
+       sat side by side in one block as though they did not. Four rows of
+       arithmetic became one line of it, under the two figures it produces. */
     var spareNeg = routes.spare < -0.005, surNeg = flow.surplus < -0.005;
-    html += '<p class="label" style="margin-top:1rem">Your month as it stands</p>' +
-      '<div class="split" style="margin-top:0.4rem">' +
-      '<div class="split-row"><span>Expected in</span><span class="fig">' +
-      fmt(flow.income, { round: true }) + "</span></div>" +
-      '<div class="split-row"><span>Your budget and usual spending</span><span class="fig">\u2212' +
-      fmt(flow.out, { round: true }) + "</span></div>" +
-      (flow.goals > 0
-        ? '<div class="split-row"><span>What your goals need</span><span class="fig">\u2212' +
-          fmt(flow.goals, { round: true }) + "</span></div>"
-        : "") +
-      '<div class="split-row"><span><b>' + (surNeg ? "Short every month" : "Left over each month") +
-      '</b></span><span class="fig"' + (surNeg ? ' style="color:var(--warn)"' : "") + "><b>" +
-      fmt(Math.abs(flow.surplus), { round: true }) + "</b></span></div></div>" +
-      (flow.basis.budgeted > 0
-        ? '<p class="hint">Of that spending, ' + fmt(flow.basis.budgeted, { round: true }) +
-          " is what you budgeted and " + fmt(flow.basis.unbudgeted, { round: true }) +
-          " is what you actually spend on things you have not budgeted.</p>"
-        : "");
-
-    // and separately, the stock: what could be spent today without breaking
-    // a promise. A month's flow and a pile of savings answer different
-    // questions and sat side by side in one block as though they did not.
-    html += '<div class="split" style="margin-top:0.6rem">' +
+    html += '<div class="split" style="margin-top:0.9rem">' +
       '<div class="split-row"><span>' +
       (spareNeg ? "Short of your goals and cushion" : "Spare to spend today") +
       '</span><span class="fig"' + (spareNeg ? ' style="color:var(--warn)"' : "") + ">" +
-      fmt(Math.abs(routes.spare), { round: true }) + (spareNeg ? " short" : "") + "</span></div></div>" +
-      '<p class="hint">' + (spareNeg
-        ? "Your goals and your " + floorMonths() + "-month cushion together want more than you can reach."
-        : "What you could reach without touching your goals or your " + floorMonths() +
-          "-month cushion.") + "</p>";
+      fmt(Math.abs(routes.spare), { round: true }) + "</span></div>" +
+      '<div class="split-row"><span>' + (surNeg ? "Short every month" : "Left over each month") +
+      '</span><span class="fig"' + (surNeg ? ' style="color:var(--warn)"' : "") + ">" +
+      fmt(Math.abs(flow.surplus), { round: true }) + "</span></div></div>" +
+      '<p class="hint">' + fmt(flow.income, { round: true }) + " comes in; " +
+      fmt(flow.out, { round: true }) + " goes on budget and usual spending" +
+      (flow.goals > 0 ? " and " + fmt(flow.goals, { round: true }) + " on your goals" : "") +
+      ". Spare is what you could reach without touching your goals or your " +
+      floorMonths() + "-month cushion.</p>";
 
-    /* Prose above names the route it recommends; the list below highlights it.
-       Nothing said the two were the same thing, so the reader had to guess
-       which row the sentence meant. */
-    html += '<p class="label" style="margin-top:1rem">Ways to pay for it</p>' +
-      '<p class="hint" style="margin-top:0.2rem">The highlighted one costs you least. ' +
-      "Tap another to see what that one would cost instead.</p>";
-    html += '<div class="afford-rows">' + routes.map(function (r) {
-      var v = routeVerdict(r);
-      var on = showing && r.id === showing.id;
-      return '<button class="afford-row' + (on ? " on" : "") + (r.blocked ? " off" : "") + '" ' +
-        'data-act="afford-route" data-id="' + r.id + '">' +
-        '<span class="afford-name">' + esc(r.label) + "</span>" +
-        '<span class="pill ' + v.tone + '">' + esc(v.text) + "</span>" +
-        '<span class="afford-detail">' + esc(r.detail) + "</span>" +
-        "</button>";
-    }).join("") + "</div>";
+    /* Every way of paying, one line each, under two column headings — the eye
+       runs down "savings" and stops. The cheapest is first and says so, and
+       only the one you are looking at spells itself out. */
+    var order = ranked.concat(routes.filter(function (r) { return r.blocked; }));
+    html += '<p class="label" style="margin-top:1.1rem">Ways to pay for it</p>' +
+      '<div class="afford-head" style="margin-top:0.45rem">' +
+      "<span>Route</span><span>Savings</span><span>Costs</span></div>" +
+      '<div class="afford-rows">' + order.map(function (r, i) {
+        var cols = routeColumns(r);
+        var on = showing && r.id === showing.id;
+        return '<button class="afford-row' + (on ? " on" : "") + (r.blocked ? " off" : "") + '" ' +
+          'data-act="afford-route" data-id="' + r.id + '">' +
+          '<span class="afford-name">' + esc(r.label) +
+          (r.blocked ? '<span class="afford-tag">not open</span>'
+            : i === 0 ? '<span class="afford-tag">costs least</span>' : "") + "</span>" +
+          '<span class="afford-col ' + cols.moneyTone + '">' + esc(cols.money) + "</span>" +
+          '<span class="afford-col ' + cols.delayTone + '">' + esc(cols.delay) + "</span>" +
+          (cols.pace ? '<span class="afford-pace">' + esc(cols.pace) + "</span>" : "") +
+          "</button>";
+      }).join("") + "</div>";
 
-    if (showing) html += affordBreakdown(showing);
+    if (showing) {
+      // the tile names the promise that moves furthest; if a route moves more
+      // than one, the rest are said here rather than left off the card
+      var rest = routeCost(showing).slips.filter(function (d) {
+        return d.name !== (routeCost(showing).worst || {}).name;
+      });
+      html += '<p class="afford-detail">' + esc(showing.detail) +
+        (rest.length
+          ? " It also puts back " + esc(rest.map(function (d) {
+              return d.name + (d.broken ? " for good" : " by about " + Math.round(d.slip) +
+                (Math.round(d.slip) === 1 ? " month" : " months"));
+            }).join(", and ")) + "."
+          : "") + "</p>";
+    }
 
     html += "</div></div>";
     return html;
   }
 
-  // What the chosen route costs, spelled out rather than scored.
-  function affordBreakdown(r) {
-    var c = routeCost(r);
-    var rows = [];
-    if (r.fromIncome > 0.005) {
-      rows.push(["Out of what you earn", fmt(r.fromIncome, { round: true }) +
-        (r.months ? " over " + r.months + (r.months === 1 ? " month" : " months") : "")]);
+  /* The answer in one line, and its price in a second. The old lead ran to
+     twenty-odd words and had to carry the route, the delay and the savings at
+     once; split in two, each half is readable at a glance. */
+  function affordHeadline(best, flow) {
+    if (!best) {
+      return { lead: "No way of paying for this leaves your plans standing.",
+               sub: "Every route either breaks something you are saving for or takes you under your cushion." };
     }
-    if (r.fromSavings > 0.005) {
-      rows.push(["Out of savings", fmt(r.fromSavings, { round: true }) +
-        (r.raid > 0.005 && r.raid < r.fromSavings - 0.005
-          ? " (" + fmt(r.raid, { round: true }) + " of it already spoken for)" : "")]);
+    var c = routeCost(best);
+    var phrase = best.phrase || best.label.toLowerCase();
+    // "Yes" is the reassuring half of a sentence that says otherwise: when the
+    // month does not balance and the cheapest route still costs something,
+    // nothing here is a yes. A route paid out of income, or out of spending
+    // less, costs nothing that is going down anyway and stays one.
+    var costly = best.underFloor || !!c.worst || best.fromSavings > 0.005;
+    var lead = c.broken ? "Not without breaking " + c.worst.name + "."
+      : (flow && flow.surplus < -0.005 && costly) ? "Only by " + phrase + "."
+      : "Yes — " + phrase + ".";
+    var bits = [];
+    bits.push(best.fromSavings > 0.005
+      ? fmt(best.fromSavings, { round: true }) + " of it comes out of savings"
+      : "nothing comes out of savings");
+    if (c.worst && !c.broken) {
+      bits.push(c.worst.name + " lands " + Math.round(c.worst.slip) +
+        (Math.round(c.worst.slip) === 1 ? " month" : " months") + " later" +
+        (c.worst.nowOn ? ", in " + monthName(c.worst.nowOn, true) : ""));
     }
-    if (r.overpay > 0.5) rows.push(["Cost of spreading it", fmt(r.overpay, { round: true })]);
-
-    var goalLines = c.slips.length
-      ? c.slips.map(function (d) {
-          return '<p class="notice warn" style="margin:0.3rem 0 0">' + esc(d.name) +
-            (d.broken
-              ? " <b>would not be reached at all</b>."
-              : " slips about <b>" + Math.round(d.slip) +
-                (Math.round(d.slip) === 1 ? " month" : " months") + "</b>" +
-                (d.nowOn ? ", to " + esc(monthName(d.nowOn, true)) : "") + ".") + "</p>";
-        }).join("")
-      : '<p class="hint" style="margin:0.4rem 0 0">Nothing you are saving for moves.</p>';
-
-    return '<p class="label" style="margin-top:1rem">What that costs</p>' +
-      '<div class="split" style="margin-top:0.4rem">' +
-      rows.map(function (x) {
-        return '<div class="split-row"><span>' + esc(x[0]) + '</span><span class="fig">' + x[1] + "</span></div>";
-      }).join("") + "</div>" +
-      goalLines +
-      (r.underFloor
-        ? '<p class="notice warn" style="margin:0.3rem 0 0">This takes you under the ' + floorMonths() +
-          "-month cushion you set.</p>"
-        : "");
+    if (best.underFloor) bits.push("it dips into your " + floorMonths() + "-month cushion");
+    if (best.overpay > 0.5) bits.push(fmt(best.overpay, { round: true }) + " goes on the instalment plan");
+    var sub = bits.join(", and ");
+    return { lead: lead, sub: sub.charAt(0).toUpperCase() + sub.slice(1) + "." };
   }
+
+  // The three figures a decision turns on, above everything that explains them.
+  function affordCostTiles(r) {
+    var c = routeCost(r);
+    function tile(k, v, note, cls) {
+      return "<div><div class=\"k\">" + esc(k) + '</div><div class="v ' + (cls || "") + '">' +
+        esc(v) + "</div>" + (note ? '<div class="n">' + esc(note) + "</div>" : "") + "</div>";
+    }
+    return '<div class="afford-cost">' +
+      tile("Savings",
+        r.fromSavings > 0.005 ? fmt(r.fromSavings, { round: true }) : "Nothing",
+        r.underFloor ? "under your " + floorMonths() + "-month cushion"
+          : r.raid > 0.005 ? fmt(r.raid, { round: true }) + " already spoken for" : null,
+        r.fromSavings > 0.005 ? (r.underFloor ? "warn" : "") : "words") +
+      tile("Income",
+        r.fromIncome > 0.005 ? fmt(r.fromIncome, { round: true }) : "Nothing",
+        r.fromIncome > 0.005 && r.months
+          ? "over " + r.months + (r.months === 1 ? " month" : " months") : null,
+        r.fromIncome > 0.005 ? "" : "words") +
+      tile("Delays",
+        c.broken ? "Breaks it" : c.worst ? "+" + Math.round(c.worst.slip) + " mo" : "Nothing",
+        c.worst ? c.worst.name : null,
+        c.broken ? "words bad" : c.worst ? "warn" : "words") +
+      "</div>";
+  }
+
+  /* A route's two columns: money out of savings, and the promise that moves.
+     They are the only two currencies a route has, so they are the only two
+     things worth aligning down the page. */
+  function routeColumns(r) {
+    /* A blocked route cannot be selected, so it has nowhere to say WHY it is
+       shut — "not open" on its own is the least useful thing a screen can
+       print. Its reason goes in the row. */
+    if (r.blocked) return { money: "—", moneyTone: "mute", delay: "—", delayTone: "mute", pace: r.detail };
+    var c = routeCost(r);
+    /* What the second column holds is everything the first cannot: a promise
+       moving, the cushion dipped into, or what an instalment plan adds. The
+       markup used to appear nowhere in the table, so "6 monthly payments" read
+       as costing nothing while quietly charging $336 over the price. */
+    var over = r.overpay > 0.5;
+    return {
+      money: r.fromSavings > 0.005 ? fmt(r.fromSavings, { round: true }) : "—",
+      moneyTone: r.fromSavings <= 0.005 ? "mute" : r.underFloor ? "warn" : "",
+      delay: c.broken ? "breaks" : c.worst ? "+" + Math.round(c.worst.slip) + " mo"
+        : r.underFloor ? "cushion" : over ? "+" + fmt(r.overpay, { round: true }) : "—",
+      delayTone: c.broken ? "words bad" : c.worst ? "warn"
+        : r.underFloor ? "words warn" : over ? "warn" : "mute",
+      pace: r.monthly > 0.005 && r.months
+        ? fmt(r.monthly, { round: true }) + " a month for " + r.months +
+          (r.months === 1 ? " month" : " months")
+        : r.months ? "over " + r.months + (r.months === 1 ? " month" : " months")
+        : "all of it today"
+    };
+  }
+
   function outlookBody() {
     if (!state.accounts.length && !state.transactions.length) return firstRunCard();
 
@@ -6396,7 +6443,7 @@
       '<p class="lead" style="color:var(--' + tone + ')">' + esc(
         // an amber sentence that reads like good news is worse than either
         goalsCross != null && pr.crossing == null
-          ? outlookSentence(pr).replace(/\.\s*$/, "") + " \u2014 but only by leaving your goals unfed."
+          ? outlookSentence(pr) + " Even that leaves your goals unfed."
           : outlookSentence(pr)) + "</p>" +
       '<p class="band-sub">Starting from ' + fmt(pr.start, { round: true }) + ' reachable, at ' +
       fmt(pr.burn, { round: true }) + " a month" +
