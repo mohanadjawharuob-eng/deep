@@ -1,5 +1,5 @@
 /* Offline shell for Coffer. Scope: /deep/apps/coffer/ */
-var CACHE = 'coffer-v6';
+var CACHE = 'coffer-v7';
 var PRECACHE = [
   "./",
   "../icons/coffer-192.png",

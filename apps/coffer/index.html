@@ -831,6 +831,50 @@
      a sentence and a half — and nobody reads five paragraphs to decide about
      a trip. The two columns are the only two currencies a route has: money
      out of savings, and a promise moving. */
+  /* The adviser. A proposal is three short lines — what to do, what made me
+     say it, and what changes if you agree — because an instruction with
+     neither of the other two is an instruction out of nowhere. */
+  /* On Today it is one row, never a card: the tab has nine blocks already
+     and this is a signpost, not a screen. */
+  .advice-strip {
+    display: flex; align-items: center; gap: 0.5rem; width: 100%;
+    margin-top: 0.9rem; padding: 0.7rem 0.85rem; text-align: left;
+    background: var(--tint); border: 1px solid var(--rule); border-radius: 14px;
+    color: inherit; font: inherit; cursor: pointer;
+  }
+  .advice-strip.warn { background: var(--warn-bg); border-color: transparent; color: var(--warn); }
+  .advice-strip-mark { font-size: 0.9rem; line-height: 1; }
+  .advice-strip-lead { font-size: 0.82rem; font-weight: 600; min-width: 0; line-height: 1.35; }
+  .advice-strip-more {
+    font-size: 0.72rem; color: var(--faint); margin-left: auto;
+    white-space: nowrap; padding-left: 0.4rem;
+  }
+  .advice-strip.warn .advice-strip-more { color: inherit; opacity: 0.8; }
+  .advice-strip-go { font-size: 1.1rem; line-height: 1; opacity: 0.55; }
+  .advice-strip-more + .advice-strip-go { margin-left: 0.15rem; }
+  .advice-strip-lead + .advice-strip-go { margin-left: auto; }
+
+  .advice-moves { display: flex; flex-direction: column; margin-top: 0.45rem; }
+  .advice-move {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 0.6rem;
+    align-items: center; padding: 0.55rem 0; border-top: 1px solid var(--rule);
+  }
+  .advice-move:first-child { border-top: 0; }
+  .advice-move-name { font-size: 0.84rem; font-weight: 600; min-width: 0; }
+  .advice-move-in { display: block; font-size: 0.7rem; font-weight: 400; color: var(--faint); }
+  .advice-move .fig { font-family: var(--serif); font-weight: 400; font-size: 0.95rem; white-space: nowrap; }
+  .advice-move .fig.advice-done { color: var(--faint); }
+  .advice-done-tag {
+    font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--calm); font-weight: 700; white-space: nowrap;
+  }
+
+  .advice-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.85rem; }
+  .advice-item { padding: 0.75rem 0.8rem; background: var(--tint); border-radius: 14px; }
+  .advice-title { font-size: 0.92rem; font-weight: 600; line-height: 1.3; margin: 0; }
+  .advice-why { font-size: 0.76rem; color: var(--dim); line-height: 1.5; margin: 0.35rem 0 0; }
+  .advice-then { font-size: 0.76rem; color: var(--ink); line-height: 1.5; margin: 0.3rem 0 0; }
+
   .afford-alarm {
     display: flex; align-items: baseline; gap: 0.45rem;
     background: var(--warn-bg); color: var(--warn);
@@ -1113,7 +1157,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-08a";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-08b";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -1341,6 +1385,10 @@
       // fine: floorMonths() falls back to the default on its own
       s.settings.floorMonths = num(p.settings.floorMonths) || null;
       s.settings.defaultAccountRef = p.settings.defaultAccountRef || null;
+      // proposals the reader has waved away; absent from every backup written
+      // before the adviser, and an empty set is the right default anyway
+      s.settings.adviceOff = (p.settings.adviceOff && typeof p.settings.adviceOff === "object")
+        ? p.settings.adviceOff : {};
     }
     if (p.categories) {
       if (Array.isArray(p.categories.expense) && p.categories.expense.length) s.categories.expense = p.categories.expense;
@@ -5190,6 +5238,7 @@
       (debt > 0 ? " · after " + fmt(debt, { round: true }) + " owed" : "") + "</p></div>";
 
     html += runwayBand();
+    html += adviceStrip();
     html += burnCard();
     html += threeTiles();
     html += todayCard();
@@ -5567,6 +5616,7 @@
   }
 
   var PLAN_TABS = [
+    { id: "advice", label: "Advice" },
     { id: "outlook", label: "Outlook" },
     { id: "budgets", label: "Budgets" },
     { id: "bills", label: "Bills" },
@@ -5642,10 +5692,13 @@
       plan: "A written plan, scored against what actually happened.",
       outlook: "Where the money goes from here, month by month, with every contract " +
         "starting and stopping on its own date.",
-      grants: "Money you are holding for someone else, split into what it has to be spent on."
+      grants: "Money you are holding for someone else, split into what it has to be spent on.",
+      advice: "What this month asks of you, and what I would change so it adds up. " +
+        "Nothing here happens until you tap it."
     }[sub];
 
     var right = sub === "goals" ? '<button class="btn primary" data-act="goal-add">Add a goal</button>'
+      : sub === "advice" ? ""
       : sub === "outlook" ? ""
       : sub === "grants" ? ""
       : sub === "plan" ? ""
@@ -5655,7 +5708,8 @@
     var html = pageHead("Plan", blurb, right) +
       subNav("plan-tab", PLAN_TABS, sub);
 
-    if (sub === "outlook") html += outlookBody();
+    if (sub === "advice") html += adviceBody();
+    else if (sub === "outlook") html += outlookBody();
     else if (sub === "grants") html += grantsBody();
     else if (sub === "budgets") html += budgetsBody();
     else if (sub === "bills") html += billsBody();
@@ -6404,6 +6458,422 @@
         : r.months ? "over " + r.months + (r.months === 1 ? " month" : " months")
         : "all of it today"
     };
+  }
+
+  /* ---------------- the adviser ----------------
+
+     Every other screen answers a question you asked. This one answers the
+     one you did not: what should I change?
+
+     Two rules hold it up, and they are the rules the written report lives by.
+     It computes nothing of its own — every figure comes from the function the
+     screen it is about already uses (`monthlySurplus`, `goalNeed`,
+     `budgetRows`, `spendByCategory`), or the advice and the app will
+     eventually disagree and only one of them will be right. And it proposes
+     and never acts: nothing here moves a figure until it is tapped, and
+     everything it does arrives with an undo. A ledger that rearranges itself
+     is a ledger you cannot trust, and being trusted is the whole product.  */
+
+  // What a goal has actually been fed this month, read off the ledger. Only a
+  // goal held in a pocket leaves a record; a hand-tracked one does not, so
+  // nothing is claimed about it either way rather than guessed.
+  function goalFedIn(g, mk) {
+    if (!g.holdsIn) return null;
+    var r = parseRef(g.holdsIn);
+    var t = 0;
+    state.transactions.forEach(function (x) {
+      if (x.type !== "transfer" || monthOf(x.date) !== mk) return;
+      if (x.toAccountId !== r.accountId) return;
+      if ((x.toPocketId || null) !== (r.pocketId || null)) return;
+      t += txBaseIn(x);
+    });
+    return t;
+  }
+
+  /* This month as a set of instructions rather than a set of figures: what is
+     expected in, what the plan takes, what each promise is owed, and what is
+     left once they are kept. */
+  function adviceMonth() {
+    var flow = monthlySurplus();
+    var mk = thisMonth();
+    var moves = state.goals.map(function (g) {
+      var need = goalNeed(g);
+      if (need.done || !(need.need > 0)) return null;
+      var fed = goalFedIn(g, mk);
+      var ref = g.holdsIn ? parseRef(g.holdsIn) : null;
+      return {
+        id: g.id, name: g.name, need: need.need, fed: fed,
+        left: fed == null ? need.need : Math.max(0, need.need - fed),
+        done: fed != null && fed >= need.need - 0.005,
+        holder: ref ? accountName(ref.accountId, ref.pocketId) : null,
+        tracked: !!g.holdsIn
+      };
+    }).filter(Boolean).sort(function (a, b) { return b.need - a.need; });
+    return {
+      flow: flow, mk: mk, moves: moves,
+      // what is left for you once the plan is paid and the promises kept
+      free: flow.surplus,
+      short: flow.surplus < -0.005 ? -flow.surplus : 0
+    };
+  }
+
+  /* What you actually spend per category, averaged over the months that have
+     entries in them — the same basis `plannedOutgoings()` uses, so a budget
+     proposal and the surplus it claims to change cannot disagree. */
+  function observedSpend() {
+    var months = recentMonths(BURN_LOOKBACK, monthShift(thisMonth(), -1))
+      .filter(function (mk) { return monthTx(mk).length > 0; });
+    var out = { months: months.length, avg: {} };
+    if (!months.length) return out;
+    months.forEach(function (mk) {
+      var s = spendByCategory(mk);
+      Object.keys(s).forEach(function (c) { out.avg[c] = (out.avg[c] || 0) + s[c]; });
+    });
+    Object.keys(out.avg).forEach(function (c) { out.avg[c] /= months.length; });
+    return out;
+  }
+
+  // round a proposed limit to something a person would actually write down
+  function tidy(n) { return Math.max(5, Math.round(n / 5) * 5); }
+  // …and one that is never below the figure it has to cover
+  function tidyUp(n) { return Math.max(5, Math.ceil(n / 5) * 5); }
+
+  /* Everything worth changing, in the order it should be done.
+
+     Order is the whole of the intelligence here. Proposed against today's
+     figures, the first advice this gave was to take the date off a goal —
+     while a budget set at $300 for something costing $120 sat two cards
+     below, and fixing that alone would have paid for the goal twice over.
+     So the budgets that do not describe what you actually do are worked out
+     first, the month is re-read as if they were corrected, and a promise is
+     only asked to move if it still does not fit.
+
+     A proposal carries the finding that produced it and the effect of
+     accepting it, because "raise Groceries to $340" with neither is an
+     instruction out of nowhere. `apply` makes the change and hands back the
+     undo for it. */
+  function adviceProposals() {
+    var off = state.settings.adviceOff || {};
+    var flow = monthlySurplus();
+    var seen = observedSpend();
+    var mk = thisMonth();
+    var budgetProps = [], goalProps = [];
+
+    /* 1. Budgets that do not describe what you do. A budget nobody keeps is
+       not a limit — it is a wrong number sitting inside every figure built on
+       it, starting with what you have left over each month. */
+    var freed = 0;      // what correcting them does to the month, net
+    if (seen.months >= 2) {
+      Object.keys(state.budgets).forEach(function (cat) {
+        var limit = num(state.budgets[cat]), avg = seen.avg[cat] || 0;
+        if (!(limit > 0)) return;
+        if (avg > limit * 1.15 && avg - limit > 5) {
+          var up = tidyUp(avg);
+          freed -= up - limit;
+          budgetProps.push({
+            id: "budget-up-" + cat, rank: 1, delta: -(up - limit),
+            title: "Raise " + cat + " to " + fmt(up, { round: true }),
+            finding: "It is set at " + fmt(limit, { round: true }) + " and you have spent " +
+              fmt(avg, { round: true }) + " a month over " + seen.months + " months.",
+            effect: "The bar stops reading red every month and what you have left over becomes a " +
+              "figure worth trusting \u2014 it falls by " + fmt(up - limit, { round: true }) + ".",
+            apply: function () { var was = state.budgets[cat]; state.budgets[cat] = up;
+              return function () { state.budgets[cat] = was; }; }
+          });
+        } else if (avg < limit * 0.7 && limit - avg > 10) {
+          // a little room above what you spend, or the bar reads red the
+          // first month anything is slightly out of the ordinary
+          var down = tidyUp(avg * 1.1);
+          if (down >= limit - 0.005) return;
+          freed += limit - down;
+          budgetProps.push({
+            id: "budget-down-" + cat, rank: 1, delta: limit - down,
+            title: "Lower " + cat + " to " + fmt(down, { round: true }),
+            finding: "It is set at " + fmt(limit, { round: true }) + " and you have spent " +
+              fmt(avg, { round: true }) + " a month over " + seen.months + " months.",
+            effect: "That frees " + fmt(limit - down, { round: true }) +
+              " a month toward what you are saving for, with room above what you actually spend.",
+            apply: function () { var was = state.budgets[cat]; state.budgets[cat] = down;
+              return function () { state.budgets[cat] = was; }; }
+          });
+        }
+      });
+      /* A category you spend real money on with no limit at all. This one
+         barely moves the month — the spending is already inside the burn
+         rate — so it is not counted toward closing a gap. */
+      Object.keys(seen.avg).forEach(function (cat) {
+        if (state.budgets[cat] != null || cat === "Transfer") return;
+        var avg = seen.avg[cat];
+        if (!(avg > Math.max(25, flow.income * 0.02))) return;
+        var set = tidyUp(avg * 1.1);
+        budgetProps.push({
+          id: "budget-new-" + cat, rank: 4, delta: 0,
+          title: "Put a budget on " + cat,
+          finding: cat + " has no limit and has taken " + fmt(avg, { round: true }) +
+            " a month over " + seen.months + " months.",
+          effect: "A limit of " + fmt(set, { round: true }) + " puts it on the Budgets screen " +
+            "beside everything else, where running hot shows before the month ends.",
+          apply: function () { state.budgets[cat] = set;
+            return function () { delete state.budgets[cat]; }; }
+        });
+      });
+    }
+
+    /* 2. Re-read the month as if those were corrected, and only then ask
+       whether a promise has to move. `freed` is what the corrections do to
+       outgoings, which is exactly what `plannedOutgoings()` would return with
+       the new limits in place. */
+    var surplus = flow.surplus + freed;
+    var avail = flow.income - flow.out + freed;     // what is left for promises
+
+    // say so on the correction that carries it, rather than leaving the
+    // reader to add the two figures up themselves
+    if (flow.surplus < -0.005 && surplus >= -0.005 && freed > 0.005) {
+      budgetProps.forEach(function (p) {
+        if (p.delta > 0.005) p.effect += " Between them these corrections are enough on their own: " +
+          "your month balances and nothing you are saving for has to move.";
+      });
+    }
+
+    if (surplus < -0.005 && flow.goals > 0) {
+      var deficit = -surplus;
+      /* Which promise to move, and by how little. For each goal, the pace it
+         would have to drop to for the month to fit; the one that lands
+         soonest relative to its own date is the cheapest promise to break. */
+      var best = null;
+      state.goals.forEach(function (g) {
+        var need = goalNeed(g);
+        if (!(need.need > 0) || !g.due || !(need.left > 0)) return;
+        var pace = need.need - deficit;
+        if (!(pace > 0.005)) return;
+        var months = Math.ceil(need.left / pace);
+        var slip = months - need.months;
+        if (!(slip > 0.05)) return;
+        if (!best || slip < best.slip) best = { g: g, need: need, pace: pace, months: months, slip: slip };
+      });
+      if (best) {
+        var g2 = best.g, newMk = monthShift(mk, best.months), newDue = lastDayOf(newMk);
+        goalProps.push({
+          id: "goal-date-" + g2.id, rank: 2,
+          title: "Give " + g2.name + " until " + monthName(newMk, true),
+          finding: g2.name + " wants " + fmt(best.need.need, { round: true }) + " a month, which is " +
+            fmt(deficit, { round: true }) + " more than the month leaves" +
+            (freed > 0.005 ? " even with the corrections above" : "") + ".",
+          effect: "At " + fmt(best.pace, { round: true }) + " a month it lands in " +
+            monthName(newMk, true) + " instead, and your month balances.",
+          apply: function () { var was = g2.due; g2.due = newDue;
+            return function () { g2.due = was; }; }
+        });
+        if (best.need.months > 0.5) {
+          var newTarget = tidy(goalSaved(g2) + best.need.months * best.pace);
+          if (newTarget > goalSaved(g2) + 0.005 && newTarget < num(g2.target) - 0.005) {
+            goalProps.push({
+              id: "goal-target-" + g2.id, rank: 3,
+              title: "Aim at " + fmt(newTarget, { round: true }) + " for " + g2.name,
+              finding: "Keeping " + monthName(monthOf(g2.due), true) + " means " +
+                fmt(best.need.need, { round: true }) + " a month, and only " +
+                fmt(best.pace, { round: true }) + " is there.",
+              effect: fmt(newTarget, { round: true }) + " by the same date is " +
+                fmt(best.pace, { round: true }) + " a month, which you have.",
+              apply: function () { var was = g2.target; g2.target = newTarget;
+                return function () { g2.target = was; }; }
+            });
+          }
+        }
+      } else {
+        /* No single promise can be slowed enough — moving one still leaves
+           the month short, so the honest advice is to stop asking for one
+           of them at all. */
+        var biggest = state.goals.filter(function (x) { return goalNeed(x).need > 0 && x.due; })
+          .sort(function (x, y) { return goalNeed(y).need - goalNeed(x).need; })[0];
+        if (biggest) {
+          goalProps.push({
+            id: "goal-pause-" + biggest.id, rank: 2,
+            title: "Take the date off " + biggest.name,
+            finding: "Even slowed right down it cannot fit beside the rest, so its date is asking " +
+              "every month for money that does not exist.",
+            effect: "It stays on the list and keeps what it holds. Nothing is asked of it each " +
+              "month until you give it a date again, and " +
+              fmt(goalNeed(biggest).need, { round: true }) + " a month goes back to the others.",
+            apply: function () { var was = biggest.due; biggest.due = null;
+              return function () { biggest.due = was; }; }
+          });
+        }
+      }
+    }
+
+    /* Six is as many as anyone reads, and a ledger with a dozen budgets can
+       fill all six with budget corrections and push the one thing that
+       actually moves a promise off the end. So the corrections take at most
+       four of the places and the promise keeps its own. */
+    var keep = function (list) { return list.filter(function (p) { return !off[p.id]; }); };
+    var b1 = keep(budgetProps).sort(function (x, y) { return x.rank - y.rank; });
+    var g1 = keep(goalProps).sort(function (x, y) { return x.rank - y.rank; });
+    return b1.slice(0, 4).concat(g1).concat(b1.slice(4)).slice(0, 6);
+  }
+
+  /* Things that are not wrong yet but are heading that way. Not proposals:
+     there is nothing here to accept, only something to know. */
+  function driftWarnings() {
+    var out = [], mk = thisMonth(), through = monthProgress(mk);
+    budgetRows(mk).forEach(function (r) {
+      if (!(r.limit > 0)) return;
+      /* Being over is a fact and can be said on any day. Being "ahead of
+         pace" is an inference, and early in a month it is a wrong one: rent
+         and every other bill lands on the 1st, so on the 8th a category with
+         one monthly bill in it reads as spending twelve times over. Half the
+         month in, pace starts to mean something; before that it does not, so
+         nothing is claimed. This is the same trap the Today screen's "at this
+         pace you'll spend" line falls into. */
+      if (r.left < -0.005) {
+        out.push(r.category + " is " + fmt(-r.left, { round: true }) + " over its " +
+          fmt(r.limit, { round: true }) + " already.");
+      } else if (through >= 0.5 && r.pct > through + 0.15 && r.pct > 0.5) {
+        out.push(Math.round(r.pct * 100) + "% of " + r.category + " is gone with " +
+          Math.round((1 - through) * 100) + "% of the month left \u2014 " +
+          fmt(r.left, { round: true }) + " to last it.");
+      }
+    });
+    state.goals.forEach(function (g) {
+      var n = goalNeed(g);
+      if (n.overdue && !n.done) {
+        out.push(g.name + " is past its date with " + fmt(n.left, { round: true }) + " still to find.");
+      }
+    });
+    // a wall of warnings is a wall nobody reads
+    return out.slice(0, 4);
+  }
+
+  /* Today is nine blocks already, so what the adviser has to say arrives
+     there as one line or not at all: the most pressing thing, and a tap
+     through to the rest of it. Nothing to do prints nothing. */
+  function adviceStrip() {
+    var m = adviceMonth();
+    if (!m.flow.income) return "";
+    var props = adviceProposals();
+    var drift = driftWarnings();
+    var owed = m.moves.filter(function (x) { return !x.done && x.left > 0.005; });
+    var lead, tone = "";
+
+    if (m.short) {
+      lead = fmt(m.short, { round: true }) + " short every month";
+      tone = " warn";
+    } else if (owed.length) {
+      lead = "Put aside " + fmt(owed[0].left, { round: true }) + " for " + owed[0].name;
+    } else if (drift.length) {
+      lead = drift[0];
+      tone = " warn";
+    } else if (props.length) {
+      lead = props.length + (props.length === 1 ? " thing" : " things") + " I would change";
+    } else {
+      return "";
+    }
+
+    var more = [];
+    if (owed.length > (m.short ? 0 : 1)) {
+      more.push((owed.length - (m.short ? 0 : 1)) + " to set aside");
+    }
+    if (props.length && (m.short || !owed.length)) {
+      more.push(props.length + (props.length === 1 ? " change" : " changes"));
+    }
+
+    return '<button class="advice-strip' + tone + '" data-act="go-advice">' +
+      (tone ? '<span class="advice-strip-mark">\u26a0</span>' : "") +
+      '<span class="advice-strip-lead">' + esc(lead) + "</span>" +
+      (more.length ? '<span class="advice-strip-more">' + esc(more.join(" \u00b7 ")) + "</span>" : "") +
+      '<span class="advice-strip-go">\u203a</span></button>';
+  }
+
+  function adviceBody() {
+    if (!state.accounts.length && !state.transactions.length) return firstRunCard();
+    var m = adviceMonth();
+    var props = adviceProposals();
+    var drift = driftWarnings();
+    var flow = m.flow;
+    var skipped = Object.keys(state.settings.adviceOff || {}).length;
+    var html = "";
+
+    /* This month, as instructions. The figures are the ones Outlook and the
+       afford card are built from; what is different is that they are in the
+       order you would act on them. */
+    html += '<div class="card pad"><span class="label">This month</span>';
+    if (!flow.income) {
+      html += '<p class="lead" style="color:var(--warn)">Nothing is booked as coming in, so there ' +
+        "is no month to plan.</p>" +
+        '<p class="band-sub">Add what you are expecting under Plan › Income and this fills in.</p>';
+    } else {
+      html += '<div class="split" style="margin-top:0.7rem">' +
+        '<div class="split-row"><span>Expected in</span><span class="fig">' +
+        fmt(flow.income, { round: true }) + "</span></div>" +
+        '<div class="split-row"><span>Budget and usual spending</span><span class="fig">−' +
+        fmt(flow.out, { round: true }) + "</span></div></div>";
+
+      if (m.moves.length) {
+        html += '<p class="label" style="margin-top:1rem">Put aside</p>' +
+          '<div class="advice-moves">' + m.moves.map(function (mv) {
+            return '<div class="advice-move"><span class="advice-move-name">' + esc(mv.name) +
+              (mv.holder ? '<span class="advice-move-in">into ' + esc(mv.holder) + "</span>" : "") +
+              "</span>" +
+              /* Once it is fed, the figure to show is what actually went in.
+                 `need` is recomputed from the new balance, so a goal fed
+                 $531 was reporting "$462 done" — the pace it wants NEXT
+                 month, printed as though it were the payment. */
+              '<span class="fig' + (mv.done ? " advice-done" : "") + '">' +
+              fmt(mv.done ? mv.fed : mv.left, { round: true }) + "</span>" +
+              (mv.done
+                ? '<span class="advice-done-tag">done</span>'
+                : '<button class="btn sm" data-act="advice-move" data-id="' + mv.id + '">Set aside</button>') +
+              "</div>";
+          }).join("") + "</div>";
+      }
+
+      html += '<div class="split" style="margin-top:0.9rem">' +
+        '<div class="split-row"><span><b>' + (m.short ? "Short every month" : "Yours to spend") +
+        '</b></span><span class="fig"' + (m.short ? ' style="color:var(--warn)"' : "") + "><b>" +
+        fmt(Math.abs(m.free), { round: true }) + "</b></span></div></div>" +
+        '<p class="hint">' + (m.short
+          ? "Your promises want more than the month leaves. Everything below is a way to close that."
+          : "What is left once the plan is paid and everything above is set aside.") + "</p>";
+    }
+    html += "</div>";
+
+    if (props.length) {
+      html += '<div class="card pad" style="margin-top:1rem">' +
+        '<span class="label">What I would change</span>' +
+        '<p class="band-sub">Nothing here happens until you tap it, and every one of them can be undone.</p>' +
+        '<div class="advice-list">' + props.map(function (p) {
+          return '<div class="advice-item"><p class="advice-title">' + esc(p.title) + "</p>" +
+            '<p class="advice-why">' + esc(p.finding) + "</p>" +
+            '<p class="advice-then">' + esc(p.effect) + "</p>" +
+            '<div class="btn-row" style="margin-top:0.55rem">' +
+            '<button class="btn sm primary" data-act="advice-do" data-id="' + esc(p.id) + '">Do it</button>' +
+            '<button class="btn sm" data-act="advice-skip" data-id="' + esc(p.id) + '">Not this</button>' +
+            "</div></div>";
+        }).join("") + "</div>" +
+        (skipped ? '<div class="btn-row" style="margin-top:0.9rem">' +
+          '<button class="btn sm" data-act="advice-reset">Bring back what I skipped</button></div>' : "") +
+        "</div>";
+    } else if (flow.income) {
+      html += '<div class="card pad" style="margin-top:1rem">' +
+        '<span class="label">What I would change</span>' +
+        '<p class="lead" style="color:var(--calm)">Nothing. Your budgets match what you spend, and ' +
+        "your promises fit the month.</p>" +
+        (skipped ? '<div class="btn-row" style="margin-top:0.8rem">' +
+          '<button class="btn sm" data-act="advice-reset">Bring back what I skipped</button></div>' : "") +
+        "</div>";
+    }
+
+    if (drift.length) {
+      html += '<div class="card pad" style="margin-top:1rem">' +
+        '<span class="label">Worth watching</span><div class="notices" style="margin-top:0.6rem">' +
+        drift.map(function (d) { return '<p class="notice warn">' + esc(d) + "</p>"; }).join("") +
+        "</div></div>";
+    }
+
+    html += '<p class="hint" style="margin-top:1rem;padding:0 0.35rem">Every figure here comes from ' +
+      "the screen it is about — the same income, the same budgets, the same goals. Nothing is " +
+      "averaged from what you earned before, and nothing changes until you say so.</p>";
+    return html;
   }
 
   function outlookBody() {
@@ -8593,6 +9063,78 @@
       save(); applyTheme(); render();
     },
     "plan-tab": function (id) { planTab = id; view = "plan"; render(); },
+    "go-advice": function () {
+      planTab = "advice"; view = "plan"; render();
+      window.scrollTo({ top: 0, behavior: "auto" });
+    },
+
+    /* ---- the adviser: it proposes, you tap, and every tap can be undone ---- */
+    "advice-do": function (id) {
+      var p = adviceProposals().filter(function (x) { return x.id === id; })[0];
+      if (!p) return;
+      var undo = p.apply();
+      save(); render();
+      toast(p.title + " \u2014 done.", undo);
+    },
+    "advice-skip": function (id) {
+      if (!state.settings.adviceOff) state.settings.adviceOff = {};
+      state.settings.adviceOff[id] = true;
+      save(); render();
+      toast("Left as it is.", function () { delete state.settings.adviceOff[id]; });
+    },
+    "advice-reset": function () {
+      var was = state.settings.adviceOff || {};
+      state.settings.adviceOff = {};
+      save(); render();
+      toast("Everything you skipped is back.", function () { state.settings.adviceOff = was; });
+    },
+    /* Setting money aside is the one thing here that writes to the ledger, so
+       it opens with the figure filled in and asks where it comes from rather
+       than assuming. A goal not held in a pocket has no transfer to write —
+       there is nowhere for the money to go — so it records progress instead. */
+    "advice-move": function (id) {
+      var g = state.goals.filter(function (x) { return x.id === id; })[0];
+      if (!g) return;
+      var m = adviceMonth().moves.filter(function (x) { return x.id === id; })[0];
+      if (!m) return;
+      if (!g.holdsIn) return ACTIONS["goal-fund"](id);
+      var ref = parseRef(g.holdsIn);
+      var opts = accountOptionsFlat().filter(function (o) { return o.value !== g.holdsIn; });
+      if (!opts.length) { toast("There is nowhere to move it from."); return; }
+      openModal({
+        title: "Set aside for " + g.name,
+        message: "This writes a transfer into " + accountName(ref.accountId, ref.pocketId) +
+          ". It is the same as any transfer you would log by hand.",
+        confirmLabel: "Set it aside",
+        fields: [
+          { key: "amount", label: "Amount", type: "number", min: 0, value: Math.round(m.left * 100) / 100 }
+        ].concat(currencyField()).concat([
+          { key: "from", label: "Out of", type: "select", options: opts, value: opts[0].value, span: true },
+          { key: "date", label: "Date", type: "date", value: today() }
+        ]),
+        validate: function (v) {
+          if (!(v.amount > 0)) return "Enter an amount above zero.";
+          if (v.from === g.holdsIn) return "That is the pocket it is going into.";
+        },
+        onConfirm: function (v) {
+          var cur = v.currency || baseCode();
+          var src = parseRef(v.from);
+          var t = {
+            id: uid(), date: v.date || today(), desc: "Set aside for " + g.name,
+            type: "transfer", category: "Transfer", amount: v.amount,
+            currency: cur, rate: rateFor(cur),
+            accountId: src.accountId, pocketId: src.pocketId || null,
+            toAccountId: ref.accountId, toPocketId: ref.pocketId || null
+          };
+          state.transactions.push(t);
+          save(); render();
+          toast(fmt(toBase(v.amount, cur, rateFor(cur))) + " set aside for " + g.name + ".",
+            function () {
+              state.transactions = state.transactions.filter(function (x) { return x.id !== t.id; });
+            });
+        }
+      });
+    },
 
     /* ---- outlook ---- */
     "afford-open": function () {
