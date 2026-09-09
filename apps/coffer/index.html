@@ -936,6 +936,26 @@
   .advice-why { font-size: 0.76rem; color: var(--dim); line-height: 1.5; margin: 0.35rem 0 0; }
   .advice-then { font-size: 0.76rem; color: var(--ink); line-height: 1.5; margin: 0.3rem 0 0; }
 
+  /* the adviser's reading of ONE goal, on the goal itself. Set inside the
+     card on the tint so it reads as a note about the thing above it rather
+     than as a second card. */
+  .goal-need { font-size: var(--fs-sm); line-height: 1.55; margin: 0.7rem 0 0; }
+
+  .goal-link {
+    margin-top: 0.85rem; padding: 0.75rem 0.85rem;
+    background: var(--tint); border-radius: 16px;
+  }
+  .goal-link-row {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 0.6rem; align-items: center;
+  }
+  .goal-link-lead { font-size: var(--fs-sm); font-weight: 600; min-width: 0; }
+  .goal-link-in { display: block; font-size: var(--fs-xs); font-weight: 400; color: var(--faint); }
+  .goal-link-row .fig { font-family: var(--serif); font-weight: 400; font-size: 0.95rem; white-space: nowrap; }
+  .goal-link-row .fig.advice-done { color: var(--faint); }
+  .goal-link .hint { margin-top: 0.55rem; }
+  .goal-prop { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--rule); }
+  .goal-link-row + .goal-prop { margin-top: 0.6rem; }
+
   /* One tap: a picture you hit without reading, four to a row. */
   .taps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; margin-top: 0.7rem; }
   .tapbtn {
@@ -1349,7 +1369,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-09b";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-09c";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -8390,6 +8410,55 @@
     return out.join("\n") + "\n";
   }
 
+  /* What the adviser has to say about ONE goal, on the goal itself.
+
+     The page was a list of goals and nothing else, so the three things that
+     actually decide whether a goal happens — what it is owed this month, what
+     would have to change for it to fit, and the budgets that get corrected
+     before it is asked to move — all lived on another screen. Nothing here is
+     computed: `adviceMonth()` and `adviceProposals()` are handed in already
+     built, so this cannot drift away from what Horizon says. The proposals
+     for a goal are the ones whose id ends in its own id, which is how
+     `adviceProposals` names them. */
+  function goalAdviceBlock(g, m, mine) {
+    var mv = m.moves.filter(function (x) { return x.id === g.id; })[0];
+    if (!mv && !mine.length) return "";
+
+    var html = '<div class="goal-link">';
+
+    if (mv) {
+      html += '<div class="goal-link-row">' +
+        '<span class="goal-link-lead">' +
+        (mv.done
+          ? "Set aside this month"
+          : "Put aside " + fmt(mv.left, { round: true }) + " this month") +
+        (mv.holder ? '<span class="goal-link-in">into ' + esc(mv.holder) + "</span>" : "") +
+        "</span>" +
+        '<span class="fig' + (mv.done ? " advice-done" : "") + '">' +
+        fmt(mv.done ? mv.fed : mv.left, { round: true }) + "</span>" +
+        (mv.done
+          ? '<span class="advice-done-tag">done</span>'
+          : '<button class="btn sm" data-act="advice-move" data-id="' + g.id + '">Set aside</button>') +
+        "</div>";
+      if (!mv.tracked) {
+        html += '<p class="hint">Nothing holds this one, so what you put aside is not counted back ' +
+          "automatically. Give it a pocket when you edit it and this figure fills itself in.</p>";
+      }
+    }
+
+    mine.forEach(function (p) {
+      html += '<div class="goal-prop"><p class="advice-title">' + esc(p.title) + "</p>" +
+        '<p class="advice-why">' + esc(p.finding) + "</p>" +
+        '<p class="advice-then">' + esc(p.effect) + "</p>" +
+        '<div class="btn-row" style="margin-top:0.5rem">' +
+        '<button class="btn sm primary" data-act="advice-do" data-id="' + esc(p.id) + '">Do it</button>' +
+        '<button class="btn sm" data-act="advice-skip" data-id="' + esc(p.id) + '">Not this</button>' +
+        "</div></div>";
+    });
+
+    return html + "</div>";
+  }
+
   function goalsBody() {
     var pace = avgMonthlySaving(3);
     var html = "";
@@ -8401,6 +8470,25 @@
         "putting aside.</p><button class=\"btn primary\" data-act=\"goal-add\">Add a goal</button></div></div>";
     }
 
+    /* Built once for the whole page rather than once per card: both of these
+       walk every transaction, and a ledger with six goals would walk it
+       twelve times over. */
+    var m = adviceMonth();
+    var props = m.flow.income ? adviceProposals() : [];
+    var budgetProps = props.filter(function (p) { return /^budget-/.test(p.id); });
+    /* Order is the whole of the adviser's intelligence: budgets that do not
+       describe what you spend are corrected first, and only then is a promise
+       asked to move. Saying so is what stops this page reading as though the
+       goals were the problem — and it is one fact about the month, so it is
+       said once above them rather than repeated inside every card. */
+    if (budgetProps.length) {
+      html += '<p class="hint" style="margin:0 0.35rem 0.9rem">' +
+        budgetProps.length + (budgetProps.length === 1 ? " budget does" : " budgets do") +
+        " not describe what you actually spend. Those get corrected before anything you are " +
+        "saving for is asked to move, because they change what the month leaves. " +
+        '<button class="linkbtn" data-act="plan-tab" data-id="budgets">Open Budgets</button></p>';
+    }
+
     html += '<div class="stack">';
     state.goals.forEach(function (g) {
       var target = num(g.target), saved = goalSaved(g);
@@ -8408,6 +8496,10 @@
       var pct = target > 0 ? saved / target : 0;
       var left = Math.max(target - saved, 0);
       var done = left <= 0.005;
+      // the adviser's proposals for THIS goal — it names them by the goal's id
+      var mine = props.filter(function (p) {
+        return /^goal-/.test(p.id) && p.id.slice(-g.id.length) === g.id;
+      });
 
       var needLine, tone = "mute";
       var gn = goalNeed(g);
@@ -8417,13 +8509,26 @@
         else {
           var need = gn.need;
           var ok = pace >= need;
+          /* Two honest answers to "does this fit", and they can disagree:
+             `pace` is what you actually kept over three months, while the
+             adviser reads what the month leaves once the plan is paid. Left
+             alone this card said "your recent pace covers it" eight lines
+             above a proposal to move the goal because it does not. So when
+             the adviser has something to say about this goal, the pace is
+             named as what it is — behaviour, not the plan — and the line
+             points at the answer below rather than contradicting it. Green
+             means a healthy state and nothing else, so the tone goes with it. */
+          var contested = ok && mine.length > 0;
           needLine = "Needs <b>" + fmt(need, { round: true }) + "/mo</b> to land by " + esc(g.due) +
             (pace > 0
-              ? ok ? " — your recent pace of " + fmt(pace, { round: true }) + "/mo covers it."
-                   : " — you're currently keeping " + fmt(pace, { round: true }) + "/mo, so this is short by " +
-                     fmt(need - pace, { round: true }) + "/mo."
+              ? contested
+                ? " — you have been keeping " + fmt(pace, { round: true }) + "/mo, which covers it, but " +
+                  "the month as planned leaves less than that."
+                : ok ? " — your recent pace of " + fmt(pace, { round: true }) + "/mo covers it."
+                     : " — you're currently keeping " + fmt(pace, { round: true }) + "/mo, so this is short by " +
+                       fmt(need - pace, { round: true }) + "/mo."
               : ".");
-          tone = pace > 0 ? (ok ? "ok" : "warn") : "mute";
+          tone = pace > 0 ? (contested ? "warn" : ok ? "ok" : "warn") : "mute";
         }
       } else if (pace > 0) {
         needLine = "At your recent pace of " + fmt(pace, { round: true }) + "/mo you'd get there in about <b>" +
@@ -8444,13 +8549,21 @@
         '<span style="color:var(--faint);font-size:0.85rem">of ' + fmt(target) + "</span>" +
         '<span style="margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums">' + Math.round(pct * 100) + "%</span></div>" +
         meter(pct, done ? "var(--gain)" : "var(--c3)") +
-        '<p style="font-size:0.85rem;color:var(--dim);line-height:1.55;margin:0.7rem 0 0">' + needLine + "</p>" +
+        /* `tone` was computed on all four branches here and read by nothing,
+           so a goal past its date and a goal comfortably on pace printed in
+           the same grey. Green is only ever a healthy state, which is why
+           "covers it" is the one branch that gets it. */
+        '<p class="goal-need" style="color:var(--' +
+        (tone === "ok" ? "calm" : tone === "warn" ? "warn" : tone === "bad" ? "alert" : "dim") +
+        ')">' + needLine + "</p>" +
         '<div class="btn-row" style="margin-top:0.85rem">' +
         (held
           ? '<span class="hint">follows ' + esc(held) + '</span>'
           : '<button class="btn sm primary" data-act="goal-fund" data-id="' + g.id + '">Add funds</button>' +
             (saved > 0 ? '<button class="btn sm" data-act="goal-withdraw" data-id="' + g.id + '">Take out</button>' : "")) +
-        "</div></div></div>";
+        "</div>" +
+        (done ? "" : goalAdviceBlock(g, m, mine)) +
+        "</div></div>";
     });
     html += "</div>";
     return html;
