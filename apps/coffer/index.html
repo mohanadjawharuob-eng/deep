@@ -90,6 +90,17 @@
     --c5: #7a5c78; --c6: #3f6b6b; --c7: #6b6f4a; --c8: #99553d;
     --grid: rgba(27, 26, 23, 0.08);
 
+    /* One type ramp. The app had eleven distinct sizes between 0.66rem and
+       0.86rem, chosen a card at a time; five is enough and makes two screens
+       built months apart look like one app. */
+    --fs-xs: 0.72rem;   /* captions, sub-lines under a figure */
+    --fs-sm: 0.82rem;   /* row titles, body inside a card */
+    --fs-md: 0.92rem;   /* a lead sentence */
+    --fs-lg: 1.08rem;   /* a card heading */
+    /* One press feel. Almost nothing reacted to a tap before, which is most of
+       why the app read as stiff rather than as smooth. */
+    --t: 120ms ease;
+
     --serif: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", serif;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color-scheme: light;
@@ -838,7 +849,7 @@
      and this is a signpost, not a screen. */
   .advice-strip {
     display: flex; align-items: center; gap: 0.5rem; width: 100%;
-    margin-top: 0.9rem; padding: 0.7rem 0.85rem; text-align: left;
+    margin: 0 0 0.75rem; padding: 0.7rem 0.85rem; text-align: left;
     background: var(--tint); border: 1px solid var(--rule); border-radius: 14px;
     color: inherit; font: inherit; cursor: pointer;
   }
@@ -874,6 +885,134 @@
   .advice-title { font-size: 0.92rem; font-weight: 600; line-height: 1.3; margin: 0; }
   .advice-why { font-size: 0.76rem; color: var(--dim); line-height: 1.5; margin: 0.35rem 0 0; }
   .advice-then { font-size: 0.76rem; color: var(--ink); line-height: 1.5; margin: 0.3rem 0 0; }
+
+  /* One tap: a picture you hit without reading, four to a row. */
+  .taps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; margin-top: 0.7rem; }
+  .tapbtn {
+    display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+    background: var(--tint); border: 0; border-radius: 16px;
+    padding: 0.6rem 0.3rem 0.5rem; cursor: pointer; color: inherit; font: inherit;
+    min-width: 0; transition: background var(--t), transform var(--t);
+  }
+  .tapbtn:active { transform: scale(0.94); }
+  .tap-ico { display: inline-flex; }
+  .tap-ico svg { width: 20px; height: 20px; }
+  .tap-name {
+    font-size: var(--fs-xs); font-weight: 700; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tap-amt {
+    font-family: var(--serif); font-size: 0.7rem; color: var(--dim);
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* ---------------- Home ----------------
+     The gear: Settings is not a tab any more, so it needs a real target here,
+     not a glyph tucked into a line of text. */
+  /* ---------------- the press pass ----------------
+     Every tappable thing gets the same short transition and the same small
+     give. Applied in one place rather than per component, so nothing is
+     missed and nothing invents its own timing. */
+  .btn, .pill, .ibtn, .chip, .subnav button, .tab,
+  .afford-row, .advice-strip, .today-row, .stand-cell, .gearbtn, .tappable {
+    transition: background var(--t), color var(--t), border-color var(--t),
+                opacity var(--t), transform var(--t);
+  }
+  .btn:active, .pill:active, .ibtn:active, .subnav button:active,
+  .afford-row:active, .advice-strip:active, .gearbtn:active { transform: scale(0.96); }
+  .tab:active { transform: scale(0.92); }
+  .card.tappable:active, .today-row:active, .stand-cell:active { transform: scale(0.985); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+    .btn:active, .pill:active, .ibtn:active, .subnav button:active, .tab:active,
+    .afford-row:active, .advice-strip:active, .card.tappable:active,
+    .today-row:active, .stand-cell:active, .gearbtn:active { transform: none; }
+  }
+
+  .gearbtn {
+    width: 34px; height: 34px; border-radius: 999px; border: 0;
+    background: var(--tint); color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background var(--t), transform var(--t);
+  }
+  .gearbtn:active { transform: scale(0.94); }
+
+  /* Net worth and the runway side by side. Each was a full-width block saying
+     one figure; together they are the answer Home exists to give. */
+  .stand { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
+  .stand-cell {
+    text-align: left; border: 1px solid var(--rule); font: inherit; color: inherit;
+    cursor: pointer; display: flex; flex-direction: column; min-width: 0;
+    transition: background var(--t), transform var(--t);
+  }
+  .stand-cell:active { transform: scale(0.985); background: var(--tint); }
+  .stand-fig {
+    font-family: var(--serif); font-weight: 600; font-size: 1.45rem;
+    letter-spacing: -0.02em; line-height: 1.05; margin-top: 0.4rem;
+  }
+  .stand-fig.loss { color: var(--alert); }
+  .stand-gauge { margin-top: 0.35rem; }
+  .stand-gauge svg { width: 54px; height: auto; }
+  .stand-sub { font-size: var(--fs-xs); color: var(--dim); line-height: 1.35; margin-top: 0.3rem; }
+  .stand-sub.warn { color: var(--warn); }
+  .stand-sub.alert { color: var(--alert); }
+
+  /* What today's figure is made of, tappable to correct. */
+  .today-list { display: flex; flex-direction: column; margin-top: 0.75rem; }
+  .today-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 0.6rem;
+    align-items: baseline; width: 100%; text-align: left; font: inherit; color: inherit;
+    background: transparent; border: 0; border-top: 1px solid var(--rule);
+    padding: 0.5rem 0; cursor: pointer;
+  }
+  .today-row:active { background: var(--tint); }
+  /* every cell placed explicitly — left to auto-placement the figure landed in
+     column one and the name wrapped to a second row of its own */
+  .today-name {
+    grid-area: 1 / 1; font-size: var(--fs-sm); font-weight: 600;
+    min-width: 0; overflow-wrap: anywhere;
+  }
+  .today-fig {
+    grid-area: 1 / 2; font-family: var(--serif); font-weight: 400;
+    font-size: 0.95rem; white-space: nowrap; text-align: right;
+  }
+  .today-cat { grid-area: 2 / 1; font-size: var(--fs-xs); color: var(--faint); margin-top: 0.1rem; }
+  .today-fig.in { color: var(--calm); }
+  .today-more {
+    border: 0; background: transparent; color: var(--dim); font: inherit;
+    font-size: var(--fs-xs); text-align: left; padding: 0.5rem 0 0; cursor: pointer;
+  }
+
+  /* Pending: bills about to leave and money about to come back, one card. */
+  .pend-list { display: flex; flex-direction: column; margin-top: 0.7rem; }
+  .pend-row {
+    display: flex; align-items: center; gap: 0.6rem;
+    border-top: 1px solid var(--rule); padding: 0.55rem 0;
+  }
+  .pend-row:first-child { border-top: 0; }
+  .pend-main { min-width: 0; display: flex; flex-direction: column; }
+  .pend-name { font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
+  .pend-sub { font-size: var(--fs-xs); color: var(--faint); margin-top: 0.1rem; }
+  .pend-sub.warn { color: var(--warn); }
+  .pend-fig {
+    margin-left: auto; font-family: var(--serif); font-weight: 400;
+    font-size: 0.95rem; white-space: nowrap;
+  }
+  .pend-fig.back { color: var(--calm); }
+  /* Icon only — the label lives in title and aria-label, not in ink. */
+  .ibtn.settle {
+    width: 28px; height: 28px; flex: none; border-radius: 999px;
+    background: var(--ac); color: var(--onac); border: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform var(--t), opacity var(--t);
+  }
+  .ibtn.settle svg { width: 13px; height: 13px; }
+  .ibtn.settle:active { transform: scale(0.9); }
 
   .afford-alarm {
     display: flex; align-items: baseline; gap: 0.45rem;
@@ -1157,7 +1296,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-08b";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-09a";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -1195,19 +1334,22 @@
       'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + "</svg>";
   }
   var TABS = [
-    { id: "today", label: "Today",
+    { id: "today", label: "Home",
       ico: ico('<path d="M3 14.6h14"/><path d="M6.2 14.6a3.8 3.8 0 0 1 7.6 0"/><path d="M10 4.4v1.7"/><path d="M4.9 6.5 6 7.6"/><path d="M15.1 6.5 14 7.6"/>') },
     { id: "ledger", label: "Ledger",
       ico: ico('<rect x="4.8" y="3.2" width="10.4" height="13.6" rx="2.4"/><path d="M7.7 3.2v13.6"/><path d="M9.9 7.1h3.3"/><path d="M9.9 10h3.3"/><path d="M9.9 12.9h2.1"/>') },
-    { id: "plan", label: "Plan",
+    { id: "plan", label: "Horizon",
       ico: ico('<path d="M3.6 7.2 10 3.6l6.4 3.6v6.6a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2z"/><path d="M3.6 7.2 10 10.8l6.4-3.6"/>') },
     { id: "worth", label: "Worth",
       ico: ico('<ellipse cx="10" cy="6" rx="5.6" ry="2.4"/><path d="M4.4 6v4c0 1.33 2.51 2.4 5.6 2.4s5.6-1.07 5.6-2.4V6"/><path d="M4.4 10v3.2c0 1.33 2.51 2.4 5.6 2.4s5.6-1.07 5.6-2.4V10"/>') },
     { id: "insights", label: "Insights",
       ico: ico('<circle cx="8.9" cy="8.9" r="4.9"/><path d="M12.6 12.6 16.4 16.4"/>') },
-    { id: "settings", label: "Settings",
-      ico: ico('<path d="M3.4 7h13"/><path d="M3.4 13h13"/><circle cx="7.6" cy="7" r="2"/><circle cx="12.4" cy="13" r="2"/>') }
   ];
+
+  /* Settings is not a tab. It is opened a few times a year and was holding a
+     sixth of the bottom bar; the freed slot is what let Horizon exist and the
+     eight sub-tabs become pages. It lives on a gear in Home's header. */
+  var GEAR_ICO = ico('<path d="M3.4 7h13"/><path d="M3.4 13h13"/><circle cx="7.6" cy="7" r="2"/><circle cx="12.4" cy="13" r="2"/>');
 
   /* ---------------- small utilities ---------------- */
 
@@ -4962,19 +5104,31 @@
         ? '<p class="pair-sub" style="margin-top:0.6rem">' + fmt(todayIn) + " came in today as well.</p>"
         : "") +
 
-      (todayTx.length
-        ? '<div class="rows" style="margin-top:0.7rem">' + todayTx.slice(0, 4).map(function (t) {
-            return '<div class="row"><div class="row-main">' +
-              '<div class="row-title">' + esc(t.desc || t.category) + "</div>" +
-              '<div class="row-sub">' + esc(t.category) + "</div></div>" +
-              '<span class="row-fig">' + (t.type === "income" ? "+" : "−") +
-              fmt(txBase(t)).replace("-", "") + "</span></div>";
-          }).join("") + "</div>" +
-          (todayTx.length > 4
-            ? '<div class="btn-row" style="margin-top:0.7rem"><button class="btn sm quiet" data-tab="ledger">' +
-              "See all " + todayTx.length + "</button></div>"
-            : "")
-        : "") + "</div>";
+      /* What the figure is made of. A total on its own is half an answer —
+         you cannot correct a mistyped taxi from a number, and the entries
+         were only reachable by leaving the screen. */
+      (todayTx.filter(function (t) { return t.type === "expense"; }).length
+        ? '<div class="today-list">' + todayTx
+            .filter(function (t) { return t.type === "expense"; })
+            .sort(function (a, b) { return String(b.id).localeCompare(String(a.id)); })
+            .slice(0, 5)
+            .map(function (t) {
+              return '<button class="today-row" data-act="tx-edit" data-id="' + t.id + '">' +
+                '<span class="today-name">' + esc(t.desc || t.category) + "</span>" +
+                '<span class="fig today-fig">' + fmt(txBase(t), { round: true }) + "</span>" +
+                '<span class="today-cat">' + esc(t.category) +
+                (isPending(t) ? " \u00b7 owed back" : t.oneOff ? " \u00b7 one-off" : "") +
+                "</span></button>";
+            }).join("") +
+          (todayTx.filter(function (t) { return t.type === "expense"; }).length > 5
+            ? '<button class="today-more" data-tab="ledger">the rest of today \u2192</button>'
+            : "") + "</div>"
+        : "") +
+
+      /* The day used to be listed twice over once the tappable list above
+         landed — this block was the older one: every entry type including
+         transfers, and nothing you could tap to fix. */
+      "</div>";
   }
 
   function monthTilesCard() {
@@ -5068,36 +5222,8 @@
       "</span></button>";
   }
 
-  function owedBackCard() {
-    var owed = pendingRefunds();
-    if (!owed.length) return "";
-    var total = owed.reduce(function (t, x) { return t + txBase(x); }, 0);
-
-    return '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Owed back to you</h3>' +
-      '<span class="sub">' + owed.length + (owed.length === 1 ? " thing" : " things") + " · " +
-      fmt(total, { round: true }) + " out</span></div>" +
-      '<div class="card-body flush"><div class="rows">' +
-      owed.slice()
-        .sort(function (a, b) { return a.date.localeCompare(b.date); })
-        .map(function (t) {
-          var age = Math.max(0, Math.round((parseISO(today()) - parseISO(t.date)) / 86400000));
-          return '<div class="row stacked">' +
-            '<div class="stack-top">' +
-            '<span class="row-title">' + esc(t.desc || t.category) + "</span>" +
-            '<span class="row-fig">' + fmt(txBase(t)) +
-            (isForeign(t.currency) ? '<span class="fx">' + esc(fmtIn(t.amount, t.currency)) + "</span>" : "") +
-            "</span></div>" +
-            '<div class="stack-foot">' +
-            '<span class="row-sub">' + esc(t.category) + " · " + esc(accountName(t.accountId, t.pocketId)) +
-            " · paid " + esc(t.date) + "</span>" +
-            (age >= 30 ? '<span class="pill warn">' + age + " days</span>" : "") +
-            '<button class="btn sm primary" data-act="tx-settle" data-id="' + t.id + '">Money came back</button>' +
-            "</div></div>";
-        }).join("") + "</div>" +
-      '<p class="hint" style="padding:0.75rem">This is money that has left your accounts but is not counted ' +
-      "as spending, so it is out of your burn rate and your runway. Mark each one when it comes back.</p>" +
-      "</div></div>";
-  }
+  /* owedBackCard lived here. pendingCard() shows the same refundables beside
+     the bills that have not left yet, and carries the same tx-settle button. */
 
   /* ---- Today, to the design ------------------------------------------
      Date line · net worth · runway · the burn pair · three small tiles ·
@@ -5131,15 +5257,9 @@
         : "all of it was running cost this month") + "</p></div>";
   }
 
-  function threeTiles() {
-    var cur = monthSummary(viewMonth);
-    function tile(lab, val) {
-      return '<div class="card tile-sm"><span class="label">' + esc(lab) + "</span>" +
-        '<div class="tile-fig">' + fmt(val, { round: true }) + "</div></div>";
-    }
-    return '<div class="triple">' + tile("In", cur.income) + tile("Kept", cur.net) +
-      tile("Reachable", freeAssets()) + "</div>";
-  }
+  /* threeTiles lived here. Insights shows the same three figures over a
+     typical month, and Home now answers the day rather than the month, so it
+     was two copies of one card rather than a block that lost its home. */
 
   // The one-tap buttons: things paid often at no fixed time. They belong on the
   // screen you open, next to the day they affect.
@@ -5149,6 +5269,46 @@
       '<span class="label">One tap</span>' +
       '<button class="btn sm quiet" data-act="quick-manage">Manage</button></div>' +
       '<div style="margin-top:0.7rem">' + quickChipsHtml() + "</div></div>";
+  }
+
+  /* Two lists that were separate blocks on Today and are one question: what
+     is not settled. Bills inside a week are money about to leave; a refundable
+     is money about to come back. Each row carries the act that settles it. */
+  function pendingCard() {
+    var up = upcomingBills(7).filter(function (r) { return r.type !== "income"; });
+    var owed = pendingRefunds().slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+    if (!up.length && !owed.length) return "";
+    var free = freeAssets(), running = 0;
+
+    var rows = up.slice(0, 4).map(function (r) {
+      var amt = toBase(r.amount, r.currency, r.rate);
+      running += amt;
+      var tight = running > free;
+      return '<div class="pend-row"><div class="pend-main">' +
+        '<span class="pend-name">' + esc(r.name) + "</span>" +
+        '<span class="pend-sub' + (tight ? " warn" : "") + '">' + esc(shortDate(r.nextDate)) + "</span>" +
+        "</div>" +
+        '<span class="fig pend-fig">' + fmt(amt, { round: true }) + "</span></div>";
+    }).join("");
+
+    rows += owed.slice(0, 4).map(function (t) {
+      var age = Math.max(0, Math.round((parseISO(today()) - parseISO(t.date)) / 86400000));
+      return '<div class="pend-row"><div class="pend-main">' +
+        '<span class="pend-name">' + esc(t.desc || t.category) + "</span>" +
+        '<span class="pend-sub' + (age >= 30 ? " warn" : "") + '">owed back \u00b7 ' + age +
+        " day" + (age === 1 ? "" : "s") + "</span></div>" +
+        '<span class="fig pend-fig back">+' + fmt(txBase(t), { round: true }) + "</span>" +
+        '<button class="ibtn settle" data-act="tx-settle" data-id="' + t.id + '" ' +
+        'title="Money came back" aria-label="Money came back for ' + esc(t.desc || t.category) + '">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+        'stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' +
+        "</button></div>";
+    }).join("");
+
+    return '<div class="card pad"><div class="card-tophead">' +
+      '<span class="label">Pending</span>' +
+      '<span class="sub">nothing settled yet</span></div>' +
+      '<div class="pend-list">' + rows + "</div></div>";
   }
 
   function upcomingCard() {
@@ -5211,9 +5371,13 @@
       }).join("") + "</div></div></div>";
   }
 
-  function renderToday() {
+  /* Home answers "what did I spend today, and what do I log" — so it opens on
+     the day and closes on the month, rather than the other way round. It had
+     grown to ten blocks, six of which were another tab's card shown in full;
+     those are signposts or gone. */
+  function renderHome() {
     if (!state.accounts.length && !state.transactions.length) {
-      return pageHead("Today", "Log what you spend, and see where the month is going.") + firstRunCard();
+      return homeHead() + firstRunCard();
     }
 
     var assets = totalAssets(), debt = totalDebt(), net = netWorth();
@@ -5223,32 +5387,49 @@
     var nowValue = totalAssets(asOf) - debt - restrictedTotal(asOf);
     var moved = nowValue - startOfMonth;
 
-    var html = '<div class="dateline">' +
-      '<span>' + esc(new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })) + "</span>" +
-      monthStepper() + "</div>";
+    var moveWords = Math.abs(moved) < 0.005
+      ? "level so far in " + esc(monthName(viewMonth, true))
+      : (moved > 0 ? "up " : "down ") + fmt(Math.abs(moved), { round: true }) +
+        " in " + esc(monthName(viewMonth, true));
 
-    // net worth, plainly, first — it is what people open the app to see
-    html += '<div class="hero-plain">' +
-      '<span class="label">Net worth</span>' +
-      '<div class="hero-fig' + (net < 0 ? " loss" : "") + '">' + fmt(net) + "</div>" +
-      '<p class="band-sub">' +
-      (Math.abs(moved) < 0.005
-        ? "level so far in " + esc(monthName(viewMonth, true))
-        : (moved > 0 ? "up " : "down ") + fmt(Math.abs(moved), { round: true }) + " in " + esc(monthName(viewMonth, true))) +
-      (debt > 0 ? " · after " + fmt(debt, { round: true }) + " owed" : "") + "</p></div>";
-
-    html += runwayBand();
-    html += adviceStrip();
-    html += burnCard();
-    html += threeTiles();
-    html += todayCard();
-    html += quickCard();
-    html += upcomingCard();
-    html += noticesBlock();
-    // last, because it is a list of things to chase rather than something to
-    // read every time you open the app
-    html += owedBackCard();
+    var html = homeHead();
+    html += todayCard();          // 1 · the day, and what it went on
+    html += standRow(net, moveWords, debt);   // 2 · where you stand, as two tiles
+    html += adviceStrip();        // a signpost, when there is something to say
+    html += quickCard();          // 3 · the two taps you came for
+    html += pendingCard();        // 4 · what has not settled
+    html += burnCard();           // 5 · the month, last
     return html;
+  }
+
+  function homeHead() {
+    return '<div class="dateline">' +
+      '<span>' + esc(new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })) +
+      "</span>" +
+      '<span style="display:flex;align-items:center;gap:0.35rem">' + monthStepper() +
+      '<button class="gearbtn" data-tab="settings" aria-label="Settings" title="Settings">' +
+      GEAR_ICO + "</button></span></div>";
+  }
+
+  /* Net worth and the runway, side by side. Both were full-width blocks that
+     said one figure each; neither needs the whole screen, and seeing them
+     together is the answer to "how am I doing" that Home is actually for. */
+  function standRow(net, moveWords, debt) {
+    var rw = runway();
+    var m = rw.months;
+    var tone = m == null ? "dim" : m < floorMonths() ? "alert" : m < 6 ? "warn" : "calm";
+    return '<div class="stand">' +
+      '<button class="card pad stand-cell" data-tab="worth" aria-label="Net worth — open Worth">' +
+      '<span class="label">Net worth</span>' +
+      '<div class="fig stand-fig' + (net < 0 ? " loss" : "") + '">' + fmt(net, { round: true }) + "</div>" +
+      '<div class="stand-sub">' + moveWords +
+      (debt > 0 ? " · after " + fmt(debt, { round: true }) + " owed" : "") + "</div></button>" +
+      '<button class="card pad stand-cell" data-act="plan-tab" data-id="outlook" ' +
+      'aria-label="Runway — see the months ahead">' +
+      '<span class="label">Runway</span>' +
+      '<div class="stand-gauge">' + runwayGauge(m) + "</div>" +
+      '<div class="stand-sub' + (tone === "calm" ? "" : " " + tone) + '">' +
+      (m == null ? "log a few weeks" : "months of cover") + "</div></button></div>";
   }
 
   /* Worth, in the Press idiom: one card per account, the three-way split
@@ -7530,8 +7711,12 @@
 
 
   function billsBody() {
+    /* The fortnight of bills used to be a block on Home. It is the same list
+       Bills already exists to show, so it moved here rather than being
+       deleted; Home keeps only the seven days that have not settled. */
     var load = recurringMonthlyLoad();
-    var html = recurCard("expense", "Bills and subscriptions",
+    var html = upcomingCard();
+    html += recurCard("expense", "Bills and subscriptions",
       "Nothing scheduled. <strong>Add rent, subscriptions and bills</strong> — Coffer counts the monthly cost, " +
       "warns you before each is due, and logs it to the ledger when you mark it paid.", load.expense, "mute");
 
@@ -8201,6 +8386,9 @@
       html += '<div class="btn-row" style="margin-bottom:0.9rem">' +
         '<button class="btn sm primary" data-act="report-write">Write a report</button></div>';
     }
+    /* What changed, first — it was the ninth block on Home and the fifth here,
+       and this is the tab whose question it answers. */
+    html += noticesBlock();
 
     if (state.transactions.length < 2) {
       return html + '<div class="card pad"><p class="empty" style="margin:0;padding:0">' +
@@ -8634,20 +8822,54 @@
     });
   }
 
+  /* One-tap buttons are the thing you hit without reading, so they get a
+     picture rather than a coloured dot and a word. Drawn from the same 20px
+     stroke grid as the tab bar, so nothing here is a new visual language. */
+  var QUICK_ICONS = {
+    coffee: '<path d="M3.5 6.5h9v4.5a3.5 3.5 0 0 1-3.5 3.5H7a3.5 3.5 0 0 1-3.5-3.5z"/><path d="M12.5 7.5h1.8a2 2 0 0 1 0 4h-1.8"/><path d="M6 3v1.5M9 3v1.5"/>',
+    taxi:   '<path d="M3 12.5h14M5 12.5v1.7M15 12.5v1.7"/><path d="M3.6 12.5l1.3-3.6A1.7 1.7 0 0 1 6.5 7.8h7a1.7 1.7 0 0 1 1.6 1.1l1.3 3.6"/><path d="M8 5.4h4"/>',
+    food:   '<path d="M4.5 3v6a1.7 1.7 0 0 0 3.4 0V3"/><path d="M6.2 9v8"/><path d="M13.5 3c-1.2 0-2 1.6-2 3.7s.8 3 2 3 2-.9 2-3S14.7 3 13.5 3z"/><path d="M13.5 9.7V17"/>',
+    shop:   '<path d="M3.5 6.5h13l-1 9.5a1 1 0 0 1-1 .9H5.5a1 1 0 0 1-1-.9z"/><path d="M7 6.5a3 3 0 0 1 6 0"/>',
+    phone:  '<rect x="6" y="2.5" width="8" height="15" rx="1.8"/><path d="M9 15h2"/>',
+    fuel:   '<path d="M4 17V4.5a1.5 1.5 0 0 1 1.5-1.5h4A1.5 1.5 0 0 1 11 4.5V17"/><path d="M3 17h9"/><path d="M11 7.5h2.5a1.5 1.5 0 0 1 1.5 1.5v4a1.3 1.3 0 0 0 2.6 0V8"/>',
+    home:   '<path d="M3.5 8.5 10 3.5l6.5 5V16a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z"/><path d="M8 17v-5h4v5"/>',
+    health: '<path d="M10 16.5S3.5 12.8 3.5 8.2A3.7 3.7 0 0 1 10 5.9a3.7 3.7 0 0 1 6.5 2.3c0 4.6-6.5 8.3-6.5 8.3z"/>',
+    gift:   '<rect x="3.5" y="8" width="13" height="8.5" rx="1"/><path d="M3.5 11.5h13M10 8v8.5"/><path d="M10 8S8.8 5 7.2 5a1.6 1.6 0 0 0 0 3zm0 0s1.2-3 2.8-3a1.6 1.6 0 0 1 0 3z"/>',
+    wallet: '<rect x="3" y="5" width="14" height="10.5" rx="2"/><path d="M13.2 10.2h1.6"/><path d="M3 8.2h14"/>'
+  };
+  // guessed from the category, then the label, so an old button that never
+  // picked one still gets a picture rather than an empty square
+  function quickIcon(q) {
+    if (q.icon && QUICK_ICONS[q.icon]) return ico(QUICK_ICONS[q.icon]);
+    var s = ((q.category || "") + " " + (q.label || "")).toLowerCase();
+    var guess =
+      /coffee|caf|tea/.test(s) ? "coffee" :
+      /taxi|transport|bus|ride/.test(s) ? "taxi" :
+      /fuel|petrol|diesel|gas/.test(s) ? "fuel" :
+      /groc|food|dining|eat|restaur|bread/.test(s) ? "food" :
+      /shop|corner|market|household/.test(s) ? "shop" :
+      /phone|top.?up|internet|mobile/.test(s) ? "phone" :
+      /rent|housing|home/.test(s) ? "home" :
+      /health|pharm|doctor|medic/.test(s) ? "health" :
+      /gift|present/.test(s) ? "gift" : "wallet";
+    return ico(QUICK_ICONS[guess]);
+  }
+
   function quickChipsHtml() {
     if (!state.quick.length) {
       return '<p class="hint" style="margin:0">No one-tap buttons yet. Good for anything you pay often at no fixed time — ' +
         "a taxi, a coffee, the corner shop.</p>";
     }
-    return '<div class="chips">' + state.quick.map(function (q) {
+    return '<div class="taps">' + state.quick.map(function (q) {
       var amt = num(q.amount);
-      return '<button class="chip quick" data-act="quick-log" data-id="' + q.id + '" ' +
+      return '<button class="tapbtn" data-act="quick-log" data-id="' + q.id + '" ' +
         'title="' + esc(q.label + " · " + q.category +
           (amt > 0 ? " · " + (isForeign(q.currency) ? fmtIn(amt, q.currency) : fmt(amt)) : " · asks for the amount")) + '">' +
-        '<span class="cat-dot" style="background:' + catColor(q.category) + '"></span>' +
-        "<b>" + esc(q.label) + "</b>" +
-        '<span style="color:var(--faint);font-variant-numeric:tabular-nums">' +
-        (amt > 0 ? fmt(amt, { round: true }) : "…") + "</span></button>";
+        '<span class="tap-ico" style="color:' + catColor(q.category) + '">' + quickIcon(q) + "</span>" +
+        '<span class="tap-name">' + esc(q.label) + "</span>" +
+        '<span class="tap-amt">' +
+        (amt > 0 ? (isForeign(q.currency) ? esc(fmtIn(amt, q.currency)) : fmt(amt, { round: true })) : "asks") +
+        "</span></button>";
     }).join("") + "</div>";
   }
 
@@ -11555,6 +11777,11 @@
           { key: "type", label: "Type", type: "select", options: ["expense", "income"], value: "expense" },
           { key: "category", label: "Category", type: "select", options: allCats, catKind: "auto" },
           { key: "accountId", label: "Account", type: "select", options: accountOptions() },
+          { key: "icon", label: "Icon", type: "select",
+            options: [{ value: "", label: "— guess from the category —" }].concat(
+              Object.keys(QUICK_ICONS).map(function (k) {
+                return { value: k, label: k.charAt(0).toUpperCase() + k.slice(1) };
+              })), value: "" },
           { key: "amount", label: "Amount", type: "number", placeholder: "leave blank to ask", min: 0 }
         ].concat(currencyField()),
         confirmLabel: "Add button",
@@ -11564,7 +11791,8 @@
             id: uid(), label: v.label.trim(), category: v.category, type: v.type,
             accountId: parseRef(v.accountId).accountId, pocketId: parseRef(v.accountId).pocketId,
             amount: v.amount > 0 ? v.amount : 0,
-            currency: v.currency || baseCode()
+            currency: v.currency || baseCode(),
+            icon: v.icon || null
           });
           save(); render();
           toast(v.label.trim() + " added.");
@@ -12385,7 +12613,7 @@
     resetMemo();
     renderNav();
     var html;
-    if (view === "today") html = renderToday();
+    if (view === "today") html = renderHome();
     else if (view === "ledger") html = renderLedger();
     else if (view === "plan") html = renderPlanTab();
     else if (view === "worth") html = renderWorth();
