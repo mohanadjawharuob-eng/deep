@@ -789,6 +789,56 @@
   .runway-band { display: flex; gap: 1rem; align-items: center; }
   .lead { font-size: 0.88rem; font-weight: 600; line-height: 1.35; margin: 0.45rem 0 0; }
   .band-sub { font-size: 0.72rem; color: var(--dim); margin: 0.4rem 0 0; line-height: 1.4; }
+  .band-sub.emph { color: var(--ink); }
+
+  /* ---- Horizon: two lead cards and a grid of pages ---------------------
+     The hub answers "where does the money go from here" and "what would you
+     change", then hands you the five pages that hold the detail. Every hub
+     card is the same size: a bigger one reads as a more important page, and
+     these are equal questions. */
+  .lead-card {
+    display: block; width: 100%; text-align: left;
+    border: 0; font: inherit; color: inherit;
+  }
+  .lead-card.static { cursor: default; }
+  .lead-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+  .lead-go { color: var(--faint); font-size: 1.1rem; line-height: 1; }
+  .lead-count { font-size: var(--fs-xs); color: var(--dim); }
+  .lead-card .lead.calm { color: var(--calm); }
+  .lead-card .lead.warn { color: var(--warn); }
+  .lead-chart { margin-top: 0.7rem; }
+  .lead-card .btn-row { flex-wrap: wrap; }
+
+  .hub { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 1rem; }
+  .hub-card {
+    /* one height for every card, whatever its sub-line says */
+    min-height: 108px;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+    padding: 0.85rem 0.9rem; text-align: left; border: 0; font: inherit; color: inherit;
+  }
+  .hub-ico { color: var(--faint); display: block; margin-bottom: auto; }
+  .hub-name { font-size: var(--fs-md); font-weight: 650; line-height: 1.2; }
+  .hub-sub {
+    font-size: var(--fs-xs); color: var(--dim); line-height: 1.3;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hub-card:active { transform: scale(0.985); background: var(--tint); }
+  .hub-card:hover .hub-ico { color: var(--ac); }
+
+  /* a page opened from the hub says where it is and how to get back; there is
+     no sub-nav left to show you either */
+  .backbtn {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    font-size: var(--fs-xs); font-weight: 600; color: var(--dim);
+    padding: 0.2rem 0.5rem 0.2rem 0; margin-bottom: 0.1rem;
+    border: 0; background: none;
+  }
+  .backbtn:hover { color: var(--ac); }
+  .linkbtn {
+    border: 0; background: none; padding: 0; font: inherit;
+    color: var(--ac); font-weight: 600; text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 
   .card.pad { padding: 1rem 1.15rem; margin-bottom: 0.75rem; }
   .card-tophead { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
@@ -914,14 +964,16 @@
      give. Applied in one place rather than per component, so nothing is
      missed and nothing invents its own timing. */
   .btn, .pill, .ibtn, .chip, .subnav button, .tab,
-  .afford-row, .advice-strip, .today-row, .stand-cell, .gearbtn, .tappable {
+  .afford-row, .advice-strip, .today-row, .stand-cell, .gearbtn, .tappable,
+  .hub-card, .lead-card, .backbtn {
     transition: background var(--t), color var(--t), border-color var(--t),
                 opacity var(--t), transform var(--t);
   }
   .btn:active, .pill:active, .ibtn:active, .subnav button:active,
   .afford-row:active, .advice-strip:active, .gearbtn:active { transform: scale(0.96); }
   .tab:active { transform: scale(0.92); }
-  .card.tappable:active, .today-row:active, .stand-cell:active { transform: scale(0.985); }
+  .card.tappable:active, .today-row:active, .stand-cell:active,
+  .hub-card:active, .lead-card:not(.static):active { transform: scale(0.985); }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       transition-duration: 0.01ms !important;
@@ -931,7 +983,8 @@
     }
     .btn:active, .pill:active, .ibtn:active, .subnav button:active, .tab:active,
     .afford-row:active, .advice-strip:active, .card.tappable:active,
-    .today-row:active, .stand-cell:active, .gearbtn:active { transform: none; }
+    .today-row:active, .stand-cell:active, .gearbtn:active,
+    .hub-card:active, .lead-card:active { transform: none; }
   }
 
   .gearbtn {
@@ -1296,7 +1349,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-09a";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-09b";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -1432,7 +1485,9 @@
   function blank() {
     return {
       version: 2,
-      settings: { theme: "system", currency: "$", lock: null, base: "USD", rates: {} },
+      // grantMode is off by default: most ledgers never hold money that is
+      // not theirs, and a permanent page for it costs everyone a slot
+      settings: { theme: "system", currency: "$", lock: null, base: "USD", rates: {}, grantMode: false },
       photoIndex: {},
       categories: { expense: DEFAULT_CATS.expense.slice(), income: DEFAULT_CATS.income.slice() },
       accounts: [],
@@ -1450,6 +1505,10 @@
       // how many days were worked in a month, per income source with an
       // allowance — an input, not a balance
       allowanceDays: {},
+      /* Accounts removed for good but whose entries were kept: id -> the name
+         they were logged under. Without it every one of those rows reads
+         "(removed account)" and the history stops being history. */
+      forgotten: {},
       extraDebtPayment: 0
     };
   }
@@ -1510,7 +1569,7 @@
      Restoring a backup therefore dropped every grant and every recorded
      allowance day, silently. Anything added to the state shape goes here once. */
   var STATE_LISTS = ["accounts", "transactions", "goals", "debts", "recurring", "quick", "grants"];
-  var STATE_MAPS = ["budgets", "allowanceDays", "photoIndex"];
+  var STATE_MAPS = ["budgets", "allowanceDays", "photoIndex", "forgotten"];
 
   function adoptState(p) {
     var s = blank();
@@ -1531,6 +1590,10 @@
       // before the adviser, and an empty set is the right default anyway
       s.settings.adviceOff = (p.settings.adviceOff && typeof p.settings.adviceOff === "object")
         ? p.settings.adviceOff : {};
+      // absent from every backup written before grants became a mode; false is
+      // right there, because grantMode() reads a book that holds a grant as in
+      // the mode whether or not the setting says so
+      s.settings.grantMode = !!p.settings.grantMode;
     }
     if (p.categories) {
       if (Array.isArray(p.categories.expense) && p.categories.expense.length) s.categories.expense = p.categories.expense;
@@ -1567,9 +1630,11 @@
   // which group of the Plan tab is showing; an imported plan opens on its own
   // scoring, otherwise the budgets you are most likely to be setting up
   var planTab = null;
+  /* Horizon opens on its hub, always. It used to open on whichever sub-tab
+     seemed most likely, which meant the tab showed you a different screen
+     depending on state and nobody could learn where anything was. */
   function currentPlanTab() {
-    if (planTab) return planTab;
-    return state.plan ? "plan" : "budgets";
+    return planTab || "hub";
   }
   var LEDGER_PAGE = 60;
   var ledgerLimit = LEDGER_PAGE;
@@ -2169,7 +2234,11 @@
     }
     if (pocketId && memo.accName[id + "|" + pocketId]) return memo.accName[id + "|" + pocketId];
     var n = memo.accName[id];
-    return n == null ? "(removed account)" : n;
+    if (n != null) return n;
+    // removed for good, entries kept: it still answers to the name it was
+    // logged under, or the row it is on stops meaning anything
+    var gone = state.forgotten && state.forgotten[id];
+    return gone ? gone + " (removed)" : "(removed account)";
   }
 
   /* Effect of one transaction on one account. Both sides are added rather
@@ -4996,40 +5065,8 @@
       "</div></div>";
   }
 
-  function worthHero() {
-    var assets = totalAssets(), debt = totalDebt(), net = netWorth();
-    var histMonths = dataWindow(12, viewMonth);
-    var histPoints = histMonths.map(function (mk) {
-      var v = totalAssets(lastDayOf(mk));
-      return { label: monthName(mk), value: v, tip: monthName(mk, true) + "\n" + fmt(v) };
-    });
-    var monthStartAssets = totalAssets(lastDayOf(monthShift(viewMonth, -1)));
-    var assetsNow = totalAssets(viewMonth === thisMonth() ? null : lastDayOf(viewMonth));
-    var html = "";
-
-    html += '<div class="hero"><div class="hero-left">' +
-      '<span class="label">Net worth</span>' +
-      '<div class="hero-fig">' + fmt(net) + "</div>" +
-      '<div class="hero-delta">' + deltaBadge(assetsNow, monthStartAssets, { asMoney: true }) +
-      '<span style="color:var(--faint)">in ' + monthName(viewMonth, true) + "</span></div>" +
-      '<div class="hero-split">' +
-      '<div><span>Accounts</span><span class="fig">' + fmt(assets) + "</span></div>" +
-      (debt > 0 ? '<div><span>Debts</span><span class="fig" style="color:var(--loss)">−' + fmt(debt) + "</span></div>" : "") +
-      "</div></div>" +
-      '<div class="hero-right">' +
-      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.2rem">' +
-      '<span class="label">' + (histMonths.length >= 12
-        ? "Balance, last 12 months"
-        : "Balance since " + monthName(histMonths[0], true)) + "</span>" +
-      '<span class="hint">' + esc(fmtCompact(histPoints[0].value)) + " → " + esc(fmtCompact(histPoints[histPoints.length - 1].value)) + "</span></div>" +
-      areaChart(histPoints, { cssHeight: 132, height: 42, color: "var(--c3)", aria: "Balance over the last 12 months" }) +
-      '<div style="display:flex;justify-content:space-between;margin-top:0.25rem">' +
-      '<span class="hint">' + monthName(histMonths[0], true) + "</span>" +
-      '<span class="hint">' + monthName(histMonths[histMonths.length - 1], true) + "</span></div>" +
-      "</div></div>";
-
-    return html;
-  }
+  /* worthHero() lived here — the old Worth headline, a hero figure beside a
+     twelve-month chart. renderWorth() draws its own head now. */
 
   function todayCard() {
     var t0 = today();
@@ -5131,96 +5168,112 @@
       "</div>";
   }
 
-  function monthTilesCard() {
-    var cur = monthSummary(viewMonth), prev = monthSummary(monthShift(viewMonth, -1));
-    var rw = runway();
-    var html = "";
+  /* monthTilesCard() lived here: In / Out / Kept / Runway as four sparkline
+     tiles. Insights answers the month, and Home answers the day, so it was a
+     fifth copy of figures both of them already print. */
 
+  /* Where the money went, over a stretch of months you pick.
 
-    var sparkIn = dataWindow(6, viewMonth).map(function (mk) {
-      var s = monthSummary(mk);
-      return { label: monthName(mk), value: s.income, tip: monthName(mk, true) + "\n" + fmt(s.income) };
+     One month is the default because that is the question you ask most, and
+     the same card answers a year without becoming a different card. The two
+     copies of it ask different questions of the same maths: Insights asks it
+     of the month it is showing, and the Ledger asks it of a period, beside
+     the entries that make it up.
+
+     `spendByCategory` is per month and memoised, so a range is the sum of the
+     months in it. There is no second way of counting — a range that computed
+     its own categories would eventually disagree with the month. */
+  function spendOver(months) {
+    var out = {}, total = 0, live = 0;
+    months.forEach(function (mk) {
+      var by = spendByCategory(mk), any = false;
+      Object.keys(by).forEach(function (c) {
+        if (by[c] > 0) any = true;
+        out[c] = (out[c] || 0) + by[c];
+        total += by[c];
+      });
+      if (any) live++;
     });
-    var sparkOut = dataWindow(6, viewMonth).map(function (mk) {
-      var s = monthSummary(mk);
-      return { label: monthName(mk), value: s.expense, tip: monthName(mk, true) + "\n" + fmt(s.expense) };
-    });
-    var sparkNet = dataWindow(6, viewMonth).map(function (mk) {
-      var s = monthSummary(mk);
-      return { label: monthName(mk), value: s.net, tip: monthName(mk, true) + "\n" + fmt(s.net) };
-    });
-
-    html += '<div class="tiles" style="margin-top:1rem">' +
-      '<div class="tile"><span class="label">Money in</span><div class="tile-fig">' + fmt(cur.income, { round: true }) + "</div>" +
-      '<div class="tile-foot">' + deltaBadge(cur.income, prev.income) + " vs last month</div>" +
-      '<div class="spark">' + sparkline(sparkIn, "var(--c1)") + "</div></div>" +
-
-      '<div class="tile"><span class="label">Money out</span><div class="tile-fig">' + fmt(cur.expense, { round: true }) + "</div>" +
-      '<div class="tile-foot">' + (cur.pending > 0.005
-        ? "incl. " + fmt(cur.pending, { round: true }) + " you're owed back"
-        : deltaBadge(cur.expense, prev.expense, { lowerIsBetter: true }) + " vs last month") + "</div>" +
-      '<div class="spark">' + sparkline(sparkOut, "var(--c8)") + "</div></div>" +
-
-      '<div class="tile"><span class="label">Kept</span><div class="tile-fig" style="color:' +
-      (cur.net >= 0 ? "var(--gain)" : "var(--loss)") + '">' + fmt(cur.net, { round: true, signed: true }) + "</div>" +
-      '<div class="tile-foot">' + deltaBadge(cur.net, prev.net) + " vs last month</div>" +
-      '<div class="spark">' + sparkline(sparkNet, "var(--c3)") + "</div></div>" +
-
-      // Runway sits here rather than savings rate, which is a salary-shaped
-      // measure. When income arrives in lumps, "how long can I survive" is the
-      // question you actually open the app to answer.
-      '<div class="tile"><span class="label">Runway</span><div class="tile-fig" style="color:' +
-      (rw.months == null ? "var(--ink)" : rw.months >= 6 ? "var(--gain)" : rw.months >= 3 ? "var(--warn)" : "var(--loss)") +
-      '">' + (rw.months == null ? "—" : rw.months.toFixed(1) + " mo") + "</div>" +
-      '<div class="tile-foot">' + (rw.months == null
-        ? "no spending logged yet"
-        : fmt(rw.free, { round: true }) + " free ÷ " + fmt(rw.burn, { round: true }) + "/mo") + "</div>" +
-      '<div class="spark">' + sparkline(dataWindow(6, viewMonth).map(function (mk) {
-        var v = trueBurnFor(mk);
-        return { label: monthName(mk), value: v, tip: monthName(mk, true) + "\n" + fmt(v, { round: true }) + " burn" };
-      }), "var(--c4)") + "</div></div>" +
-      "</div>";
-
-    return html;
+    // months that actually have entries, not months in the range. Dividing by
+    // the range makes every average look better the further back you ask,
+    // which is exactly the plausible wrong number this app refuses to print.
+    return { byCat: out, total: total, months: months.length, live: live };
   }
 
-  // Both of these used to render on Overview *and* on Insights. They belong to
-  // Insights: they are about a pattern, not about right now.
-  function whereItWentCard() {
-    var cur = monthSummary(viewMonth);
-    var donut = donutChart(spendByCategory(viewMonth), cur.expense);
-    return '<div class="card"><div class="card-head"><h3>Where it went</h3><span class="sub">' +
-      monthName(viewMonth, true) + "</span></div>" +
-      '<div class="card-body">' + (donut || '<p class="empty">No spending logged for ' +
-        monthName(viewMonth, true) + " yet.</p>") + "</div></div>";
+  var WIW_RANGES = [{ n: 1, label: "This month" }, { n: 3, label: "3 mo" },
+                    { n: 6, label: "6 mo" }, { n: 12, label: "12 mo" }];
+  // which stretch the Ledger's copy is showing. A question, not a preference.
+  var wiwRange = 1;
+
+  function whereItWentCard(o) {
+    var opts = o || {};
+    var n = opts.ranged ? wiwRange : 1;
+    var months = recentMonths(n, viewMonth);
+    var sum = spendOver(months);
+    /* One month has to agree with the month card beside it, which counts
+       everything that left; over a range there is no such neighbour, and the
+       honest total of the slices is the slices. */
+    var total = n === 1 ? monthSummary(viewMonth).expense : sum.total;
+    var donut = donutChart(sum.byCat, total);
+    var span = n === 1 ? monthName(viewMonth, true)
+      : monthName(months[0], true) + " \u2013 " + monthName(months[months.length - 1], true);
+
+    return '<div class="card"><div class="card-head"><h3>Where it went</h3>' +
+      '<span class="sub">' + esc(span) + "</span></div>" +
+      (opts.ranged
+        ? '<div class="card-body" style="padding-bottom:0"><div class="chiprow">' +
+          WIW_RANGES.map(function (r) {
+            return '<button class="chip' + (wiwRange === r.n ? " on" : "") +
+              '" data-act="wiw-range" data-v="' + r.n + '">' + esc(r.label) + "</button>";
+          }).join("") + "</div></div>"
+        : "") +
+      '<div class="card-body">' + (donut || '<p class="empty">No spending logged ' +
+        (n === 1 ? "for " + esc(monthName(viewMonth, true)) : "over these " + n + " months") +
+        " yet.</p>") +
+      (n > 1 && sum.total > 0
+        ? '<p class="hint" style="margin-top:0.8rem">' + fmt(sum.total, { round: true }) +
+          " over " + sum.live + (sum.live === 1 ? " month" : " months") +
+          " with entries" + (sum.live < n ? " (of the " + n + " you asked for)" : "") +
+          " \u2014 " + fmt(sum.total / Math.max(1, sum.live), { round: true }) +
+          " a month on average. Grant spending and money you are owed back are " +
+          "left out, the same as everywhere else.</p>"
+        : "") + "</div></div>";
+  }
+
+  /* The months either side of the one you are reading, as a shape. The ledger
+     is a list of what happened; this is the only thing on the screen that
+     says whether the month you are looking at is a normal one. */
+  function spendSparkCard() {
+    var months = dataWindow(12, viewMonth);
+    if (months.length < 2) return "";
+    var pts = months.map(function (mk) {
+      var v = monthSummary(mk).expense;
+      return { label: monthName(mk), value: v,
+               tip: monthName(mk, true) + "\n" + fmt(v, { round: true }) + " out" };
+    });
+    var vals = pts.map(function (x) { return x.value; });
+    var here = vals[vals.length - 1];
+    var typical = vals.slice(0, -1).reduce(function (a, b) { return a + b; }, 0) /
+                  Math.max(1, vals.length - 1);
+    var off = typical > 0 ? (here - typical) / typical : 0;
+    return '<div class="card pad" style="margin-top:1rem">' +
+      '<div class="card-tophead"><span class="label">Out, month by month</span>' +
+      '<span class="sub">' + (Math.abs(off) < 0.1 || typical <= 0
+        ? "a normal month"
+        : (off > 0 ? Math.round(off * 100) + "% above" : Math.round(-off * 100) + "% below") +
+          " your usual") + "</span></div>" +
+      '<div style="margin-top:0.7rem">' +
+      areaChart(pts, { cssHeight: 84, height: 34, color: "var(--c1)", baseZero: true,
+                       aria: "What left, month by month" }) + "</div>" +
+      '<div style="display:flex;justify-content:space-between;margin-top:0.3rem">' +
+      '<span class="hint">' + esc(monthName(months[0], true)) + "</span>" +
+      '<span class="hint">' + esc(monthName(months[months.length - 1], true)) + "</span></div></div>";
   }
 
   /* ---- the six tabs ---- */
 
-  function netWorthStrip() {
-    var assets = totalAssets(), debt = totalDebt(), net = netWorth();
-    var prevEnd = lastDayOf(monthShift(viewMonth, -1));
-    var asOf = viewMonth === thisMonth() ? null : lastDayOf(viewMonth);
-    var startOfMonth = totalAssets(prevEnd) - debt - restrictedTotal(prevEnd);
-    var nowValue = totalAssets(asOf) - debt - restrictedTotal(asOf);
-    var moved = nowValue - startOfMonth;
-    // freeAssets() is about reach, not solvency — it does not net off debt. Put
-    // beside net worth it read as larger than net worth, which is nonsense. Say
-    // what is spoken for instead; that is unambiguous next to either figure.
-    var spokenFor = committedTotal();
-
-    return '<button class="worth-strip" data-tab="worth" aria-label="Net worth — open the Worth tab">' +
-      '<span class="worth-label">Net worth</span>' +
-      '<span class="worth-fig' + (net < 0 ? " loss" : "") + '">' + fmt(net) + "</span>" +
-      '<span class="worth-meta">' +
-      (Math.abs(moved) < 0.005
-        ? "level in " + esc(monthName(viewMonth, true))
-        : '<span class="' + (moved > 0 ? "gain" : "loss") + '">' + (moved > 0 ? "\u25b2 " : "\u25bc ") +
-          fmt(Math.abs(moved), { round: true }) + "</span> in " + esc(monthName(viewMonth, true))) +
-      (debt > 0 ? " \u00b7 after " + fmt(debt, { round: true }) + " owed" : "") +
-      (spokenFor > 0.5 ? " \u00b7 " + fmt(spokenFor, { round: true }) + " already spoken for" : "") +
-      "</span></button>";
-  }
+  /* netWorthStrip() lived here. Home's stand tile says the same figure and
+     opens the same tab, in a third of the height. */
 
   /* owedBackCard lived here. pendingCard() shows the same refundables beside
      the bills that have not left yet, and carries the same tx-settle button. */
@@ -5305,13 +5358,23 @@
         "</button></div>";
     }).join("");
 
+    /* Both halves get a figure. "Nothing settled yet" was a label that said
+       what the card was for and nothing about your money; what you want off
+       this card at a glance is how much is about to leave and how much is
+       still out. */
+    var dueTotal = up.reduce(function (t, r) { return t + toBase(r.amount, r.currency, r.rate); }, 0);
+    var owedTotal = owed.reduce(function (t, x) { return t + txBase(x); }, 0);
+    var sub = [];
+    if (dueTotal > 0.005) sub.push(fmt(dueTotal, { round: true }) + " due");
+    if (owedTotal > 0.005) sub.push(fmt(owedTotal, { round: true }) + " out");
+
     return '<div class="card pad"><div class="card-tophead">' +
       '<span class="label">Pending</span>' +
-      '<span class="sub">nothing settled yet</span></div>' +
+      '<span class="sub">' + esc(sub.join(" \u00b7 ") || "nothing settled yet") + "</span></div>" +
       '<div class="pend-list">' + rows + "</div></div>";
   }
 
-  function upcomingCard() {
+  function upcomingCard(o) {
     var up = upcomingBills(14);
     if (!up.length) return "";
     var free = freeAssets();
@@ -5327,8 +5390,11 @@
           ' <span class="due-when' + (tight ? " warn" : "") + '">' + esc(shortDate(r.nextDate)) + "</span></span>" +
           '<span class="due-amt">' + fmt(amt, { round: true }) + "</span></div>";
       }).join("") + "</div>" +
-      '<div class="btn-row" style="margin-top:0.9rem">' +
-      '<button class="btn sm quiet" data-act="plan-tab" data-id="bills">Manage bills</button></div></div>';
+      // on the Bills page itself this would link to the page you are on
+      (o && o.manage === false ? ""
+        : '<div class="btn-row" style="margin-top:0.9rem">' +
+          '<button class="btn sm quiet" data-act="plan-tab" data-id="bills">Manage bills</button></div>') +
+      "</div>";
   }
 
   // shortDate drops the year, which is fine for a bill due next week and not
@@ -5351,25 +5417,12 @@
   // These used to sit loose on the page background between two cards, which
   // read as leftover text rather than as a block worth reading. Same shell as
   // everything else on Today.
-  function noticesBlock() {
-    var notes = buildInsights(viewMonth).slice(0, 3);
-    var asking = allowancesAwaiting();
-    if (!notes.length && !asking.length) return "";
-    return '<div class="card" style="margin-top:1rem"><div class="card-head">' +
-      "<h3>Everything worth noting</h3>" +
-      '<button class="btn sm quiet" data-act="go-insights">All insights \u2192</button></div>' +
-      '<div class="card-body"><div class="notices">' +
-      asking.map(function (a) {
-        return '<p class="notice warn">How many days did you go in to <b>' + esc(a.source.name) +
-          "</b> in " + esc(monthName(a.mk, true)) + "? Until you say, none of the " +
-          esc(a.source.allowance.category) + " allowance is counted. " +
-          '<button class="btn sm" data-act="allowance-days" data-id="' + a.source.id +
-          '" data-mk="' + a.mk + '" style="margin-left:0.3rem">Say how many</button></p>';
-      }).join("") +
-      notes.map(function (nt) {
-        return '<p class="notice' + (nt.tone === "warn" || nt.tone === "bad" ? " warn" : "") + '">' + nt.html + "</p>";
-      }).join("") + "</div></div></div>";
-  }
+  /* noticesBlock() lived here: the first three insights plus the allowance
+     question, with an "All insights →" button. It was Home's three-line
+     summary of the Insights feed. Moved here wholesale it became a second
+     card with the same heading, four rows above the full list, and a button
+     linking to the page it was already on. The question it carried is in that
+     card now; the summary was not needed twice. */
 
   /* Home answers "what did I spend today, and what do I log" — so it opens on
      the day and closes on the month, rather than the other way round. It had
@@ -5493,7 +5546,10 @@
       '<button class="ibtn" data-act="pocket-add" data-id="' + a.id + '" aria-label="Add a pocket to ' + esc(a.name) + '" title="Add a pocket">+</button>' +
       '<button class="ibtn" data-act="account-edit" data-id="' + a.id + '" aria-label="Edit ' + esc(a.name) + '" title="Edit">✎</button>' +
       (used
-        ? '<button class="ibtn" data-act="account-close" data-id="' + a.id + '" aria-label="Close ' + esc(a.name) + '" title="Close, keeping its history">⊘</button>'
+        ? '<button class="ibtn" data-act="account-close" data-id="' + a.id + '" aria-label="Close ' + esc(a.name) + '" title="Close, keeping its history">⊘</button>' +
+          // the third move: gone from Worth, every entry kept — the same thing
+          // removing a pocket does one level down
+          '<button class="ibtn danger" data-act="account-forget" data-id="' + a.id + '" aria-label="Remove ' + esc(a.name) + ', keeping its entries" title="Remove, keeping its entries">✕</button>'
         : '<button class="ibtn danger" data-act="account-del" data-id="' + a.id + '" aria-label="Delete ' + esc(a.name) + '" title="Delete">✕</button>') +
       "</span></div></div>";
     return html;
@@ -5512,7 +5568,13 @@
       '<span class="due-amt" style="color:var(--dim)">' + fmt(bal) + "</span></div>" +
       '<div class="budget-foot"><p class="pair-sub"></p><span class="card-tools">' +
       '<button class="ibtn" data-act="account-open" data-id="' + a.id + '" aria-label="Reopen ' + esc(a.name) + '" title="Reopen">↺</button>' +
-      '<button class="ibtn danger" data-act="account-del" data-id="' + a.id + '" aria-label="Delete ' + esc(a.name) + '" title="Delete for good">✕</button>' +
+      /* A closed account is the commonest place to want this: you kept it on
+         the screen for its history, and the history is exactly what stays.
+         `\u2715` means the same thing here as it does on a pocket — remove the
+         record, keep what is filed in it — and there is deliberately no
+         second button for erasing the entries too: entries live in the
+         Ledger, and that is where they are deleted. */
+      '<button class="ibtn danger" data-act="account-forget" data-id="' + a.id + '" aria-label="Remove ' + esc(a.name) + ', keeping its entries" title="Remove, keeping its entries">\u2715</button>' +
       "</span></div></div>";
   }
 
@@ -5796,16 +5858,61 @@
     return html;
   }
 
-  var PLAN_TABS = [
-    { id: "advice", label: "Advice" },
-    { id: "outlook", label: "Outlook" },
-    { id: "budgets", label: "Budgets" },
-    { id: "bills", label: "Bills" },
-    { id: "income", label: "Income" },
-    { id: "goals", label: "Goals" },
-    { id: "grants", label: "Grants" },
-    { id: "plan", label: "The plan" }
+  /* Horizon is a hub, not a sub-nav. Eight sub-tabs on one strip meant the
+     last three were off the edge of a phone and nobody ever opened them; a
+     page you can see is a page you use. Every card is the same size on
+     purpose — a bigger card reads as a more important page, and these are
+     five equal questions.
+
+     `grants` is the exception: most ledgers never hold money that is not
+     theirs, and a permanent card for it costs everyone a slot. It appears
+     when grant mode is on. */
+  var PLAN_PAGES = [
+    { id: "contracts", label: "Contracts",
+      blurb: "What pays you, and until when",
+      ico: '<path d="M4.6 3.4h7.2l3.6 3.6v9.6a1 1 0 0 1-1 1H4.6a1 1 0 0 1-1-1V4.4a1 1 0 0 1 1-1z"/><path d="M11.8 3.4V7h3.6"/><path d="M6.6 11h6.8"/><path d="M6.6 13.8h4.4"/>' },
+    { id: "budgets", label: "Budgets",
+      blurb: "A limit a category, against what you spend",
+      ico: '<path d="M3.4 15.4V9.2"/><path d="M7.8 15.4V4.6"/><path d="M12.2 15.4v-8"/><path d="M16.6 15.4v-4.2"/>' },
+    { id: "goals", label: "Goals",
+      blurb: "What you are saving toward, and by when",
+      ico: '<circle cx="10" cy="10" r="6.4"/><circle cx="10" cy="10" r="3.2"/><circle cx="10" cy="10" r="0.6" fill="currentColor"/>' },
+    { id: "bills", label: "Bills & one-offs",
+      blurb: "What leaves on a cycle, and what lands once",
+      ico: '<path d="M4.4 3.6h11.2v12.8l-2.24-1.4-2.24 1.4-2.24-1.4-2.24 1.4-2.24-1.4z"/><path d="M7.4 7.4h5.2"/><path d="M7.4 10.4h5.2"/>' },
+    { id: "grants", label: "Grants", mode: "grant",
+      blurb: "Money you hold for someone else",
+      ico: '<path d="M10 16.4s-5.6-3.2-5.6-7.2a2.8 2.8 0 0 1 5.6-1.2 2.8 2.8 0 0 1 5.6 1.2c0 4-5.6 7.2-5.6 7.2z"/>' },
+    { id: "plan", label: "The plan",
+      blurb: "What you meant to do, scored",
+      ico: '<rect x="3.6" y="4.2" width="12.8" height="12" rx="2"/><path d="M3.6 8h12.8"/><path d="M7.2 2.8v2.6"/><path d="M12.8 2.8v2.6"/>' }
   ];
+
+  /* Pages that are not cards on the hub: reached from the lead cards at the
+     top of it, or from anywhere in the app that links straight to them. */
+  var PLAN_DEEP = { outlook: "The months ahead", advice: "What I would change" };
+
+  function planPages() {
+    return PLAN_PAGES.filter(function (pg) { return pg.mode !== "grant" || grantMode(); });
+  }
+
+  function planPageLabel(id) {
+    if (PLAN_DEEP[id]) return PLAN_DEEP[id];
+    var hit = PLAN_PAGES.filter(function (pg) { return pg.id === id; })[0];
+    return hit ? hit.label : "Horizon";
+  }
+
+  /* Grants as a mode, the way a theme is: off until you say otherwise, and
+     nothing grant-shaped renders while it is off. Two rules keep it honest.
+     A book that already holds a grant is in the mode whether or not the
+     setting says so, or shipping this would hide money people are tracking —
+     which is also the whole of "switching it off with a live grant refuses".
+     And the ARITHMETIC NEVER CHANGES WITH THE MODE: restrictedTotal(),
+     trueBurnFor() and spendByCategory() exclude grant money either way. A
+     mode that moved a figure would be a mode that lies. */
+  function grantMode() {
+    return !!state.settings.grantMode || grants().length > 0;
+  }
 
   /* #15 — projected against real, over the plan's own months. The point is
      not the score; it is that the next plan should be written against how you
@@ -5861,14 +5968,229 @@
              plannedIn: plannedIn, plannedOut: plannedOut, verdict: verdict };
   }
 
+  /* The hub's own head: where the money goes from here, in one sentence and
+     one line, tapping through to the whole projection. It comes first because
+     it is the evidence for everything the adviser says below it, and it used
+     to be two taps down a sub-nav. */
+  function outlookLead() {
+    var pr = projectForward(PROJECT_MONTHS, {});
+    var goalsCross = goalsMonthlyNeed() > 0
+      ? projectForward(PROJECT_MONTHS, { holdGoals: true }).crossing : null;
+    /* The same tone rule the Outlook page uses, deliberately: two screens
+       reading the same projection must not disagree about whether it is good
+       news. Green means a healthy state and nothing else, so a line that ends
+       under the cushion, or one that only stays up by leaving your goals
+       unfed, is amber. */
+    var endCover = coverAfter(pr);
+    var tone = pr.crossing != null
+      ? (projectedMonths(pr) >= 6 ? "warn" : "alert")
+      : (endCover >= floorMonths() ? "calm" : "warn");
+    if (tone === "calm" && goalsCross != null) tone = "warn";
+
+    var pts = pr.points.map(function (pt) {
+      return { label: monthName(pt.mk), value: pt.balance,
+               tip: monthName(pt.mk, true) + "\n" + fmt(pt.balance) };
+    });
+
+    return '<button class="card pad lead-card" data-act="plan-tab" data-id="outlook" ' +
+      'aria-label="See the months ahead">' +
+      '<span class="lead-head"><span class="label">The next ' + pr.horizon + ' months</span>' +
+      '<span class="lead-go">\u203a</span></span>' +
+      '<p class="lead ' + tone + '">' + esc(outlookSentence(pr)) + "</p>" +
+      '<p class="band-sub">From ' + fmt(pr.start, { round: true }) + " reachable, at " +
+      fmt(pr.burn, { round: true }) + " a month" +
+      (goalsCross != null ? " \u00b7 goals unfed after " + esc(monthName(goalsCross, true)) : "") +
+      "</p>" +
+      (pts.length
+        ? '<div class="lead-chart">' +
+          areaChart(pts, { cssHeight: 78, height: 34,
+                           color: tone === "calm" ? "var(--calm)" : "var(--" + tone + ")",
+                           aria: "Projected balance over the next " + pr.horizon + " months" }) + "</div>"
+        : "") + "</button>";
+  }
+
+  /* One thing at a time.
+
+     The adviser ranks its proposals already; the screen threw all six at once
+     with a sentence and a half each, which is the same essay problem the
+     afford card had. So the hub says the single most useful thing in the
+     second person, with the two taps that act on it and a way to see the
+     next one. `adviceIdx` is which of them is being looked at — a question,
+     not a preference, so it is not saved. */
+  var adviceIdx = 0;
+
+  function adviceLead() {
+    var m = adviceMonth();
+    if (!m.flow.income) {
+      return '<div class="card pad lead-card static"><span class="label">This month</span>' +
+        '<p class="lead warn">Nothing is booked as coming in, so there is no month to plan.</p>' +
+        '<p class="band-sub">Add a contract or a one-off and every figure here fills in.</p>' +
+        '<div class="btn-row" style="margin-top:0.7rem">' +
+        '<button class="btn sm primary" data-act="plan-tab" data-id="contracts">Add income</button>' +
+        "</div></div>";
+    }
+
+    var props = adviceProposals();
+    var drift = driftWarnings();
+    var owed = m.moves.filter(function (x) { return !x.done && x.left > 0.005; });
+
+    // the same order of pressing-ness the Home strip uses, so the two screens
+    // never disagree about what the most important thing is
+    /* Saying you are short and stopping there is throwing a figure at
+       somebody. The shortfall is the finding; the first proposal is what to
+       do about it, and it is one tap away in the same card. */
+    if (m.short) {
+      var first = props[0];
+      return adviceLeadCard({
+        label: "This month",
+        tone: "warn",
+        lead: "You are " + fmt(m.short, { round: true }) + " short every month.",
+        why: "Your promises want more than the month leaves once the plan is paid.",
+        then: first ? "Start here: " + first.title + ". " + first.effect : "",
+        act: first
+          ? '<button class="btn sm primary" data-act="advice-do" data-id="' + esc(first.id) + '">Do it</button>' +
+            '<button class="btn sm" data-act="advice-skip" data-id="' + esc(first.id) + '">Not this</button>'
+          : "",
+        props: props
+      });
+    }
+    if (owed.length) {
+      var mv = owed[0];
+      return adviceLeadCard({
+        label: "This month",
+        lead: "Put aside " + fmt(mv.left, { round: true }) + " for " + mv.name + ".",
+        why: owed.length > 1
+          ? "Then " + (owed.length - 1) + (owed.length === 2 ? " other promise" : " other promises") +
+            " after it, out of " + fmt(Math.abs(m.free), { round: true }) + " left this month."
+          : "That is the whole of what you promised yourself this month.",
+        act: '<button class="btn sm primary" data-act="advice-move" data-id="' + esc(mv.id) + '">Set aside</button>',
+        props: props
+      });
+    }
+    if (drift.length) {
+      return adviceLeadCard({
+        label: "Worth watching", tone: "warn",
+        lead: drift[0],
+        why: drift.length > 1
+          ? (drift.length - 1) + " more like it on the page." : "Nothing else is drifting.",
+        props: props
+      });
+    }
+    if (props.length) {
+      var i = ((adviceIdx % props.length) + props.length) % props.length;
+      var pr = props[i];
+      return adviceLeadCard({
+        label: "What I would change",
+        lead: pr.title, why: pr.finding, then: pr.effect,
+        act: '<button class="btn sm primary" data-act="advice-do" data-id="' + esc(pr.id) + '">Do it</button>' +
+             '<button class="btn sm" data-act="advice-skip" data-id="' + esc(pr.id) + '">Not this</button>',
+        next: props.length > 1 ? { i: i, of: props.length } : null,
+        props: props
+      });
+    }
+    return '<div class="card pad lead-card static"><span class="label">This month</span>' +
+      '<p class="lead calm">' + esc(fmt(Math.abs(m.free), { round: true })) + " is yours to spend.</p>" +
+      '<p class="band-sub">Your budgets match what you spend, your promises are fed, and nothing ' +
+      "is drifting. There is nothing I would change.</p></div>";
+  }
+
+  function adviceLeadCard(o) {
+    return '<div class="card pad lead-card static' + (o.tone ? " " + o.tone : "") + '">' +
+      '<span class="lead-head"><span class="label">' + esc(o.label) + "</span>" +
+      (o.next
+        ? '<span class="lead-count">' + (o.next.i + 1) + " of " + o.next.of + "</span>"
+        : "") + "</span>" +
+      '<p class="lead' + (o.tone ? " " + o.tone : "") + '">' + esc(o.lead) + "</p>" +
+      '<p class="band-sub">' + esc(o.why) + "</p>" +
+      (o.then ? '<p class="band-sub emph">' + esc(o.then) + "</p>" : "") +
+      '<div class="btn-row" style="margin-top:0.75rem">' + (o.act || "") +
+      (o.next ? '<button class="btn sm quiet" data-act="advice-next">Show me another</button>' : "") +
+      '<button class="btn sm quiet" data-act="plan-tab" data-id="advice">' +
+      (o.props && o.props.length > 1 ? "See all " + o.props.length : "See the month") + "</button>" +
+      "</div></div>";
+  }
+
+  /* What each page is worth opening for, said in its own figures. A card with
+     nothing live on it says so rather than sitting blank — "no budgets set"
+     is the reason to tap it. */
+  function planPageSub(id) {
+    var n;
+    if (id === "contracts") {
+      n = state.recurring.filter(function (r) { return isContract(r) && !recurEnded(r); });
+      if (!n.length) return "nothing scheduled";
+      var permo = n.reduce(function (t, r) {
+        return t + monthlyEquivalent(toBase(r.amount, r.currency, r.rate), r.frequency) * confidenceOf(r);
+      }, 0);
+      return n.length + " live \u00b7 " + fmt(permo, { round: true }) + "/mo";
+    }
+    if (id === "budgets") {
+      var rows = budgetRows(viewMonth).filter(function (r) { return r.limit > 0; });
+      if (!rows.length) return "no limits set";
+      var over = rows.filter(function (r) { return r.left < -0.005; }).length;
+      return rows.length + " set" + (over ? " \u00b7 " + over + " over" : " \u00b7 all within");
+    }
+    if (id === "goals") {
+      if (!state.goals.length) return "nothing set aside for";
+      var late = state.goals.filter(function (g) {
+        var need = goalNeed(g); return need.overdue && !need.done;
+      }).length;
+      return state.goals.length + (state.goals.length === 1 ? " goal" : " goals") +
+        (late ? " \u00b7 " + late + " past its date" : "");
+    }
+    if (id === "bills") {
+      var load = recurringMonthlyLoad();
+      var once = state.recurring.filter(function (r) { return isOneOff(r) && r.nextDate; }).length;
+      if (!load.expense && !once) return "nothing scheduled";
+      return (load.expense ? fmt(load.expense, { round: true }) + "/mo" : "no bills") +
+        (once ? " \u00b7 " + once + " expected" : "");
+    }
+    if (id === "grants") {
+      var live = grants().filter(function (g) { return !g.closed; });
+      if (!live.length) return "none held";
+      return fmt(restrictedTotal(), { round: true }) + " held \u00b7 " + live.length +
+        (live.length === 1 ? " grant" : " grants");
+    }
+    if (id === "plan") return state.plan ? esc(state.plan.name || "imported") : "none imported";
+    return "";
+  }
+
+  function hubGrid() {
+    return '<div class="hub">' + planPages().map(function (pg) {
+      return '<button class="card hub-card" data-act="plan-tab" data-id="' + pg.id + '">' +
+        '<span class="hub-ico">' + ico(pg.ico) + "</span>" +
+        '<span class="hub-name">' + esc(pg.label) + "</span>" +
+        '<span class="hub-sub">' + planPageSub(pg.id) + "</span></button>";
+    }).join("") + "</div>";
+  }
+
+  function horizonHub() {
+    if (!state.accounts.length && !state.transactions.length) {
+      return pageHead("Horizon", "Where the money goes from here.") + firstRunCard();
+    }
+    return pageHead("Horizon", "Where the money goes from here, and what I would change so it adds up.") +
+      outlookLead() + adviceLead() + hubGrid();
+  }
+
+  /* A page opened from the hub says what it is and how to get back. There is
+     no sub-nav to show you where you are any more, so the head has to. */
+  function subPageHead(id, blurb, right) {
+    return '<div class="page-head sub"><div>' +
+      '<button class="backbtn" data-act="plan-tab" data-id="hub">\u2039 Horizon</button>' +
+      "<h2>" + esc(planPageLabel(id)) + "</h2>" +
+      (blurb ? "<p>" + blurb + "</p>" : "") + "</div>" + (right || "") + "</div>";
+  }
+
   function renderPlanTab() {
     var sub = currentPlanTab();
+    if (sub === "hub") return horizonHub();
+
     var blurb = {
-      budgets: "Monthly limits per category. The marker on each bar shows how far through the month you are — " +
+      budgets: "Monthly limits per category. The marker on each bar shows how far through the month you are \u2014 " +
         "a bar past its marker is running hot.",
-      bills: "What you have committed to paying, and what it costs a month.",
-      income: "Contracts that pay on a cycle, and money that arrives once. Both are what your " +
-        "bills are measured against, and what every projection is built from.",
+      bills: "What leaves on a cycle, and the money that arrives once. Both are what every " +
+        "projection is built from.",
+      contracts: "Work that pays on a cycle: what it is worth a month, when it ends, and how " +
+        "likely it is to carry on.",
       goals: "What you're saving toward, and whether your current pace gets you there.",
       plan: "A written plan, scored against what actually happened.",
       outlook: "Where the money goes from here, month by month, with every contract " +
@@ -5879,22 +6201,17 @@
     }[sub];
 
     var right = sub === "goals" ? '<button class="btn primary" data-act="goal-add">Add a goal</button>'
-      : sub === "advice" ? ""
-      : sub === "outlook" ? ""
-      : sub === "grants" ? ""
-      : sub === "plan" ? ""
-      : !state.plan ? '<button class="btn sm" data-act="plan-tab" data-id="plan">Import a plan</button>'
+      : sub === "advice" || sub === "outlook" || sub === "grants" || sub === "plan" ? ""
       : monthStepper();
 
-    var html = pageHead("Plan", blurb, right) +
-      subNav("plan-tab", PLAN_TABS, sub);
+    var html = subPageHead(sub, blurb, right);
 
     if (sub === "advice") html += adviceBody();
     else if (sub === "outlook") html += outlookBody();
     else if (sub === "grants") html += grantsBody();
     else if (sub === "budgets") html += budgetsBody();
     else if (sub === "bills") html += billsBody();
-    else if (sub === "income") html += incomeBody();
+    else if (sub === "contracts") html += contractsBody();
     else if (sub === "goals") html += goalsBody();
     else html += planBody();
     return html;
@@ -6002,7 +6319,7 @@
         '<span class="label">Income</span>' +
         '<p class="empty" style="margin:0.5rem 0 0.9rem">Nothing is scheduled to come in, so this projection is ' +
         'just your savings running down. Add what you are expecting and it will be worth reading.</p>' +
-        '<button class="btn sm primary" data-act="plan-tab" data-id="income">Add income</button></div>';
+        '<button class="btn sm primary" data-act="plan-tab" data-id="contracts">Add income</button></div>';
     }
     return '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>What if this stops</h3>' +
       '<span class="sub">tap to leave one out</span></div>' +
@@ -7120,169 +7437,15 @@
     return html;
   }
 
-  function accountsCard() {
-    // A heading only earns its line when it actually collects something. One
-    // account under its own "Whish \u2014 1 account" heading was three lines of
-    // furniture wrapped around a single row, three times over; that is what
-    // made this card read as clutter. So: places holding two or more accounts
-    // get a heading and a subtotal, and everything else falls into one plain
-    // list with its place written into the row instead.
-    var live = openAccounts();
-    var shut = state.accounts.filter(function (a) { return a.closed; });
+  /* accountsCard() lived here: 131 lines rendering the accounts as hairline
+     rows, with its own copies of pocket-edit, account-close and account-del.
+     It stopped being called during the Worth rebuild and took pocket editing
+     with it — the bug CLAUDE.md warns about — and it has been dead ever
+     since. assetCard() is the screen that renders now. Kept as this note
+     rather than as code, so nobody edits the copy nothing draws. */
 
-    var byGroup = {}, seen = [];
-    live.forEach(function (a) {
-      var g = (a.group || "").trim();
-      if (!g) return;
-      if (!byGroup[g]) { byGroup[g] = []; seen.push(g); }
-      byGroup[g].push(a);
-    });
-    var headed = seen.filter(function (g) { return byGroup[g].length > 1; }).sort(function (x, y) {
-      return x.localeCompare(y);
-    });
-    var isHeaded = {};
-    headed.forEach(function (g) { isHeaded[g] = true; });
-    var loose = live.filter(function (a) { return !isHeaded[(a.group || "").trim()]; });
-
-    function sumOfAccounts(list) {
-      return list.reduce(function (t, a) { return t + balanceOf(a); }, 0);
-    }
-    function head(name, count, total) {
-      return '<div class="grp-head"><span class="grp-name">' + esc(name) + "</span>" +
-        '<span class="grp-sub">' + esc(count) + "</span>" +
-        '<span class="grp-fig' + (total < 0 ? " loss" : "") + '">' + fmt(total) + "</span></div>";
-    }
-
-    function accountRow(a, showPlace) {
-      var bal = balanceOf(a);
-      var pockets = pocketsOf(a);
-      var bits = [];
-      // in the loose list nothing above the row says where it is held, so the
-      // place goes in the row itself rather than being lost with the heading
-      if (showPlace && (a.group || "").trim()) bits.push((a.group || "").trim());
-      bits.push(a.type);
-      if (pockets.length) bits.push(pockets.length + (pockets.length === 1 ? " pocket" : " pockets"));
-
-      // An account carrying history offers Close, not Delete: deleting it
-      // would take every transaction with it, which is exactly the trap this
-      // is here to avoid. Delete stays on the ones with nothing to lose, and
-      // on closed accounts, where the warning has already been read.
-      var used = state.transactions.some(function (t) {
-        return t.accountId === a.id || t.toAccountId === a.id;
-      }) || state.recurring.some(function (r) { return r.accountId === a.id; });
-
-      var html = '<div class="row"><div class="row-main">' +
-        '<div class="row-title">' + esc(a.name) + "</div>" +
-        '<div class="row-sub">' + esc(bits.join(" \u00b7 ")) + "</div></div>" +
-        '<div class="row-end"><span class="row-fig' + (bal < 0 ? " loss" : "") + '">' + fmt(bal) + "</span>" +
-        '<button class="ibtn" data-act="pocket-add" data-id="' + a.id + '" aria-label="Add a pocket to ' + esc(a.name) + '" title="Add a pocket">+</button>' +
-        '<button class="ibtn" data-act="account-edit" data-id="' + a.id + '" aria-label="Edit ' + esc(a.name) + '" title="Edit">\u270e</button>' +
-        (used
-          ? '<button class="ibtn" data-act="account-close" data-id="' + a.id + '" aria-label="Close ' + esc(a.name) + '" title="Close, keeping its history">\u2298</button>'
-          : '<button class="ibtn danger" data-act="account-del" data-id="' + a.id + '" aria-label="Delete ' + esc(a.name) + '" title="Delete">\u2715</button>') +
-        "</div></div>";
-
-      if (pockets.length) {
-        var left = unallocatedOf(a);
-        html += pockets.map(function (p) {
-          var pb = pocketBalance(a, p);
-          var st = pocketStatus(p);
-          return '<div class="row pocket"><div class="row-main">' +
-            '<div class="row-title">' + esc(p.name) + "</div>" +
-            '<div class="row-sub">' + esc(POCKET_STATUS_LABEL[st]) +
-            (st === "committed" ? " · not counted toward your runway" : "") + "</div></div>" +
-            '<div class="row-end"><span class="row-fig' + (pb < 0 ? " loss" : "") + '">' + fmt(pb) + "</span>" +
-            '<button class="ibtn" data-act="pocket-edit" data-id="' + a.id + "|" + p.id + '" aria-label="Edit ' + esc(p.name) + '" title="Edit">\u270e</button>' +
-            '<button class="ibtn danger" data-act="pocket-del" data-id="' + a.id + "|" + p.id + '" aria-label="Remove ' + esc(p.name) + '" title="Remove">\u2715</button>' +
-            "</div></div>";
-        }).join("");
-        // the leftover is shown rather than hidden, so the pockets always
-        // visibly add up to the account
-        if (Math.abs(left) > 0.005) {
-          html += '<div class="row pocket"><div class="row-main">' +
-            '<div class="row-title" style="color:var(--dim)">Unallocated</div></div>' +
-            '<div class="row-end"><span class="row-fig' + (left < 0 ? " loss" : "") + '" style="color:var(--dim)">' + fmt(left) + "</span></div></div>";
-        }
-      }
-      return html;
-    }
-
-    function closedRow(a) {
-      var bal = balanceOf(a);
-      var count = state.transactions.filter(function (t) {
-        return t.accountId === a.id || t.toAccountId === a.id;
-      }).length;
-      var bits = [];
-      if ((a.group || "").trim()) bits.push((a.group || "").trim());
-      bits.push(count + (count === 1 ? " entry kept" : " entries kept"));
-      if (a.closedOn) bits.push("closed " + a.closedOn);
-      return '<div class="row"><div class="row-main">' +
-        '<div class="row-title" style="color:var(--dim)">' + esc(a.name) + "</div>" +
-        '<div class="row-sub">' + esc(bits.join(" \u00b7 ")) + "</div></div>" +
-        '<div class="row-end"><span class="row-fig' + (bal < 0 ? " loss" : "") +
-        '"' + (Math.abs(bal) < 0.005 ? ' style="color:var(--dim)"' : "") + ">" + fmt(bal) + "</span>" +
-        '<button class="ibtn" data-act="account-open" data-id="' + a.id + '" aria-label="Reopen ' + esc(a.name) + '" title="Reopen">\u21ba</button>' +
-        '<button class="ibtn danger" data-act="account-del" data-id="' + a.id + '" aria-label="Delete ' + esc(a.name) + '" title="Delete for good">\u2715</button>' +
-        "</div></div>";
-    }
-
-    var rows = "";
-    headed.forEach(function (g) {
-      var list = byGroup[g];
-      rows += head(g, list.length + " accounts", sumOfAccounts(list)) +
-        '<div class="rows">' + list.map(function (a) { return accountRow(a, false); }).join("") + "</div>";
-    });
-    if (loose.length) {
-      // a heading over the loose list is only worth it when something above it
-      // is headed too; on its own it would be a label with nothing to contrast
-      if (headed.length) {
-        rows += head("Elsewhere", loose.length + (loose.length === 1 ? " account" : " accounts"), sumOfAccounts(loose));
-      }
-      rows += '<div class="rows">' + loose.map(function (a) { return accountRow(a, true); }).join("") + "</div>";
-    }
-    if (!live.length) rows = shut.length ? "" : '<p class="empty">No accounts yet.</p>';
-    if (shut.length) {
-      rows += head("Closed", shut.length + (shut.length === 1 ? " account" : " accounts"), sumOfAccounts(shut)) +
-        '<div class="rows">' + shut.map(closedRow).join("") + "</div>";
-    }
-
-    return '<div class="card"><div class="card-head"><h3>Accounts</h3>' +
-      '<div class="btn-row"><button class="btn sm" data-act="transfer-add">Transfer</button>' +
-      '<button class="btn sm primary" data-act="account-add">Add</button></div></div>' +
-      '<div class="card-body flush">' + rows + "</div></div>";
-  }
-
-  function billsCard() {
-    var up = upcomingBills(14);
-    var load = recurringMonthlyLoad();
-    var body = up.length
-      ? '<div class="rows">' + up.map(function (r) {
-          var d = daysUntil(r.nextDate);
-          var tone = d < 0 ? "bad" : d <= 3 ? "warn" : "mute";
-          var when = d < 0 ? Math.abs(d) + "d overdue" : d === 0 ? "today" : "in " + d + "d";
-          return '<div class="row"><div class="row-main">' +
-            '<div class="row-title">' + esc(r.name) + "</div>" +
-            '<div class="row-sub">' + esc(r.category) + " · " + esc(FREQ_LABEL[r.frequency] || r.frequency) + " · " + esc(accountName(r.accountId)) + "</div></div>" +
-            '<div class="row-end"><span class="row-fig ' + (r.type === "income" ? "gain" : "") + '">' +
-            (r.type === "income" ? "+" : "−") + fmt(toBase(r.amount, r.currency, r.rate)).replace("-", "") +
-            (isForeign(r.currency) ? '<span class="fx">' + esc(fmtIn(r.amount, r.currency)) + "</span>" : "") + "</span>" +
-            '<span class="pill ' + tone + '">' + when + "</span>" +
-            '<button class="btn sm" data-act="recur-pay" data-id="' + r.id + '">Log</button>' +
-            "</div></div>";
-        }).join("") + "</div>"
-      : '<p class="empty">Nothing due in the next two weeks.' +
-        (state.recurring.length ? "" : " <strong>Add your rent, subscriptions and bills</strong> to see them tracked here.") + "</p>";
-
-    // The two recurring cards live on Budgets, which is not where anyone looks
-    // for their salary — give this card a way through to them.
-    return '<div class="card"><div class="card-head"><h3>Due soon</h3>' +
-      '<button class="btn sm" data-act="plan-tab" data-id="bills">Manage bills</button>' +
-      '<span class="sub">' + (load.expense > 0 || load.income > 0
-        ? [load.expense > 0 ? fmt(load.expense, { round: true }) + "/mo out" : "",
-           load.income > 0 ? fmt(load.income, { round: true }) + "/mo in" : ""].filter(Boolean).join(" · ")
-        : "next 14 days") + "</span></div>" +
-      '<div class="card-body flush">' + body + "</div></div>";
-  }
+  /* billsCard() lived here. upcomingCard() is the one that renders, on Home
+     as seven days and on Bills as a fortnight. */
 
   /* ============================================================
      LEDGER
@@ -7533,6 +7696,15 @@
       '<p class="hint" style="margin-top:0.7rem" id="txSummary">' + ledgerSummaryHtml(rows) + "</p>" +
       "</div></div>";
 
+    /* The ledger was a list and nothing else, so it could tell you what you
+       spent on and never whether it was a lot. Two pictures fix that: the
+       shape of the months around this one, and where the money went over a
+       stretch you choose. Insights keeps its own copy of the second, asked of
+       the record as a whole; this one is asked of a period, beside the
+       entries that make it up. */
+    html += spendSparkCard();
+    html += '<div style="margin-top:1rem">' + whereItWentCard({ ranged: true }) + "</div>";
+
     /* the entries themselves — id lets the search box refresh only this block */
     html += '<div id="txTable" style="margin-top:1rem">' + ledgerTableHtml() + "</div>";
 
@@ -7710,12 +7882,18 @@
   }
 
 
+  /* Bills and one-off income are one page because they are one question:
+     what is dated. A bill leaves on a cycle, a lump sum lands once, and both
+     are things with a day attached that you either have or have not settled
+     — which is exactly what the Pending card on Home is built from. They had
+     half a sub-nav slot each and neither filled it. What a CONTRACT needs
+     said about it is different enough to have its own page. */
   function billsBody() {
     /* The fortnight of bills used to be a block on Home. It is the same list
        Bills already exists to show, so it moved here rather than being
        deleted; Home keeps only the seven days that have not settled. */
     var load = recurringMonthlyLoad();
-    var html = upcomingCard();
+    var html = upcomingCard({ manage: false });
     html += recurCard("expense", "Bills and subscriptions",
       "Nothing scheduled. <strong>Add rent, subscriptions and bills</strong> — Coffer counts the monthly cost, " +
       "warns you before each is due, and logs it to the ledger when you mark it paid.", load.expense, "mute");
@@ -7727,8 +7905,32 @@
         fmt(load.expense, { round: true }) + " out against " + fmt(load.income, { round: true }) + " in, " +
         "leaving " + fmt(load.income - load.expense, { round: true }) + " a month before anything else.</p>";
     }
+    html += oneOffCard();
     return html;
   }
+
+  /* A grant, a bonus, a project fee: money that arrives once and must never
+     be averaged into a monthly rate. It sat under Income beside two-year
+     contracts, where neither could show what mattered about it. */
+  function oneOffCard() {
+    var oneOffs = state.recurring.filter(isOneOff).sort(function (a, b) {
+      return String(a.nextDate || "9").localeCompare(String(b.nextDate || "9"));
+    });
+    var lumpTotal = oneOffs.filter(function (r) { return r.nextDate; })
+      .reduce(function (t, r) { return t + toBase(r.amount, r.currency, r.rate) * confidenceOf(r); }, 0);
+
+    return '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>One-off income</h3>' +
+      '<span class="btn-row">' +
+      (lumpTotal > 0 ? '<span class="pill ok">' + fmt(lumpTotal, { round: true }) + " expected</span>" : "") +
+      '<button class="btn sm primary" data-act="recur-add" data-kind="once">Add</button></span></div>' +
+      '<div class="card-body flush">' +
+      (oneOffs.length
+        ? '<div class="rows">' + oneOffs.map(oneOffRow).join("") + "</div>"
+        : '<p class="empty">Nothing expected. <strong>A grant, a bonus, a project fee</strong> \u2014 money that ' +
+          "arrives once and should not be averaged into a monthly rate.</p>") +
+      "</div></div>";
+  }
+
 
   /* ---------------- income, split by what it actually is ----------------
      A two-year contract and a one-off grant were in the same list, which meant
@@ -7853,49 +8055,38 @@
       "</div></div>";
   }
 
-  function incomeBody() {
-    var all = state.recurring.filter(function (r) { return r.type === "income"; });
-    var contracts = all.filter(isContract).filter(function (r) { return !recurEnded(r); }).sort(byDate);
-    var ended = all.filter(isContract).filter(recurEnded)
+  /* Contracts have their own page. A two-year retainer and a bonus were in
+     one list, so neither could show what mattered about it: a contract has a
+     payer, a start, an end and a likelihood of carrying on, and every
+     projection in the app is built from those four things. The one-off half
+     went to Bills, where the other dated money lives. */
+  function contractsBody() {
+    var all = state.recurring.filter(isContract);
+    var live = all.filter(function (r) { return !recurEnded(r); }).sort(byDate);
+    var ended = all.filter(recurEnded)
       .sort(function (a, b) { return String(b.until).localeCompare(String(a.until)); });
-    var oneOffs = all.filter(isOneOff).sort(function (a, b) {
-      return String(a.nextDate || "9").localeCompare(String(b.nextDate || "9"));
-    });
 
     if (!all.length) {
-      return '<div class="card pad"><span class="label">Income</span>' +
-        '<p class="empty" style="margin:0.5rem 0 0.9rem">Nothing scheduled. <strong>Add a contract or a ' +
-        "one-off</strong> — it is what your bills are measured against, and what every projection is built " +
-        "from.</p>" +
+      return '<div class="card pad"><span class="label">Contracts</span>' +
+        '<p class="empty" style="margin:0.5rem 0 0.9rem">Nothing scheduled. <strong>Add the work that pays ' +
+        "you on a cycle</strong> \u2014 it is what your bills are measured against, and what every " +
+        "projection is built from.</p>" +
         '<div class="btn-row">' +
         '<button class="btn primary" data-act="recur-add" data-kind="income">Add a contract</button>' +
-        '<button class="btn" data-act="recur-add" data-kind="once">Add a one-off</button></div></div>';
+        '<button class="btn" data-act="plan-tab" data-id="bills">A one-off instead</button></div></div>';
     }
 
-    var monthly = contracts.reduce(function (t, r) {
+    var monthly = live.reduce(function (t, r) {
       return t + monthlyEquivalent(toBase(r.amount, r.currency, r.rate), r.frequency) * confidenceOf(r);
     }, 0);
-    var lumpTotal = oneOffs.filter(function (r) { return r.nextDate; })
-      .reduce(function (t, r) { return t + toBase(r.amount, r.currency, r.rate) * confidenceOf(r); }, 0);
 
-    var html = '<div class="sec-head"><span class="label">Contracts</span>' +
+    var html = '<div class="sec-head"><span class="label">Live</span>' +
       '<span class="btn-row">' +
       (monthly > 0 ? '<span class="pill ok">' + fmt(monthly, { round: true }) + "/mo</span>" : "") +
       '<button class="btn sm primary" data-act="recur-add" data-kind="income">Add</button></span></div>';
-    html += contracts.length
-      ? contracts.map(contractCard).join("")
+    html += live.length
+      ? live.map(contractCard).join("")
       : '<div class="card pad"><p class="empty" style="margin:0">No live contracts.</p></div>';
-
-    html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>One-off income</h3>' +
-      '<span class="btn-row">' +
-      (lumpTotal > 0 ? '<span class="pill ok">' + fmt(lumpTotal, { round: true }) + " expected</span>" : "") +
-      '<button class="btn sm primary" data-act="recur-add" data-kind="once">Add</button></span></div>' +
-      '<div class="card-body flush">' +
-      (oneOffs.length
-        ? '<div class="rows">' + oneOffs.map(oneOffRow).join("") + "</div>"
-        : '<p class="empty">Nothing expected. <strong>A grant, a bonus, a project fee</strong> — money that ' +
-          "arrives once and should not be averaged into a monthly rate.</p>") +
-      "</div></div>";
 
     if (ended.length) {
       html += '<div class="sec-head"><span class="label">Ended</span>' +
@@ -7903,6 +8094,11 @@
         (ended.length === 1 ? " contract" : " contracts") + "</span></div>" +
         ended.map(contractCard).join("");
     }
+
+    html += '<p class="hint" style="margin-top:1rem;padding:0 0.35rem">Money that arrives once \u2014 a ' +
+      "bonus, a fee, a grant payment \u2014 is under " +
+      '<button class="linkbtn" data-act="plan-tab" data-id="bills">Bills &amp; one-offs</button>, ' +
+      "because a lump sum should never be averaged into a monthly rate.</p>";
     return html;
   }
 
@@ -8379,16 +8575,15 @@
      ============================================================ */
 
   function renderInsights() {
-    var html = '<div class="dateline"><span>Insights</span>' + monthStepper() + "</div>";
-    // this whole tab answers "how am I doing" a card at a time; the report is
-    // the same answer in one piece, in a form you can send to somebody
-    if (state.transactions.length) {
-      html += '<div class="btn-row" style="margin-bottom:0.9rem">' +
-        '<button class="btn sm primary" data-act="report-write">Write a report</button></div>';
-    }
-    /* What changed, first — it was the ninth block on Home and the fifth here,
-       and this is the tab whose question it answers. */
-    html += noticesBlock();
+    /* The report is the same answer as this whole tab, in one piece and in a
+       form you can send to somebody — so it belongs beside the tab's name,
+       not as a card ahead of the reading. It sat on the first row and pushed
+       everything that answers "how am I doing" below it. */
+    var html = '<div class="dateline"><span>Insights</span>' +
+      '<span style="display:flex;align-items:center;gap:0.5rem">' +
+      (state.transactions.length
+        ? '<button class="btn sm quiet" data-act="report-write">Write a report</button>' : "") +
+      monthStepper() + "</span></div>";
 
     if (state.transactions.length < 2) {
       return html + '<div class="card pad"><p class="empty" style="margin:0;padding:0">' +
@@ -8437,8 +8632,23 @@
           : "") + "</p>";
     }
 
+    /* The allowance question used to ride on Home's three-line summary of this
+       card. That summary followed it here and became a second card with the
+       same heading, four rows above the full list it was summarising — so the
+       summary went and the one thing only it carried, the question, moved in
+       here. A question is not a note: it is at the top, and it has a button. */
+    var asking = allowancesAwaiting();
     html += '<div class="card pad"><div class="card-tophead"><span class="label">Everything worth noting</span>' +
       '<span class="sub">' + monthName(viewMonth, true) + "</span></div>" +
+      (asking.length
+        ? '<div class="notices" style="margin-top:0.7rem">' + asking.map(function (a) {
+            return '<p class="notice warn">How many days did you go in to <b>' + esc(a.source.name) +
+              "</b> in " + esc(monthName(a.mk, true)) + "? Until you say, none of the " +
+              esc(a.source.allowance.category) + " allowance is counted. " +
+              '<button class="btn sm" data-act="allowance-days" data-id="' + a.source.id +
+              '" data-mk="' + a.mk + '" style="margin-left:0.3rem">Say how many</button></p>';
+          }).join("") + "</div>"
+        : "") +
       '<div class="card-body flush">' + notesHtml(buildInsights(viewMonth), "Nothing stands out this month.") + "</div></div>";
 
     /* savings rate trend */
@@ -8595,6 +8805,31 @@
         return '<button class="btn sm' + (floorMonths() === m ? " primary" : "") +
           '" data-act="floor-set" data-v="' + m + '">' + m + " mo</button>";
       }).join("") + "</div></div></div>";
+
+    /* Grants, switched on the way a theme is. Off, nothing grant-shaped
+       renders anywhere; on, the page joins the Horizon hub. The arithmetic is
+       the same either way — restrictedTotal(), trueBurnFor() and
+       spendByCategory() have always excluded grant money and still do, in
+       both positions of this switch. */
+    var heldGrants = grants().filter(function (g) { return !g.closed; }).length;
+    html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Grants</h3>' +
+      '<span class="sub">' + (grantMode() ? "on" : "off") + "</span></div>" +
+      '<div class="card-body"><p class="hint" style="margin-bottom:0.7rem">' +
+      "Money you are holding for someone else \u2014 a grant, a fund, a budget you administer. " +
+      "Switched on, Horizon gains a page for it and Coffer tracks what is left against the headings " +
+      "you have to report on. Switched off it is simply not there, and " +
+      "<b>no figure anywhere changes</b>: grant money is out of your net worth, your burn rate and " +
+      "your budgets either way.</p>" +
+      (heldGrants
+        ? '<p class="notice">You are holding ' + heldGrants +
+          (heldGrants === 1 ? " grant" : " grants") + ", so this stays on until " +
+          (heldGrants === 1 ? "it is" : "they are") + " closed or deleted.</p>"
+        : '<div class="btn-row">' +
+          '<button class="btn' + (grantMode() ? " primary" : "") + '" data-act="grant-mode" data-v="1">' +
+          "On</button>" +
+          '<button class="btn' + (grantMode() ? "" : " primary") + '" data-act="grant-mode" data-v="0">' +
+          "Off</button></div>") +
+      "</div></div>";
 
     html += '<div class="card" style="margin-top:1rem"><div class="card-head"><h3>Appearance</h3>' +
       '<span class="sub">' + esc(currentTheme() === "system" ? "following your phone" : THEME_LABEL[currentTheme()].toLowerCase()) +
@@ -9000,7 +9235,10 @@
   }
 
   // toast() escapes for us; this just trims very long descriptions
-  function forgetPhoto(id) { if (hasPhoto(id)) { photoDel(id); markPhoto(id, false); } }
+  /* forgetPhoto() lived here. Deleting a transaction deliberately LEAVES its
+     receipt in IndexedDB while undo is still on offer, and the storage
+     tidy-up in Settings sweeps it once the delete stands — so a helper that
+     deleted the blob immediately was the wrong shape, not a missing call. */
 
   function esc0(s) { return String(s).length > 40 ? String(s).slice(0, 38) + "…" : String(s); }
 
@@ -9272,7 +9510,8 @@
   var ACTIONS = {
 
     /* ---- navigation ---- */
-    "go-insights": function () { view = "insights"; render(); },
+    // "go-insights" lived here. Its only button was noticesBlock's
+    // "All insights →", and that block is gone.
 
     "floor-set": function (id, el) {
       state.settings.floorMonths = num(el.getAttribute("data-v"));
@@ -9284,7 +9523,32 @@
       state.settings.theme = el.getAttribute("data-v");
       save(); applyTheme(); render();
     },
-    "plan-tab": function (id) { planTab = id; view = "plan"; render(); },
+    "plan-tab": function (id) {
+      // "income" split into Contracts and the one-off half of Bills; anything
+      // still pointing at the old id lands on the contracts page
+      planTab = id === "income" ? "contracts" : id;
+      view = "plan";
+      render();
+    },
+    // which of the adviser's proposals the hub is showing. A question, not a
+    // preference, so it lives for as long as the screen does and no longer.
+    "advice-next": function () { adviceIdx++; render(); },
+    "wiw-range": function (id, el) { wiwRange = num(el.getAttribute("data-v")) || 1; render(); },
+    "grant-mode": function (id, el) {
+      var on = el.getAttribute("data-v") === "1";
+      var held = grants().filter(function (g) { return !g.closed; }).length;
+      // a book holding money that is not yours cannot pretend it does not
+      if (!on && held) {
+        return toast("You are holding " + held + (held === 1 ? " grant" : " grants") +
+          ". Close or delete " + (held === 1 ? "it" : "them") + " first \u2014 hiding the page would " +
+          "not make the money yours.", "warn");
+      }
+      state.settings.grantMode = on;
+      if (!save()) return;
+      if (!on && planTab === "grants") planTab = "hub";
+      render();
+      toast(on ? "Grants are on. The page is in Horizon." : "Grants are off.");
+    },
     "go-advice": function () {
       planTab = "advice"; view = "plan"; render();
       window.scrollTo({ top: 0, behavior: "auto" });
@@ -9559,6 +9823,74 @@
       a.closedOn = null;
       save(); render();
       toast(a.name + " is open again.", function () { a.closed = true; });
+    },
+
+    /* Remove the account, keep everything that went through it.
+
+       Closing keeps the account on the screen, and deleting takes the history
+       with it; neither is what you want for a bank you left three years ago
+       whose spending is still part of your record. This is the third move,
+       and it is the one a POCKET already had: the record goes, every entry
+       stays exactly as logged, and `state.forgotten` keeps the name so the
+       rows still say where the money went.
+
+       What it does change, and says so: the account's balance leaves your net
+       worth. It has to — the account is gone, and a figure counted from
+       nothing is the kind of plausible wrong number this app refuses to
+       print. */
+    "account-forget": function (id) {
+      var a = accountById(id);
+      if (!a) return;
+      var linked = state.transactions.filter(function (t) {
+        return t.accountId === id || t.toAccountId === id;
+      });
+      if (!linked.length) {
+        // nothing to keep, so this is just a delete and should say so
+        return ACTIONS["account-del"](id);
+      }
+      var linkedRecur = state.recurring.filter(function (r) { return r.accountId === id; });
+      var linkedGoals = state.goals.filter(function (g) {
+        return !g.closed && parseRef(g.ref || "").accountId === id;
+      });
+      var bal = balanceOf(a);
+
+      var msg = "<b>" + linked.length + (linked.length === 1 ? " entry stays" : " entries stay") +
+        "</b> in your ledger exactly as logged, still filed under <b>" + esc(a.name) +
+        "</b>, so your spending history does not change.";
+      if (Math.abs(bal) > 0.005) {
+        msg += " What does change: its balance of <b>" + fmt(bal) + "</b> leaves your net worth, " +
+          "because the account is no longer there to hold it.";
+      }
+      if (linkedRecur.length) {
+        msg += " <b>" + linkedRecur.length + "</b> recurring " +
+          (linkedRecur.length === 1 ? "item goes" : "items go") +
+          " with it \u2014 nothing can be paid into an account that is not there.";
+      }
+      if (linkedGoals.length) {
+        msg += " <b>" + linkedGoals.length + "</b> " + (linkedGoals.length === 1 ? "goal" : "goals") +
+          " tied to it will stop naming a place to save into.";
+      }
+      msg += " You can undo this straight afterwards.";
+
+      confirmAction({
+        title: "Remove " + a.name + ", keeping its history?",
+        message: msg,
+        confirmLabel: "Remove, keep the entries"
+      }, function () {
+        var snapAcc = state.accounts.slice();
+        var snapRec = state.recurring.slice();
+        state.accounts = state.accounts.filter(function (x) { return x.id !== id; });
+        state.recurring = state.recurring.filter(function (r) { return r.accountId !== id; });
+        state.forgotten[id] = a.name;
+        if (filters.account === id) filters.account = "all";
+        save(); render();
+        toast(a.name + " removed \u2014 its " + linked.length +
+          (linked.length === 1 ? " entry is" : " entries are") + " still in the ledger.", function () {
+          state.accounts = snapAcc;
+          state.recurring = snapRec;
+          delete state.forgotten[id];
+        });
+      });
     },
 
     "account-del": function (id) {
@@ -10089,6 +10421,9 @@
             accountId: acc.id, pocketId: pk.id, amount: v.total,
             grantId: g.id, grantAward: true, currency: cur, rate: rt
           });
+          // adding one is the clearest possible statement that you are in
+          // the mode, so it turns itself on rather than asking
+          state.settings.grantMode = true;
           planTab = "grants"; view = "plan";
           save(); render();
           toast(g.name + " added \u2014 held in " + acc.name + " \u203a " + pk.name + ".");
@@ -12560,7 +12895,15 @@
       { id: uid(), name: "Gym", type: "expense", category: "Health", accountId: bank.id,
         amount: 30, frequency: "monthly", nextDate: nextRecur(5), currency: "USD", rate: 1 },
       { id: uid(), name: "Car insurance", type: "expense", category: "Transport", accountId: bank.id,
-        amount: 480, frequency: "yearly", nextDate: nextRecur(14), currency: "USD", rate: 1 }
+        amount: 480, frequency: "yearly", nextDate: nextRecur(14), currency: "USD", rate: 1 },
+      /* A lump sum with a date and a likelihood, so the half of Bills & one-offs
+         that is not a bill has something in it — and so the projection has one
+         month that is not like the others. Money that arrives once must never
+         be averaged into a monthly rate, and there is nowhere else to show
+         that being true. */
+      { id: uid(), name: "Exhibition fee", type: "income", category: "Freelance",
+        payer: "Beirut Art Center", accountId: bank.id, amount: 1800,
+        frequency: "once", nextDate: nextRecur(21), currency: "USD", rate: 1 }
     ];
 
     // days actually gone in this month, at the rate they were converted at
@@ -12729,6 +13072,12 @@
     var tab = e.target.closest("[data-tab]");
     if (tab) {
       view = tab.getAttribute("data-tab");
+      /* The Horizon tab always lands on its hub. Remembering the last page
+         opened means the tab shows a different screen depending on what you
+         did ten minutes ago, which is the habit the old "open on whichever
+         sub-tab seems likely" default had and the reason nobody could learn
+         where anything was. Deep links and the back button still work. */
+      if (view === "plan") planTab = null;
       ledgerLimit = LEDGER_PAGE;
       omni = { text: "", touched: {} };
       hideTip();
