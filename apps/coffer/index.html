@@ -1369,7 +1369,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-09c";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-11a";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -2024,7 +2024,7 @@
 
   var memo = {};
   function resetMemo() {
-    memo = { bal: {}, assets: {}, mtx: {}, msum: {}, cats: {}, accName: null, learned: null };
+    memo = { bal: {}, assets: {}, mtx: {}, msum: {}, cats: {}, accName: null, learned: null, refunds: null };
   }
   resetMemo();
 
@@ -2201,7 +2201,32 @@
      and they drifted apart the moment you spent from the pocket without
      remembering to adjust the goal. When `holdsIn` is set, `saved` is read
      from the pocket and the manual top-up buttons go away. */
+  /* Three ways a goal can know how far along it is.
+
+     `pocket`  — money you actually moved into somewhere (or typed in by hand).
+                 It is HELD: nothing else may spend it.
+     `free`    — your reachable money, whatever it is doing. Saving up for a
+                 laptop out of the current account, without shuffling money
+                 into a pocket first.
+     `worth`   — everything you own, net of debt. The right basis for "when am
+                 I worth enough to make the move".
+
+     The invariant that keeps the arithmetic straight: **a goal that watches a
+     total holds nothing back.** `free` and `worth` are already whole-position
+     figures, so reserving against them would subtract the same money from
+     spare cash AND count it as progress — once in each direction. Only a
+     pocket goal reaches `goalsHeld()`, and only a pocket goal can be told to
+     set money aside. */
+  function goalBasis(g) {
+    var t = g && g.tracks;
+    return (t === "free" || t === "worth") ? t : "pocket";
+  }
+  function goalHolds(g) { return goalBasis(g) === "pocket"; }
+
   function goalSaved(g) {
+    var basis = goalBasis(g);
+    if (basis === "free") return freeAssets();
+    if (basis === "worth") return netWorth();
     if (!g.holdsIn) return num(g.saved);
     var r = parseRef(g.holdsIn);
     var a = accountById(r.accountId);
@@ -2210,6 +2235,13 @@
     var pk = pocketById(a, r.pocketId);
     return pk ? pocketBalance(a, pk) : num(g.saved);
   }
+  var GOAL_BASIS_LABEL = {
+    pocket: "money set aside for it",
+    free: "your reachable money",
+    worth: "your net worth"
+  };
+  // the same thing said short enough to sit beside a figure without wrapping
+  var GOAL_BASIS_SHORT = { pocket: "set aside", free: "reachable", worth: "net worth" };
   /* What a goal needs every month to land on its date. goalsBody() worked this
      out and threw it away, which is why nothing else in the app knew a goal
      existed. Extracted so the goals screen and the afford tool cannot drift
@@ -2225,8 +2257,14 @@
   }
   // Everything already put aside toward a goal, capped at its target: money
   // past the target is spare again.
+  /* What the goals have actually put aside, which `spareAssets()` holds back.
+     A goal watching free money or net worth is measuring a total that already
+     contains this money — counting it here would remove it from spare cash and
+     credit it as progress at the same time, which is the same dollars twice in
+     opposite directions. */
   function goalsHeld() {
     return state.goals.reduce(function (t, g) {
+      if (!goalHolds(g)) return t;
       return t + Math.min(goalSaved(g), num(g.target));
     }, 0);
   }
@@ -2353,6 +2391,61 @@
     return pendingRefunds().reduce(function (s, t) { return s + txBase(t); }, 0);
   }
 
+  /* What a refundable actually COST you, which is not the same as whether you
+     are still waiting for it.
+
+     This used to key off `isPending` everywhere, so a reimbursable flight was
+     left out of the burn rate while the money was still out — and then counted
+     in full the day it came back. That is exactly backwards: the app was sure
+     it was not a cost while that was still uncertain, and called it a cost once
+     it was certain it had not been one. A month with two reimbursed trips read
+     as a month of heavy spending, which shortened the runway, ate the category
+     budget, and filled Where-it-went with money that was never yours.
+
+     So: what you paid, less what actually came back. Still out — nothing, you
+     expect all of it. Fully reimbursed — nothing. Short — the difference, and
+     it lands in the month you spent it and under its own category, because that
+     is the month and the heading it really cost you. A refund arriving in May
+     therefore corrects March rather than charging May for a March flight.
+
+     The refund entries themselves carry `refundFor`, and come out of income for
+     the same reason: money coming back is not money earned. */
+  function refundIndex() {
+    if (memo.refunds) return memo.refunds;
+    var idx = {};
+    state.transactions.forEach(function (x) {
+      if (x.type !== "income" || !x.refundFor) return;
+      idx[x.refundFor] = (idx[x.refundFor] || 0) + txBase(x);
+    });
+    memo.refunds = idx;
+    return idx;
+  }
+  function refundedFor(id) { return refundIndex()[id] || 0; }
+  function isRefundIn(t) { return t.type === "income" && !!t.refundFor; }
+
+  function netCost(t) {
+    if (!t.refundable) return txBase(t);
+    if (!t.settledOn) return 0;
+    return Math.max(0, txBase(t) - refundedFor(t.id));
+  }
+  // how much of an entry is a real cost, 0..1 — a split is scaled by it so the
+  // parts still sum to what the entry actually cost
+  function costRatio(t) {
+    var gross = txBase(t);
+    if (!(gross > 0)) return 0;
+    return clamp(netCost(t) / gross, 0, 1);
+  }
+  /* Every category site walks this instead of txParts, so nothing has to know
+     whether an entry was split, refundable, or both. */
+  function costParts(t) {
+    var r = costRatio(t);
+    if (r <= 0) return [];
+    if (r >= 1) return txParts(t);
+    return txParts(t).map(function (pt) {
+      return { category: pt.category, base: pt.base * r };
+    });
+  }
+
   /* ---------------- grants ----------------
      Money that is in your account and is not yours. Every default in a
      personal-finance app is wrong for it: it would inflate net worth, wreck
@@ -2421,6 +2514,16 @@
     var pending = tx.reduce(function (s, t) {
       return t.type === "expense" && isPending(t) ? s + txBase(t) : s;
     }, 0);
+    /* Money that left and came back, or is expected to. Both halves come out
+       together — the outlay off the spending and the refund off the income —
+       or a reimbursed flight reads as a month where you both spent and earned
+       six hundred dollars you never had. `pending` is the waiting half of the
+       same figure, kept separately because Pending on Home is about what has
+       not settled rather than what it cost. */
+    var passThrough = tx.reduce(function (s, t) {
+      return t.type === "expense" ? s + (txBase(t) - netCost(t)) : s;
+    }, 0);
+    var refundIn = tx.reduce(function (s, t) { return isRefundIn(t) ? s + txBase(t) : s; }, 0);
     // A grant landing is not a month where you earned twenty thousand, and a
     // grant being spent is not a month where you overspent. Both sides come
     // out together, or the pair stops describing the same month.
@@ -2430,18 +2533,25 @@
       if (t.type === "income") grantIn += txBase(t);
       else if (t.type === "expense") grantOut += txBase(t);
     });
-    var ownIncome = income - grantIn;
-    var ownSpend = expense - pending - grantOut;
+    var ownIncome = income - grantIn - refundIn;
+    var ownSpend = expense - passThrough - grantOut;
     var out = {
-      mk: mk, income: ownIncome, expense: expense - grantOut, net: ownIncome - (expense - grantOut),
-      // what the month actually cost you, once money you are owed back is out
+      mk: mk, income: ownIncome,
+      // everything that left, which is the gross figure by definition
+      expense: expense - grantOut,
+      /* Kept is built from the two OWN figures. Reading it off the gross
+         expense while income had the refund taken out of it would charge the
+         month for an outlay whose repayment it was no longer being credited
+         with. */
+      net: ownIncome - ownSpend,
+      // what the month actually cost you, once money that came back is out
       spend: ownSpend,
-      pending: pending,
+      pending: pending, passThrough: passThrough, refundIn: refundIn,
       grantIn: grantIn, grantOut: grantOut,
       // everything that moved, grants included, for anything that has to
       // reconcile against the account itself
       grossIncome: income, grossExpense: expense,
-      rate: ownIncome > 0 ? (ownIncome - (expense - grantOut)) / ownIncome : null,
+      rate: ownIncome > 0 ? (ownIncome - ownSpend) / ownIncome : null,
       count: tx.length
     };
     memo.msum[mk] = out;
@@ -2451,10 +2561,11 @@
     if (memo.cats[mk]) return memo.cats[mk];
     var out = {};
     monthTx(mk).forEach(function (t) {
-      if (t.type !== "expense" || isPending(t)) return;
+      if (t.type !== "expense") return;
       // a grant-funded trip is not you overspending on travel
       if (isGrantSpend(t)) return;
-      txParts(t).forEach(function (pt) {
+      // …and neither is a trip somebody paid you back for
+      costParts(t).forEach(function (pt) {
         out[pt.category] = (out[pt.category] || 0) + pt.base;
       });
     });
@@ -2525,10 +2636,9 @@
     var burn = 0;
     tx.forEach(function (t) {
       if (t.type !== "expense") return;
-      if (isPending(t)) return;            // owed back: not a cost yet
       if (t.oneOff) return;                // marked as a one-off by hand
       if (isGrantSpend(t)) return;         // someone else's money, on their errand
-      burn += txBase(t);
+      burn += netCost(t);                  // reimbursed money never cost you anything
     });
     return burn;
   }
@@ -5115,15 +5225,15 @@
 
     // today measured the same way it is judged, or it is not a comparison
     var todayBurn = todayTx.reduce(function (n, t) {
-      if (t.type !== "expense" || isPending(t) || t.oneOff || isGrantSpend(t)) return n;
-      return n + txBase(t);
+      if (t.type !== "expense" || t.oneOff || isGrantSpend(t)) return n;
+      return n + netCost(t);
     }, 0);
     var stripped = todayOut - todayBurn;
 
     // distinct dates, not entries: two coffees on one day is one day
     var seenDays = {};
     monthTx(mkNow).forEach(function (t) {
-      if (t.type !== "expense" || isPending(t) || t.oneOff || isGrantSpend(t)) return;
+      if (t.type !== "expense" || t.oneOff || isGrantSpend(t) || !(netCost(t) > 0)) return;
       seenDays[t.date] = 1;
     });
     var spendDays = Object.keys(seenDays).length;
@@ -5154,7 +5264,7 @@
       "</div>" +
       (stripped > 0.005
         ? '<p class="pair-sub" style="margin-top:0.5rem">' + fmt(stripped, { round: true }) +
-          " of today is a one-off or owed back, so it is not counted against a typical day.</p>"
+          " of today is a one-off, or money coming back, so it is not counted against a typical day.</p>"
         : "") +
 
       (todayIn > 0
@@ -5255,7 +5365,7 @@
           " over " + sum.live + (sum.live === 1 ? " month" : " months") +
           " with entries" + (sum.live < n ? " (of the " + n + " you asked for)" : "") +
           " \u2014 " + fmt(sum.total / Math.max(1, sum.live), { round: true }) +
-          " a month on average. Grant spending and money you are owed back are " +
+          " a month on average. Grant spending and money that came back to you are " +
           "left out, the same as everywhere else.</p>"
         : "") + "</div></div>";
   }
@@ -5326,7 +5436,7 @@
         : "") +
       '<p class="pair-sub" style="margin-top:0.45rem">' +
       (stripped > 0.5
-        ? fmt(stripped, { round: true }) + " of it was a one-off or money you are owed back"
+        ? fmt(stripped, { round: true }) + " of it was a one-off, or money that came back to you"
         : "all of it was running cost this month") + "</p></div>";
   }
 
@@ -6394,33 +6504,57 @@
     return freeAssets() - goalsHeld() - savingsFloor();
   }
 
-  /* What a month actually leaves you, if you keep to your plan.
+  /* What a month actually leaves you.
 
-     Outgoings use the BUDGET where a category has one and true burn where it
-     does not, because "if I stick to my budgets, what is left" is the question
-     being asked — and the two bases are reported separately, since a budget is
-     aspiration and burn is behaviour and confusing them is how a surplus
-     becomes a wish. */
+     This used to count a budgeted category at its LIMIT and everything else at
+     behaviour, on the grounds that "if I stick to my budgets, what is left" is
+     the question. That only holds while the budgets describe what you do. Set
+     above what you actually spend — which is the ordinary case, because a
+     budget is written once and hopefully — every one of them quietly removes
+     the difference from what reaches your goals, so a goal gets pushed out for
+     money you were never going to spend.
+
+     So outgoings are your burn rate: behaviour, over the months that have
+     entries, one-offs and money that came back already out of it. Budgets keep
+     the job they are good at — telling you a category is running hot before
+     the month ends — and no longer have a vote on your goal dates.
+
+     `slack` is what the limits allow ABOVE what you spend. Nothing is decided
+     by it; it is the figure that explains why the two numbers differ, and
+     `budgetSlackNote()` is the only thing that prints it. */
   function plannedOutgoings() {
     var b = burnRate();
     var burn = b.rate;
     /* What the budgeted categories actually cost, averaged over the SAME
        months the burn rate is built from. Read from this month alone it is
-       nothing on the 4th, and every budgeted category then got counted twice —
-       once as its budget and again inside the burn. */
+       nothing on the 4th. */
     var months = recentMonths(BURN_LOOKBACK, monthShift(thisMonth(), -1))
       .filter(function (mk) { return monthTx(mk).length > 0; });
     if (!months.length) months = [thisMonth()];
     var budgeted = 0, budgetedSpend = 0;
     Object.keys(state.budgets).forEach(function (cat) {
+      if (!(num(state.budgets[cat]) > 0)) return;
       budgeted += num(state.budgets[cat]);
       var t = 0;
       months.forEach(function (mk) { t += spendByCategory(mk)[cat] || 0; });
       budgetedSpend += t / months.length;
     });
-    // whatever the budgets do not describe, taken from behaviour instead
-    var unbudgeted = Math.max(0, burn - budgetedSpend);
-    return { total: budgeted + unbudgeted, budgeted: budgeted, unbudgeted: unbudgeted, burn: burn };
+    return {
+      total: burn, burn: burn,
+      budgeted: budgeted, budgetedSpend: budgetedSpend,
+      slack: Math.max(0, budgeted - budgetedSpend),
+      months: months.length
+    };
+  }
+
+  /* One line saying why "what I have left" is not "what my budgets allow".
+     Returns "" when there is nothing to explain. */
+  function budgetSlackNote() {
+    var o = plannedOutgoings();
+    if (!(o.slack > 5) || !(o.budgeted > 0)) return "";
+    return "Your budgets allow " + fmt(o.slack, { round: true }) +
+      " a month more than you actually spend. Your goals are planned on what you " +
+      "spend, not on the limits \u2014 so that money is already counted as yours.";
   }
 
   function monthlyIncomeExpected() {
@@ -7017,6 +7151,9 @@
     var moves = state.goals.map(function (g) {
       var need = goalNeed(g);
       if (need.done || !(need.need > 0)) return null;
+      // a goal watching free money or net worth has nowhere to move money TO:
+      // the total it reads already contains every account you could move from
+      if (!goalHolds(g)) return null;
       var fed = goalFedIn(g, mk);
       var ref = g.holdsIn ? parseRef(g.holdsIn) : null;
       return {
@@ -7080,21 +7217,25 @@
     /* 1. Budgets that do not describe what you do. A budget nobody keeps is
        not a limit — it is a wrong number sitting inside every figure built on
        it, starting with what you have left over each month. */
-    var freed = 0;      // what correcting them does to the month, net
+    /* Correcting a budget no longer changes what the month leaves: outgoings
+       are your burn rate now, so a limit is a monitor rather than a claim on
+       the money. These proposals still come first — a wrong number is worth
+       fixing before a promise is moved for it — but they free nothing, and
+       saying they did would be the adviser disagreeing with the app. */
     if (seen.months >= 2) {
       Object.keys(state.budgets).forEach(function (cat) {
         var limit = num(state.budgets[cat]), avg = seen.avg[cat] || 0;
         if (!(limit > 0)) return;
         if (avg > limit * 1.15 && avg - limit > 5) {
           var up = tidyUp(avg);
-          freed -= up - limit;
           budgetProps.push({
-            id: "budget-up-" + cat, rank: 1, delta: -(up - limit),
+            id: "budget-up-" + cat, rank: 1, delta: 0,
             title: "Raise " + cat + " to " + fmt(up, { round: true }),
             finding: "It is set at " + fmt(limit, { round: true }) + " and you have spent " +
               fmt(avg, { round: true }) + " a month over " + seen.months + " months.",
-            effect: "The bar stops reading red every month and what you have left over becomes a " +
-              "figure worth trusting \u2014 it falls by " + fmt(up - limit, { round: true }) + ".",
+            effect: "The bar stops reading red every month, so it means something when it does. " +
+              "Nothing you have left over changes \u2014 that is built from what you spend, not from " +
+              "the limit.",
             apply: function () { var was = state.budgets[cat]; state.budgets[cat] = up;
               return function () { state.budgets[cat] = was; }; }
           });
@@ -7103,14 +7244,14 @@
           // first month anything is slightly out of the ordinary
           var down = tidyUp(avg * 1.1);
           if (down >= limit - 0.005) return;
-          freed += limit - down;
           budgetProps.push({
-            id: "budget-down-" + cat, rank: 1, delta: limit - down,
+            id: "budget-down-" + cat, rank: 1, delta: 0,
             title: "Lower " + cat + " to " + fmt(down, { round: true }),
             finding: "It is set at " + fmt(limit, { round: true }) + " and you have spent " +
               fmt(avg, { round: true }) + " a month over " + seen.months + " months.",
-            effect: "That frees " + fmt(limit - down, { round: true }) +
-              " a month toward what you are saving for, with room above what you actually spend.",
+            effect: "A limit " + fmt(down - avg, { round: true }) + " above what you actually spend " +
+              "tells you something when it is crossed. It frees nothing \u2014 the money was never " +
+              "being spent, so it already counts as yours.",
             apply: function () { var was = state.budgets[cat]; state.budgets[cat] = down;
               return function () { state.budgets[cat] = was; }; }
           });
@@ -7137,21 +7278,11 @@
       });
     }
 
-    /* 2. Re-read the month as if those were corrected, and only then ask
-       whether a promise has to move. `freed` is what the corrections do to
-       outgoings, which is exactly what `plannedOutgoings()` would return with
-       the new limits in place. */
-    var surplus = flow.surplus + freed;
-    var avail = flow.income - flow.out + freed;     // what is left for promises
-
-    // say so on the correction that carries it, rather than leaving the
-    // reader to add the two figures up themselves
-    if (flow.surplus < -0.005 && surplus >= -0.005 && freed > 0.005) {
-      budgetProps.forEach(function (p) {
-        if (p.delta > 0.005) p.effect += " Between them these corrections are enough on their own: " +
-          "your month balances and nothing you are saving for has to move.";
-      });
-    }
+    /* 2. Whether a promise has to move, read straight off the month. There is
+       no re-reading step any more: the budgets above do not enter `flow.out`,
+       so nothing they do changes this figure. */
+    var surplus = flow.surplus;
+    var avail = flow.income - flow.out;             // what is left for promises
 
     if (surplus < -0.005 && flow.goals > 0) {
       var deficit = -surplus;
@@ -7175,8 +7306,8 @@
           id: "goal-date-" + g2.id, rank: 2,
           title: "Give " + g2.name + " until " + monthName(newMk, true),
           finding: g2.name + " wants " + fmt(best.need.need, { round: true }) + " a month, which is " +
-            fmt(deficit, { round: true }) + " more than the month leaves" +
-            (freed > 0.005 ? " even with the corrections above" : "") + ".",
+            fmt(deficit, { round: true }) + " more than the month leaves once everything you " +
+            "usually spend is paid.",
           effect: "At " + fmt(best.pace, { round: true }) + " a month it lands in " +
             monthName(newMk, true) + " instead, and your month balances.",
           apply: function () { var was = g2.due; g2.due = newDue;
@@ -7323,7 +7454,7 @@
       html += '<div class="split" style="margin-top:0.7rem">' +
         '<div class="split-row"><span>Expected in</span><span class="fig">' +
         fmt(flow.income, { round: true }) + "</span></div>" +
-        '<div class="split-row"><span>Budget and usual spending</span><span class="fig">−' +
+        '<div class="split-row"><span>What you usually spend</span><span class="fig">−' +
         fmt(flow.out, { round: true }) + "</span></div></div>";
 
       if (m.moves.length) {
@@ -8476,16 +8607,14 @@
     var m = adviceMonth();
     var props = m.flow.income ? adviceProposals() : [];
     var budgetProps = props.filter(function (p) { return /^budget-/.test(p.id); });
-    /* Order is the whole of the adviser's intelligence: budgets that do not
-       describe what you spend are corrected first, and only then is a promise
-       asked to move. Saying so is what stops this page reading as though the
-       goals were the problem — and it is one fact about the month, so it is
-       said once above them rather than repeated inside every card. */
-    if (budgetProps.length) {
-      html += '<p class="hint" style="margin:0 0.35rem 0.9rem">' +
-        budgetProps.length + (budgetProps.length === 1 ? " budget does" : " budgets do") +
-        " not describe what you actually spend. Those get corrected before anything you are " +
-        "saving for is asked to move, because they change what the month leaves. " +
+    /* Goals are planned on what you actually spend, not on your limits. When
+       the limits sit above that — which is the ordinary case — this says so,
+       because otherwise the two screens look like they disagree about how much
+       money you have. One fact about the month, said once above the goals
+       rather than repeated inside every card. */
+    var slackNote = budgetSlackNote();
+    if (slackNote) {
+      html += '<p class="hint" style="margin:0 0.35rem 0.9rem">' + esc(slackNote) + " " +
         '<button class="linkbtn" data-act="plan-tab" data-id="budgets">Open Budgets</button></p>';
     }
 
@@ -8546,7 +8675,8 @@
         "</div>" +
         '<div style="display:flex;align-items:baseline;gap:0.5rem;margin:0.55rem 0 0.5rem">' +
         '<span class="fig" style="font-size:1.5rem;font-weight:650;font-family:var(--serif)">' + fmt(saved) + "</span>" +
-        '<span style="color:var(--faint);font-size:0.85rem">of ' + fmt(target) + "</span>" +
+        '<span style="color:var(--faint);font-size:0.85rem">of ' + fmt(target) +
+        (goalHolds(g) ? "" : " \u00b7 " + esc(GOAL_BASIS_SHORT[goalBasis(g)])) + "</span>" +
         '<span style="margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums">' + Math.round(pct * 100) + "%</span></div>" +
         meter(pct, done ? "var(--gain)" : "var(--c3)") +
         /* `tone` was computed on all four branches here and read by nothing,
@@ -8557,10 +8687,13 @@
         (tone === "ok" ? "calm" : tone === "warn" ? "warn" : tone === "bad" ? "alert" : "dim") +
         ')">' + needLine + "</p>" +
         '<div class="btn-row" style="margin-top:0.85rem">' +
-        (held
-          ? '<span class="hint">follows ' + esc(held) + '</span>'
-          : '<button class="btn sm primary" data-act="goal-fund" data-id="' + g.id + '">Add funds</button>' +
-            (saved > 0 ? '<button class="btn sm" data-act="goal-withdraw" data-id="' + g.id + '">Take out</button>' : "")) +
+        (!goalHolds(g)
+          ? '<span class="hint">watching ' + esc(GOAL_BASIS_LABEL[goalBasis(g)]) +
+            ' \u2014 nothing is set aside for it, so nothing is held back from anything else</span>'
+          : held
+            ? '<span class="hint">follows ' + esc(held) + '</span>'
+            : '<button class="btn sm primary" data-act="goal-fund" data-id="' + g.id + '">Add funds</button>' +
+              (saved > 0 ? '<button class="btn sm" data-act="goal-withdraw" data-id="' + g.id + '">Take out</button>' : "")) +
         "</div>" +
         (done ? "" : goalAdviceBlock(g, m, mine)) +
         "</div></div>";
@@ -8724,7 +8857,7 @@
       '<div class="pair-sub">one-offs stripped out</div></div>' +
       "</div>" +
       '<p class="pair-sub" style="margin-top:0.7rem">' + (outflow - rw.burn > 0.5
-        ? fmt(outflow - rw.burn, { round: true }) + " of a typical month was one-offs or money owed back."
+        ? fmt(outflow - rw.burn, { round: true }) + " of a typical month was one-offs, or money that came back to you."
         : "Nothing to strip out — a typical month here is all running cost.") + "</p></div>";
 
     html += '<div class="triple">' +
@@ -8786,10 +8919,10 @@
     /* category league table */
     var totals = {}, monthsCounted = {};
     state.transactions.forEach(function (t) {
-      // the monthly chart already leaves out money you are owed back; this
-      // table counted it, so one flight was spending here and not there
-      if (t.type !== "expense" || isPending(t)) return;
-      txParts(t).forEach(function (pt) {
+      // the monthly chart already leaves out money that came back; this table
+      // counted it, so one flight was spending here and not there
+      if (t.type !== "expense") return;
+      costParts(t).forEach(function (pt) {
         totals[pt.category] = (totals[pt.category] || 0) + pt.base;
         monthsCounted[pt.category] = monthsCounted[pt.category] || {};
         monthsCounted[pt.category][monthOf(t.date)] = true;
@@ -11490,6 +11623,16 @@
           { key: "target", label: "Target amount", type: "number", min: 0 },
           { key: "saved", label: "Already saved", type: "number", value: 0 },
           { key: "due", label: "Target date", type: "date", hint: "optional" },
+          { key: "tracks", label: "Measure progress against", type: "select", span: true,
+            options: [
+              { value: "pocket", label: "Money set aside for it" },
+              { value: "free", label: "My reachable money" },
+              { value: "worth", label: "My net worth" }
+            ],
+            value: "pocket",
+            hint: "Set aside holds the money back from everything else. The other two watch a " +
+              "total you already have, so they reserve nothing \u2014 use them when you are not " +
+              "moving money into a pocket for it." },
           { key: "holdsIn", label: "Money is held in", type: "select",
             options: [{ value: "", label: "\u2014 track it by hand \u2014" }].concat(accountOptions()),
             value: "",
@@ -11501,8 +11644,12 @@
           if (v.target <= 0) return "Enter a target above zero.";
         },
         onConfirm: function (v) {
+          var watches = v.tracks === "free" || v.tracks === "worth";
           state.goals.push({ id: uid(), name: v.name.trim(), target: v.target,
-            saved: v.holdsIn ? 0 : v.saved, due: v.due || null, holdsIn: v.holdsIn || null });
+            saved: (watches || v.holdsIn) ? 0 : v.saved, due: v.due || null,
+            tracks: v.tracks || "pocket",
+            // a goal watching a total is not held anywhere, by definition
+            holdsIn: watches ? null : (v.holdsIn || null) });
           save(); render(); toast(v.name.trim() + " added.");
         }
       });
@@ -11517,8 +11664,20 @@
           { key: "name", label: "What for", value: g.name, span: true },
           { key: "target", label: "Target amount", type: "number", value: g.target, min: 0 },
           { key: "saved", label: "Saved so far", type: "number", value: g.saved,
-            hint: g.holdsIn ? "ignored while this goal reads a pocket" : "" },
+            hint: goalHolds(g)
+              ? (g.holdsIn ? "ignored while this goal reads a pocket" : "")
+              : "ignored while this goal watches " + GOAL_BASIS_LABEL[goalBasis(g)] },
           { key: "due", label: "Target date", type: "date", value: g.due || "" },
+          { key: "tracks", label: "Measure progress against", type: "select", span: true,
+            options: [
+              { value: "pocket", label: "Money set aside for it" },
+              { value: "free", label: "My reachable money" },
+              { value: "worth", label: "My net worth" }
+            ],
+            value: goalBasis(g),
+            hint: "Set aside holds the money back from everything else. The other two watch a " +
+              "total you already have, so they reserve nothing \u2014 use them when you are not " +
+              "moving money into a pocket for it." },
           { key: "holdsIn", label: "Money is held in", type: "select",
             options: [{ value: "", label: "\u2014 track it by hand \u2014" }].concat(accountOptions(g.holdsIn)),
             value: g.holdsIn || "" }
@@ -11528,8 +11687,10 @@
           if (v.target <= 0) return "Enter a target above zero.";
         },
         onConfirm: function (v) {
+          var watches = v.tracks === "free" || v.tracks === "worth";
           g.name = v.name.trim(); g.target = v.target; g.saved = v.saved; g.due = v.due || null;
-          g.holdsIn = v.holdsIn || null;
+          g.tracks = v.tracks || "pocket";
+          g.holdsIn = watches ? null : (v.holdsIn || null);
           save(); render(); toast("Goal updated.");
         }
       });
@@ -11548,6 +11709,10 @@
     "goal-fund": function (id) {
       var g = state.goals.filter(function (x) { return x.id === id; })[0];
       if (!g) return;
+      if (!goalHolds(g)) {
+        return toast(g.name + " measures " + GOAL_BASIS_LABEL[goalBasis(g)] +
+          ", so there is nothing to add to \u2014 it moves when that total does.", "warn");
+      }
       openModal({
         title: "Add funds to " + g.name,
         message: "This records progress on the goal. It doesn't move money between accounts — use a transfer for that.",
@@ -12391,8 +12556,8 @@
     L.push("");
     var totals = {}, monthsSeen = {};
     state.transactions.forEach(function (t) {
-      if (t.type !== "expense" || isPending(t) || isGrantSpend(t)) return;
-      txParts(t).forEach(function (pt) {
+      if (t.type !== "expense" || isGrantSpend(t)) return;
+      costParts(t).forEach(function (pt) {
         totals[pt.category] = (totals[pt.category] || 0) + pt.base;
         (monthsSeen[pt.category] = monthsSeen[pt.category] || {})[monthOf(t.date)] = 1;
       });
@@ -12972,9 +13137,14 @@
       Health: 260, Shopping: 150, Utilities: 140, Household: 80 };
 
     s.goals = [
-      { id: uid(), name: "Cyprus move", target: 6000, saved: 0,
+      // one of each basis, so every kind can be pointed at: money in a pocket,
+      // money typed in by hand, and a goal that watches a total and holds
+      // nothing back
+      { id: uid(), name: "Cyprus move", target: 6000, saved: 0, tracks: "pocket",
         holdsIn: acctRef(savings.id, movePk.id), due: monthShift(mk0, 7) + "-01" },
-      { id: uid(), name: "New laptop", target: 1900, saved: 620, due: monthShift(mk0, 4) + "-01" }
+      { id: uid(), name: "New laptop", target: 1900, saved: 620, tracks: "pocket",
+        due: monthShift(mk0, 4) + "-01" },
+      { id: uid(), name: "Worth $30k", target: 30000, saved: 0, tracks: "worth", due: null }
     ];
 
     s.debts = [
