@@ -940,6 +940,12 @@
      card on the tint so it reads as a note about the thing above it rather
      than as a second card. */
   .goal-need { font-size: var(--fs-sm); line-height: 1.55; margin: 0.7rem 0 0; }
+  /* the months behind the pace, so the average can be checked rather than
+     taken on trust */
+  .goal-pace {
+    font-size: var(--fs-xs); color: var(--faint); margin: 0 0.35rem 0.5rem;
+    font-variant-numeric: tabular-nums;
+  }
 
   .goal-link {
     margin-top: 0.85rem; padding: 0.75rem 0.85rem;
@@ -1369,7 +1375,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-11a";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-12a";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -2926,11 +2932,66 @@
     }
     return withData.reduce(function (s, mk) { return s + monthSummary(mk).expense; }, 0) / withData.length;
   }
+  /* What you actually kept, per month — and the months it rests on.
+
+     This used to hand back a bare number, and a bare number here is close to
+     useless: income that arrives in lumps makes a monthly average say more
+     about WHEN you were last paid than about how you are doing. Three months
+     with one dry month in them average to almost nothing, and the answer then
+     swings wildly as the dry month falls in and out of the window. The same
+     figure was also read over 3 months on the goals screen and 6 on Insights,
+     so the two disagreed about one question with nothing on either saying why.
+
+     So: one window everywhere, and the basis comes back with the figure —
+     which months, how many of them had any income, and what each contributed.
+     `paceWords()` is what puts that on screen. The current month stays out,
+     the same as the burn rate: on the 3rd it is one rent payment and no
+     invoice, and counting it would say you are losing money every month. */
   function avgMonthlySaving(lookback) {
-    var months = recentMonths(lookback || 3, monthShift(thisMonth(), -1));
+    var months = recentMonths(lookback || BURN_LOOKBACK, monthShift(thisMonth(), -1));
     var withData = months.filter(function (mk) { return monthTx(mk).length > 0; });
-    if (!withData.length) return monthSummary(thisMonth()).net;
-    return withData.reduce(function (s, mk) { return s + monthSummary(mk).net; }, 0) / withData.length;
+    if (!withData.length) {
+      var cur = monthSummary(thisMonth());
+      return { rate: cur.net, months: 0, incomeMonths: 0, parts: [], thin: true };
+    }
+    var parts = withData.map(function (mk) {
+      var m = monthSummary(mk);
+      return { mk: mk, income: m.income, spend: m.spend, net: m.net };
+    });
+    var inc = parts.filter(function (x) { return x.income > 0.005; }).length;
+    return {
+      rate: parts.reduce(function (s, x) { return s + x.net; }, 0) / parts.length,
+      months: parts.length,
+      incomeMonths: inc,
+      parts: parts,
+      /* Fewer than half the months brought anything in: the average is then
+         describing the timing of your invoices rather than your saving, and
+         the screen has to say so instead of printing it flat. */
+      lumpy: inc > 0 && inc * 2 < parts.length,
+      thin: false
+    };
+  }
+
+  /* The pace, said with what it rests on. Never a bare figure, and never a
+     bare minus: "kept -$250" says the true thing backwards, so a negative is
+     printed as going backwards with the sign carried by the words. */
+  function paceSpan(pc) {
+    var first = pc.parts[0].mk, last = pc.parts[pc.parts.length - 1].mk;
+    if (pc.months === 1) return monthName(first, true);
+    return monthName(first) + "\u2013" + monthName(last) + " " + last.slice(0, 4);
+  }
+  function paceWords(pc) {
+    if (!pc.months) return "";
+    return (pc.rate < -0.005
+      ? "gone " + fmt(Math.abs(pc.rate), { round: true }) + " a month backwards"
+      : "kept " + fmt(pc.rate, { round: true }) + " a month") +
+      " across " + paceSpan(pc);
+  }
+  function paceBreakdown(pc) {
+    if (!pc.months) return "";
+    return pc.parts.map(function (x) {
+      return esc(monthName(x.mk)) + " " + fmt(x.net, { round: true, signed: true });
+    }).join(" \u00b7 ");
   }
 
   function recurringMonthlyLoad() {
@@ -4983,7 +5044,7 @@
       // recurring item, guessing from logged history is both unnecessary and
       // wrong on the first of the month.
       var incomeRef = load.income > 0 ? load.income
-        : (cur.income > 0 ? cur.income : avgMonthlySaving(3) + burnRate().rate);
+        : (cur.income > 0 ? cur.income : avgMonthlySaving().rate + burnRate().rate);
       var refName = load.income > 0 ? "your committed income" : "your income";
       var share = incomeRef > 0 ? load.expense / incomeRef : null;
       notes.push({
@@ -8591,7 +8652,10 @@
   }
 
   function goalsBody() {
-    var pace = avgMonthlySaving(3);
+    // the same window Insights uses, so the two screens cannot print different
+    // answers to "what am I keeping"
+    var pc = avgMonthlySaving();
+    var pace = pc.rate;
     var html = "";
 
     if (!state.goals.length) {
@@ -8612,6 +8676,19 @@
        because otherwise the two screens look like they disagree about how much
        money you have. One fact about the month, said once above the goals
        rather than repeated inside every card. */
+    /* The months the pace is made of, spelled out once. A figure like "$48 a
+       month" is unarguable and unhelpful; the same figure shown as
+       "Jun −$450 · Jul −$450 · Aug +$150" is instantly checkable against what
+       you remember, and shows at a glance when one dry month is doing all the
+       work. It is one fact about the months, so it is said above the goals
+       rather than repeated identically inside every card. */
+    if (pc.months) {
+      html += '<p class="goal-pace">What you kept: ' + paceBreakdown(pc) +
+        (pc.lumpy
+          ? ' \u00b7 income in ' + pc.incomeMonths + " of " + pc.months + " months"
+          : "") + "</p>";
+    }
+
     var slackNote = budgetSlackNote();
     if (slackNote) {
       html += '<p class="hint" style="margin:0 0.35rem 0.9rem">' + esc(slackNote) + " " +
@@ -8639,29 +8716,42 @@
           var need = gn.need;
           var ok = pace >= need;
           /* Two honest answers to "does this fit", and they can disagree:
-             `pace` is what you actually kept over three months, while the
-             adviser reads what the month leaves once the plan is paid. Left
-             alone this card said "your recent pace covers it" eight lines
-             above a proposal to move the goal because it does not. So when
-             the adviser has something to say about this goal, the pace is
-             named as what it is — behaviour, not the plan — and the line
-             points at the answer below rather than contradicting it. Green
-             means a healthy state and nothing else, so the tone goes with it. */
+             the pace is what you actually kept, while the adviser reads what
+             the month leaves once the plan is paid. When the adviser has
+             something to say about this goal the pace is named as behaviour
+             rather than plan, and the line points at the answer below rather
+             than contradicting it.
+
+             The pace is stated whatever it is, nought and below included — it
+             used to be dropped unless positive, so the one case that most
+             needed saying printed nothing at all. And never bare: paceWords()
+             carries the months it rests on, because a monthly average of lumpy
+             income says more about when you were last paid than about how you
+             are doing. */
           var contested = ok && mine.length > 0;
           needLine = "Needs <b>" + fmt(need, { round: true }) + "/mo</b> to land by " + esc(g.due) +
-            (pace > 0
-              ? contested
-                ? " — you have been keeping " + fmt(pace, { round: true }) + "/mo, which covers it, but " +
-                  "the month as planned leaves less than that."
-                : ok ? " — your recent pace of " + fmt(pace, { round: true }) + "/mo covers it."
-                     : " — you're currently keeping " + fmt(pace, { round: true }) + "/mo, so this is short by " +
-                       fmt(need - pace, { round: true }) + "/mo."
-              : ".");
-          tone = pace > 0 ? (contested ? "warn" : ok ? "ok" : "warn") : "mute";
+            (!pc.months ? "."
+              : pc.lumpy
+                ? " \u2014 you have " + esc(paceWords(pc)) + ", but income arrived in only " +
+                  pc.incomeMonths + " of those " + pc.months + " months, so that average says more " +
+                  "about when you were paid than about this goal."
+              : contested
+                ? " \u2014 you have " + esc(paceWords(pc)) + ", which covers it, but the month " +
+                  "as planned leaves less than that."
+              : ok
+                ? " \u2014 you have " + esc(paceWords(pc)) + ", which covers it."
+                : " \u2014 you have " + esc(paceWords(pc)) + ", so this is short by " +
+                  fmt(Math.max(0, need - pace), { round: true }) + "/mo.");
+          tone = !pc.months ? "mute"
+            : pc.lumpy ? "warn"
+            : contested ? "warn"
+            : ok ? "ok" : "warn";
         }
       } else if (pace > 0) {
-        needLine = "At your recent pace of " + fmt(pace, { round: true }) + "/mo you'd get there in about <b>" +
-          humanMonths(Math.ceil(left / pace)) + "</b>.";
+        needLine = "Having " + esc(paceWords(pc)) + ", you'd get there in about <b>" +
+          humanMonths(Math.ceil(left / pace)) + "</b>" +
+          (pc.lumpy ? ", though income arrived in only " + pc.incomeMonths + " of those " +
+            pc.months + " months" : "") + ".";
       } else {
         needLine = fmt(left, { round: true }) + " still to go. Add a target date to see the monthly figure you need.";
       }
@@ -8686,6 +8776,7 @@
         '<p class="goal-need" style="color:var(--' +
         (tone === "ok" ? "calm" : tone === "warn" ? "warn" : tone === "bad" ? "alert" : "dim") +
         ')">' + needLine + "</p>" +
+
         '<div class="btn-row" style="margin-top:0.85rem">' +
         (!goalHolds(g)
           ? '<span class="hint">watching ' + esc(GOAL_BASIS_LABEL[goalBasis(g)]) +
@@ -8839,7 +8930,7 @@
 
     var months = monthsWithData();
     var outflow = avgMonthlyExpense(BURN_LOOKBACK);
-    var pace = avgMonthlySaving(BURN_LOOKBACK);
+    var pace = avgMonthlySaving().rate;
     var rw = runway();
     var owed = pendingRefundTotal();
 
