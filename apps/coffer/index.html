@@ -940,6 +940,11 @@
      card on the tint so it reads as a note about the thing above it rather
      than as a second card. */
   .goal-need { font-size: var(--fs-sm); line-height: 1.55; margin: 0.7rem 0 0; }
+  /* why an account's pockets can claim more than it holds */
+  .pocket-note {
+    font-size: var(--fs-xs); color: var(--warn); line-height: 1.45;
+    margin: 0.5rem 0 0; padding-left: 0.75rem; border-left: 2px solid var(--warn);
+  }
   /* the months behind the pace, so the average can be checked rather than
      taken on trust */
   .goal-pace {
@@ -1375,7 +1380,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-12b";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-12c";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -5739,6 +5744,18 @@
         ? '<div class="split-row muted"><span>' + (left < 0 ? "Over-allocated" : "Not allocated") +
           "</span>" + '<span class="split-fig"' + (left < 0 ? ' style="color:var(--warn)"' : "") + ">" +
           fmt(Math.abs(left)) + "</span></div>"
+        : "") +
+      /* "Over-allocated $185.10" was a conclusion with no cause attached, and
+         it reads as the app being broken rather than as a description. It is
+         almost always one thing: money set aside into a pocket, then spent
+         straight from the account without being filed under that pocket — the
+         pocket keeps its figure while the account drains. Say that, and say
+         the two ways out, or the reader has a warning they cannot act on. */
+      (left < -0.005
+        ? '<p class="pocket-note">The pockets add up to ' + fmt(-left, { round: true }) +
+          " more than this account holds. Usually that means money you set aside was spent " +
+          "straight from the account: file that spending under the pocket, or bring the " +
+          "pocket down to what is really there.</p>"
         : "") + "</div>";
     }
 
