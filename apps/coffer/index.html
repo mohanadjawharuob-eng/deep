@@ -1380,7 +1380,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-12d";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-12e";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -1459,6 +1459,13 @@
     var opts = { weekday: "short", day: "numeric", month: "short" };
     if (dateStr.slice(0, 4) !== t.slice(0, 4)) opts.year = "numeric";
     return d.toLocaleDateString(undefined, opts);
+  }
+  /* dayLabel answers "Today" and "Yesterday", which read wrong inside a
+     sentence about a date in an account's history. */
+  function plainDay(dateStr) {
+    var opts = { day: "numeric", month: "long" };
+    if (dateStr.slice(0, 4) !== today().slice(0, 4)) opts.year = "numeric";
+    return parseISO(dateStr).toLocaleDateString(undefined, opts);
   }
   function monthOf(dateStr) { return dateStr.slice(0, 7); }
   function thisMonth() { return today().slice(0, 7); }
@@ -2343,6 +2350,27 @@
     memo.bal[key] = b;
     return b;
   }
+  /* The lowest this account has ever been, and the day it was there. An end
+     balance cannot tell a pocket spent from without being named apart from a
+     deposit that was never logged: the first leaves the account plausible the
+     whole way through, the second takes it below zero somewhere. That dip is
+     the only evidence in the book which of the two it is, so it is worth
+     walking the history for. Sorted by date, because the array is in the
+     order things were entered, not the order they happened. */
+  function balanceFloor(acc) {
+    var rows = state.transactions.filter(function (t) {
+      return t.accountId === acc.id || t.toAccountId === acc.id;
+    }).sort(function (x, y) {
+      return (x.date || "") < (y.date || "") ? -1 : (x.date || "") > (y.date || "") ? 1 : 0;
+    });
+    var b = acctOpeningBase(acc), low = b, on = "";
+    for (var i = 0; i < rows.length; i++) {
+      b += effectOn(rows[i], acc.id);
+      if (b < low - 0.005) { low = b; on = rows[i].date; }
+    }
+    return { low: low, on: on };
+  }
+
   function totalAssets(onOrBefore) {
     var key = onOrBefore || "";
     if (memo.assets[key] != null) return memo.assets[key];
@@ -5756,13 +5784,33 @@
          If the account line disagrees with what the bank says, the fault is in
          an entry; if the pockets line disagrees with the pockets above it, the
          fault is in the app. Either way the reader can tell which. */
+      /* It names TWO causes, because it had been naming one and that one was
+         wrong for the first real book it met. A pocket spent from without
+         being named is the common case; money that arrived and was never
+         logged is the other, and it presents identically — the pockets are
+         right and the account is short. The dip below zero is what separates
+         them, and it is stated with its date so it can be looked up. */
       (left < -0.005
-        ? '<p class="pocket-note"><b>This account holds ' + fmt(bal) + "</b>; its " +
-          (pockets.length === 1 ? "pocket claims" : pockets.length + " pockets claim") + " " +
-          fmt(bal - left) + " between them \u2014 " + fmt(-left) + " more than is there.<br>" +
-          "Usually that means money you set aside was spent straight from the account. " +
-          "File that spending under the pocket, or bring the pocket down to what is really " +
-          "there. If the figures above do not add up to that, tell me \u2014 that would be a bug.</p>"
+        ? (function () {
+            var dip = balanceFloor(a);
+            return '<p class="pocket-note"><b>This account holds ' + fmt(bal) + "</b>; its " +
+              (pockets.length === 1 ? "pocket claims" : pockets.length + " pockets claim") + " " +
+              fmt(bal - left) + (pockets.length === 1 ? "" : " between them") +
+              " \u2014 " + fmt(-left) + " more than is there.<br>" +
+              "Two things do this. Money set aside into a pocket and then spent straight from " +
+              "the account, without the pocket being named \u2014 the pocket keeps its figure " +
+              "while the account drains. Or money that arrived and was never logged, which " +
+              "leaves the pockets right and the account short." +
+              (dip.low < -0.005
+                ? "<br><b>On " + esc(plainDay(dip.on)) + " this account reads " +
+                  fmt(Math.abs(dip.low)) + " below zero</b>, which a real account cannot do, so " +
+                  "at least some of it is the second: something that came in is missing, or the " +
+                  "opening figure of " + fmt(acctOpeningBase(a)) + " is lower than it really was."
+                : "") +
+              "<br>File the spending under its pocket, log what came in, or bring the pocket " +
+              "down to what is really there. If the figures above do not add up to that, tell " +
+              "me \u2014 that would be a bug.</p>";
+          })()
         : "") + "</div>";
     }
 
