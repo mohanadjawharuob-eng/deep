@@ -1380,7 +1380,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-12c";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-12d";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -5751,11 +5751,18 @@
          straight from the account without being filed under that pocket — the
          pocket keeps its figure while the account drains. Say that, and say
          the two ways out, or the reader has a warning they cannot act on. */
+      /* The working, not just the verdict. "Over-allocated $285.10" is
+         unarguable and uncheckable; the two figures it came from are neither.
+         If the account line disagrees with what the bank says, the fault is in
+         an entry; if the pockets line disagrees with the pockets above it, the
+         fault is in the app. Either way the reader can tell which. */
       (left < -0.005
-        ? '<p class="pocket-note">The pockets add up to ' + fmt(-left, { round: true }) +
-          " more than this account holds. Usually that means money you set aside was spent " +
-          "straight from the account: file that spending under the pocket, or bring the " +
-          "pocket down to what is really there.</p>"
+        ? '<p class="pocket-note"><b>This account holds ' + fmt(bal) + "</b>; its " +
+          (pockets.length === 1 ? "pocket claims" : pockets.length + " pockets claim") + " " +
+          fmt(bal - left) + " between them \u2014 " + fmt(-left) + " more than is there.<br>" +
+          "Usually that means money you set aside was spent straight from the account. " +
+          "File that spending under the pocket, or bring the pocket down to what is really " +
+          "there. If the figures above do not add up to that, tell me \u2014 that would be a bug.</p>"
         : "") + "</div>";
     }
 
