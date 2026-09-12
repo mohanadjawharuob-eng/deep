@@ -1380,7 +1380,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-12e";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-12f";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -5807,8 +5807,10 @@
                   "at least some of it is the second: something that came in is missing, or the " +
                   "opening figure of " + fmt(acctOpeningBase(a)) + " is lower than it really was."
                 : "") +
-              "<br>File the spending under its pocket, log what came in, or bring the pocket " +
-              "down to what is really there. If the figures above do not add up to that, tell " +
+              "<br>File the spending under its pocket, bring the pocket down to what is really " +
+              "there, or \u2014 if the account line above is simply wrong \u2014 use " +
+              "<b>\u21c4 Set what it really holds</b> below, which corrects the opening figure " +
+              "and leaves every entry alone. If the figures above do not add up to that, tell " +
               "me \u2014 that would be a bug.</p>";
           })()
         : "") + "</div>";
@@ -5824,6 +5826,7 @@
         : "no pockets — all of it is available") + "</p>" +
       '<span class="card-tools">' +
       '<button class="ibtn" data-act="pocket-add" data-id="' + a.id + '" aria-label="Add a pocket to ' + esc(a.name) + '" title="Add a pocket">+</button>' +
+      '<button class="ibtn" data-act="account-true" data-id="' + a.id + '" aria-label="Set what ' + esc(a.name) + ' really holds" title="Set what it really holds">⇄</button>' +
       '<button class="ibtn" data-act="account-edit" data-id="' + a.id + '" aria-label="Edit ' + esc(a.name) + '" title="Edit">✎</button>' +
       (used
         ? '<button class="ibtn" data-act="account-close" data-id="' + a.id + '" aria-label="Close ' + esc(a.name) + '" title="Close, keeping its history">⊘</button>' +
@@ -10149,6 +10152,64 @@
             currency: v.currency || baseCode(), rate: rateFor(v.currency || baseCode()) });
           save(); render();
           toast(v.name.trim() + " added.");
+        }
+      });
+    },
+
+    /* The one dial that moves a balance without touching a single entry.
+       An account's opening figure is STATED rather than derived — it is the
+       only thing about an account the ledger cannot check for itself — so when
+       the app and the bank disagree and every entry is right, the opening is
+       what was wrong. The first real book to need this had two accounts created
+       with an opening of zero for money that was already in them: everything
+       that left them came from nowhere, and the damage surfaced three screens
+       away, as pockets claiming more than their account held.
+
+       An adjustment TRANSACTION would do the same arithmetic and lie about a
+       month — it would land in income or in the burn rate and change what its
+       owner appears to have spent. This changes no month's figures at all,
+       which is the whole point of doing it here, and the dialog says so. */
+    "account-true": function (id) {
+      var a = accountById(id);
+      if (!a) return;
+      var now = balanceOf(a);
+      var cur = a.currency || baseCode();
+      // the rate the opening figure is held at: raising `opening` by d*rate
+      // raises the balance by exactly d in base
+      var acctRate = cur === baseCode() ? 1 : (num(a.rate) > 0 ? num(a.rate) : rateFor(cur));
+      var pockets = pocketsOf(a);
+      openModal({
+        title: "What does " + a.name + " really hold?",
+        message: "Coffer has it at <b>" + fmt(now) + "</b> \u2014 its opening figure of " +
+          fmt(acctOpeningBase(a)) + " plus every entry since. Put in what the account really " +
+          "holds today and the <b>opening figure moves by the difference</b>. No entry is " +
+          "touched, so no month's spending, income or burn rate changes." +
+          (pockets.length
+            ? " The difference lands in Unallocated \u2014 it is money no pocket has claimed."
+            : ""),
+        fields: [
+          /* the picker opens on the account's OWN currency, because that is
+             what its statement is written in, so the figure beside it has to
+             be in that currency too — prefilling the base figure under a EUR
+             label is an invitation to type a EUR number into a dollar box */
+          { key: "real", label: "It really holds", type: "number",
+            value: Math.round(now * acctRate * 100) / 100 }
+        ].concat(currencyField(cur)),
+        onConfirm: function (v) {
+          var realBase = toBase(num(v.real), v.currency, rateFor(v.currency));
+          var delta = realBase - now;
+          if (Math.abs(delta) < 0.005) { toast("Already matches \u2014 nothing to change."); return; }
+          var was = num(a.opening);
+          var wasBase = acctOpeningBase(a);
+          /* The opening keeps the rate it was frozen at: raising it by
+             delta * acctRate raises the balance by exactly delta in base and
+             re-values nothing. Recomputing the whole opening at today's rate
+             would move a figure that is already recorded, which is the one
+             thing a rate change may never do. */
+          a.opening = was + delta * acctRate;
+          save(); render();
+          toast(a.name + ": opening " + fmt(wasBase) + " \u2192 " + fmt(acctOpeningBase(a)) +
+            ", so it now reads " + fmt(balanceOf(a)) + ".", function () { a.opening = was; });
         }
       });
     },
