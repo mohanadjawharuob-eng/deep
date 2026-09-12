@@ -1375,7 +1375,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-12a";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-12b";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -2553,6 +2553,12 @@
       // what the month actually cost you, once money that came back is out
       spend: ownSpend,
       pending: pending, passThrough: passThrough, refundIn: refundIn,
+      /* What you kept once one-offs are out too — `spend` still counts them,
+         because they really did leave. This is the figure to average into a
+         RATE: a laptop bought once is not a reason to say you cannot save
+         every month. Same basis as the burn rate, so "what I keep" and "what
+         I spend" are finally measured the same way. */
+      kept: ownIncome - trueBurnFor(mk),
       grantIn: grantIn, grantOut: grantOut,
       // everything that moved, grants included, for anything that has to
       // reconcile against the account itself
@@ -2952,11 +2958,15 @@
     var withData = months.filter(function (mk) { return monthTx(mk).length > 0; });
     if (!withData.length) {
       var cur = monthSummary(thisMonth());
-      return { rate: cur.net, months: 0, incomeMonths: 0, parts: [], thin: true };
+      return { rate: cur.kept, months: 0, incomeMonths: 0, parts: [], thin: true };
     }
+    /* `kept`, not `net`: a one-off is not part of a rate. August with a $600
+        salary, $369 of running cost and a $183 one-off read as "+$48 kept",
+        and that $48 was then held up against a goal as what you manage every
+        month. */
     var parts = withData.map(function (mk) {
       var m = monthSummary(mk);
-      return { mk: mk, income: m.income, spend: m.spend, net: m.net };
+      return { mk: mk, income: m.income, spend: m.spend, net: m.kept };
     });
     var inc = parts.filter(function (x) { return x.income > 0.005; }).length;
     return {
@@ -2968,6 +2978,13 @@
          describing the timing of your invoices rather than your saving, and
          the screen has to say so instead of printing it flat. */
       lumpy: inc > 0 && inc * 2 < parts.length,
+      /* One month is not a rate, and two is barely one. The burn rate has
+         guarded this since it shipped ("from only 2 months of data"); the
+         pace did not, so a book a fortnight old reported "$48 a month" off a
+         single August and then declared a goal short by $629 a month on the
+         strength of it. Three is where an average starts meaning anything,
+         the same threshold burnRate() uses. */
+      partial: parts.length < 3,
       thin: false
     };
   }
@@ -8683,10 +8700,18 @@
        work. It is one fact about the months, so it is said above the goals
        rather than repeated identically inside every card. */
     if (pc.months) {
+      /* The current month is deliberately not in here — it is half over, so
+         its spending has not finished even when its income has, and counting
+         it would report whatever happens to have landed by today as a monthly
+         rate. Said out loud, because otherwise a month where real money
+         arrived looks like it went missing. */
       html += '<p class="goal-pace">What you kept: ' + paceBreakdown(pc) +
-        (pc.lumpy
-          ? ' \u00b7 income in ' + pc.incomeMonths + " of " + pc.months + " months"
-          : "") + "</p>";
+        " \u00b7 " + esc(monthName(thisMonth())) + " still running, not counted yet" +
+        (pc.partial
+          ? " \u00b7 an average needs three"
+          : pc.lumpy
+            ? " \u00b7 income in " + pc.incomeMonths + " of " + pc.months + " months"
+            : "") + "</p>";
     }
 
     var slackNote = budgetSlackNote();
@@ -8731,6 +8756,10 @@
           var contested = ok && mine.length > 0;
           needLine = "Needs <b>" + fmt(need, { round: true }) + "/mo</b> to land by " + esc(g.due) +
             (!pc.months ? "."
+              : pc.partial
+                ? " \u2014 " + (pc.months === 1 ? "one month" : pc.months + " months") +
+                  " of history so far, too little to say what you keep. Go on what the month " +
+                  "leaves until there are three."
               : pc.lumpy
                 ? " \u2014 you have " + esc(paceWords(pc)) + ", but income arrived in only " +
                   pc.incomeMonths + " of those " + pc.months + " months, so that average says more " +
@@ -8742,11 +8771,15 @@
                 ? " \u2014 you have " + esc(paceWords(pc)) + ", which covers it."
                 : " \u2014 you have " + esc(paceWords(pc)) + ", so this is short by " +
                   fmt(Math.max(0, need - pace), { round: true }) + "/mo.");
-          tone = !pc.months ? "mute"
+          tone = !pc.months || pc.partial ? "mute"
             : pc.lumpy ? "warn"
             : contested ? "warn"
             : ok ? "ok" : "warn";
         }
+      } else if (pc.partial) {
+        needLine = fmt(left, { round: true }) + " still to go \u2014 " +
+          (pc.months === 1 ? "one month" : pc.months + " months") +
+          " of history so far, too little to say how long that takes.";
       } else if (pace > 0) {
         needLine = "Having " + esc(paceWords(pc)) + ", you'd get there in about <b>" +
           humanMonths(Math.ceil(left / pace)) + "</b>" +
