@@ -1380,7 +1380,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-12f";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-12g";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -2818,6 +2818,51 @@
     var hasIncome = false;
     var crossing = null;
 
+    /* ---- the rest of THIS month --------------------------------------------
+       The walk below starts NEXT month, from TODAY's balance, so everything
+       still to happen in the current month fell into a hole between the two.
+       A salary due on the 30th — scheduled, named, eighteen days away — was on
+       the Contracts page, in the Pending card and nowhere on this chart, and
+       every point for eighteen months sat a month's income low. Anyone paid at
+       month end read their whole future understated.
+
+       The stub closes it: what is still due to land after today and before the
+       month is out, less the share of the burn belonging to the days that have
+       not happened yet. It is applied to the opening balance rather than drawn
+       as a point, because it is a part-month and the chart's x-axis is months,
+       and it is reported separately so the screen can say the line starts from
+       more than what is in the bank today.
+
+       One payment, not a monthly equivalent: `startsOn` is the next date the
+       record is actually due, so a weekly line contributes the one occurrence
+       this stub can see rather than four and a third. That undercounts, which
+       is the safe direction for a figure someone plans against. */
+    var nowEnd = lastDayOf(start);
+    var msDay = 86400000;
+    var daysLeft = Math.max(0, Math.round((parseISO(nowEnd) - parseISO(startDay)) / msDay));
+    var daysAll = Math.round((parseISO(nowEnd) - parseISO(start + "-01")) / msDay) + 1;
+    var stub = { days: daysLeft, income: 0, out: 0, events: [] };
+    if (daysLeft > 0) {
+      stub.out = (baseBurn + goalHold) * (daysLeft / daysAll);
+      lines.forEach(function (L) {
+        if (L.type !== "income" || off[L.id]) return;
+        // due strictly after today, and still inside this month
+        if (!L.startsOn || L.startsOn <= startDay || L.startsOn > nowEnd) return;
+        if (L.until && L.until < L.startsOn) return;
+        var amt = L.base * L.confidence;
+        stub.income += amt;
+        hasIncome = true;
+        stub.events.push({ kind: "due", name: L.name, amount: amt, on: L.startsOn });
+      });
+    }
+    // a purchase asked about in the CURRENT month never reached the loop either
+    if (extra[start]) {
+      stub.out += extra[start];
+      stub.events.push({ kind: "buy", amount: extra[start] });
+    }
+    balance += stub.income - stub.out;
+    var opening = balance;   // where the first DRAWN month starts from
+
     for (var i = 1; i <= horizon; i++) {
       var mk = monthShift(start, i);
       var mkStart = mk + "-01", mkEnd = lastDayOf(mk);
@@ -2914,7 +2959,13 @@
       hasSchedule: hasSchedule,
       burn: baseBurn,
       goalHold: goalHold,
+      stub: stub,
+      // what is in the bank today, before the rest of this month is applied
       start: freeAssets(),
+      // where the first drawn month actually starts from — captured before the
+      // walk, because `balance` has run the whole horizon by the time we
+      // return and reading it here put the opening 18 months in the future
+      opening: opening,
       basis: b,
       horizon: horizon
     };
@@ -7063,7 +7114,7 @@
       return shell('<p class="lead" style="color:var(--warn)">There is no income booked, so there is no ' +
         "honest answer to give.</p>" +
         '<p class="band-sub">Every route would just be your savings going down by ' +
-        fmt(a.base, { round: true }) + ". Add what you are expecting under Plan › Income and ask again.</p>");
+        fmt(a.base, { round: true }) + ". Add what you are expecting under Horizon › Contracts and ask again.</p>");
     }
     if (!(burnRate().rate > 0)) {
       return shell('<p class="lead" style="color:var(--warn)">Nothing is logged yet, so there is no running ' +
@@ -7602,7 +7653,7 @@
     if (!flow.income) {
       html += '<p class="lead" style="color:var(--warn)">Nothing is booked as coming in, so there ' +
         "is no month to plan.</p>" +
-        '<p class="band-sub">Add what you are expecting under Plan › Income and this fills in.</p>';
+        '<p class="band-sub">Add what you are expecting under Horizon › Contracts and this fills in.</p>';
     } else {
       html += '<div class="split" style="margin-top:0.7rem">' +
         '<div class="split-row"><span>Expected in</span><span class="fig">' +
@@ -7722,6 +7773,20 @@
       (pr.basis && pr.basis.partial
         ? " · burn from only " + pr.basis.months + " month" + (pr.basis.months === 1 ? "" : "s") + " of data"
         : "") + "</p>" +
+      /* The first drawn month is next month, so the rest of this one is folded
+         into where the line begins. Unsaid, the chart opens on a figure that
+         matches nothing else on screen. */
+      (pr.stub && (pr.stub.income > 0.005 || pr.stub.out > 0.005)
+        ? '<p class="band-sub">Plus the rest of ' + esc(monthName(thisMonth(), true)) + " \u2014 " +
+          (pr.stub.income > 0.005
+            ? fmt(pr.stub.income, { round: true }) + " still due (" +
+              esc(pr.stub.events.filter(function (e) { return e.kind === "due"; })
+                .map(function (e) { return e.name; }).join(", ")) + ")"
+            : "nothing more due") +
+          " against " + fmt(pr.stub.out, { round: true }) + " of burn over its last " +
+          pr.stub.days + " day" + (pr.stub.days === 1 ? "" : "s") +
+          ", so the line opens at " + fmt(pr.opening, { round: true }) + ".</p>"
+        : "") +
       '<div style="margin-top:0.9rem">' + outlookChart(pr, ghost, tone) + "</div>" +
       (ghostIs ? '<p class="band-sub" style="margin-top:0.5rem">The dashed line is ' + esc(ghostIs) +
         "." + (goalsCross != null
@@ -13683,7 +13748,7 @@
     var overdue = activeRecurring().filter(function (r) { return r.nextDate && daysUntil(r.nextDate) < 0; });
     if (overdue.length) {
       toast(overdue.length === 1
-        ? overdue[0].name + " is overdue — log it from Plan › Bills."
+        ? overdue[0].name + " is overdue — log it from Horizon › Bills & one-offs."
         : overdue.length + " recurring items are overdue.");
     }
   }
