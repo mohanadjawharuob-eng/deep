@@ -1380,7 +1380,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-12g";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-18a";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -1462,6 +1462,10 @@
   }
   /* dayLabel answers "Today" and "Yesterday", which read wrong inside a
      sentence about a date in an account's history. */
+  function monthOnly(mk) {
+    return new Date(parseInt(mk.slice(0, 4), 10), parseInt(mk.slice(5, 7), 10) - 1, 1)
+      .toLocaleDateString(undefined, { month: "long" });
+  }
   function plainDay(dateStr) {
     var opts = { day: "numeric", month: "long" };
     if (dateStr.slice(0, 4) !== today().slice(0, 4)) opts.year = "numeric";
@@ -3838,7 +3842,7 @@
     if (!raw.name) { raw.problem = "This line has no name before the colon."; return raw; }
 
     // 0. the terminal date, taken first so its date is gone before anything
-    //    else runs. PLAN-FORMAT.md has documented "until 2027-03-31" since
+    //    else runs. docs/plan-format.md has documented "until 2027-03-31" since
     //    income end dates shipped and it never parsed: left in, the account
     //    matcher ran on " into Wallet until 2027-03-31 " and took the whole
     //    tail as the account name.
@@ -5049,10 +5053,16 @@
       return notes;
     }
 
-    // pace projection
-    if (isCurrent && cur.expense > 0 && progress > 0.12) {
-      var projected = cur.expense / progress;
-      var vs = prev.expense > 0 ? projected - prev.expense : null;
+    /* Pace, on TRUE BURN rather than everything that left. It read
+       `cur.expense`, so a month holding a $290 refundable projected a figure
+       nobody would ever pay and then compared it against last month's
+       everything-that-left — two numbers the reader had no way to reconcile
+       with the TRUE BURN card directly above, which is the one the runway,
+       the goals and the adviser are all built from. */
+    var curBurn = trueBurnFor(mk), prevBurn = trueBurnFor(monthShift(mk, -1));
+    if (isCurrent && curBurn > 0 && progress > 0.12) {
+      var projected = curBurn / progress;
+      var vs = prevBurn > 0 ? projected - prevBurn : null;
       notes.push({
         tone: vs != null && vs > 0 ? "warn" : "info", mark: "→",
         html: "At this pace you'll spend about <span class=\"fig\">" + fmt(projected, { round: true }) +
@@ -6761,6 +6771,31 @@
       "spend, not on the limits \u2014 so that money is already counted as yours.";
   }
 
+  /* What is actually scheduled to land in ONE named month, by date — the
+     same liveness test `projectForward()` walks with, so the adviser and the
+     chart cannot disagree about whether a contract pays in September.
+
+     `monthlyIncomeExpected()` below is the running RATE, and it is a different
+     question: it counts every contract that has not ended, whether or not it
+     pays this month. A card headed "This month" printed the rate, so a book
+     whose second contract next pays on 31 October read "$933 expected in" in
+     September, when $600 was the whole of it. Both figures are honest; the
+     card has to say which one it is showing. */
+  function incomeDueIn(mk) {
+    var mkStart = mk + "-01", mkEnd = lastDayOf(mk), t = 0;
+    projectionLines().forEach(function (L) {
+      if (L.type !== "income") return;
+      if (L.once) {
+        if (L.startsOn && monthOf(L.startsOn) === mk) t += L.base * L.confidence;
+        return;
+      }
+      if (L.startsOn && L.startsOn > mkEnd) return;   // not paying yet
+      if (L.until && L.until < mkStart) return;       // already finished
+      t += L.monthly * L.confidence;
+    });
+    return t;
+  }
+
   function monthlyIncomeExpected() {
     var t = 0;
     projectionLines().forEach(function (L) {
@@ -6776,9 +6811,16 @@
     var income = monthlyIncomeExpected();
     var out = plannedOutgoings();
     var goals = goalsMonthlyNeed();
+    /* The rate decides, because a goal is a promise that repeats and a single
+       lumpy month is no basis for moving one. The month's own figure rides
+       along so the card can name what is actually due, and say which of the
+       two it is describing. */
+    var due = incomeDueIn(thisMonth());
     return {
       income: income, out: out.total, goals: goals,
       surplus: income - out.total - goals,
+      due: due, dueSurplus: due - out.total,
+      lumpy: Math.abs(due - income) > 0.005,
       basis: out
     };
   }
@@ -7655,11 +7697,26 @@
         "is no month to plan.</p>" +
         '<p class="band-sub">Add what you are expecting under Horizon › Contracts and this fills in.</p>';
     } else {
+      /* "Expected in $933" under a heading reading THIS MONTH, in a month
+         where $600 was the whole of what was due, because the figure was the
+         running rate and the heading promised the month. The month's own
+         figure leads; the rate is named underneath, where it belongs, because
+         it is what every proposal below is sized against. */
       html += '<div class="split" style="margin-top:0.7rem">' +
-        '<div class="split-row"><span>Expected in</span><span class="fig">' +
-        fmt(flow.income, { round: true }) + "</span></div>" +
+        '<div class="split-row"><span>Due in ' + esc(monthOnly(m.mk)) + '</span><span class="fig">' +
+        fmt(flow.due, { round: true }) + "</span></div>" +
         '<div class="split-row"><span>What you usually spend</span><span class="fig">−' +
-        fmt(flow.out, { round: true }) + "</span></div></div>";
+        fmt(flow.out, { round: true }) + "</span></div>" +
+        '<div class="split-row"><span>' + (flow.dueSurplus < -0.005 ? "Short this month" : "Left this month") +
+        '</span><span class="fig"' + (flow.dueSurplus < -0.005 ? ' style="color:var(--warn)"' : "") + ">" +
+        fmt(Math.abs(flow.dueSurplus), { round: true }) + "</span></div></div>" +
+        (flow.lumpy
+          ? '<p class="hint">A usual month brings ' + fmt(flow.income, { round: true }) +
+            "; " + esc(monthName(m.mk, true)) +
+            (flow.due < flow.income ? " is lighter" : " is heavier") +
+            " because your contracts do not all pay in the same month. " +
+            "Everything below is sized on the usual month, not this one.</p>"
+          : "");
 
       if (m.moves.length) {
         html += '<p class="label" style="margin-top:1rem">Put aside</p>' +
@@ -7681,12 +7738,12 @@
       }
 
       html += '<div class="split" style="margin-top:0.9rem">' +
-        '<div class="split-row"><span><b>' + (m.short ? "Short every month" : "Yours to spend") +
+        '<div class="split-row"><span><b>' + (m.short ? "Short in a usual month" : "Yours to spend") +
         '</b></span><span class="fig"' + (m.short ? ' style="color:var(--warn)"' : "") + "><b>" +
         fmt(Math.abs(m.free), { round: true }) + "</b></span></div></div>" +
         '<p class="hint">' + (m.short
-          ? "Your promises want more than the month leaves. Everything below is a way to close that."
-          : "What is left once the plan is paid and everything above is set aside.") + "</p>";
+          ? "Your promises want more than a usual month leaves. Everything below is a way to close that."
+          : "What a usual month leaves once the plan is paid and everything above is set aside.") + "</p>";
     }
     html += "</div>";
 
