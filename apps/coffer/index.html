@@ -1380,7 +1380,7 @@
           Enter wired up manually via submitOn().
      ============================================================ */
 
-  var BUILD = "2026-09-18a";   // shown in Settings, so "did it update?" is answerable
+  var BUILD = "2026-09-18b";   // shown in Settings, so "did it update?" is answerable
   /* Two copies of this app are served from one GitHub Pages origin —
      /Apps/coffer/ and /deep/apps/coffer/ — and browsers scope localStorage to
      the SITE, not the folder. So the two shared one ledger: a demo loaded in
@@ -3143,12 +3143,42 @@
       return r.allowance.category === category ? t + allowanceFor(r, mk) : t;
     }, 0);
   }
+  /* Which months this allowance can be asked about at all. It was asked for
+     last month and this month unconditionally, with nothing consulting the
+     contract's own dates — so a contract that started in September was asked
+     how many days were worked in AUGUST, a month in which it did not exist,
+     and the answer, typed against the only question on the screen, was filed
+     there. There was then no way to move it: the dialog took its month from
+     the notice and offered no other. */
+  function allowanceLiveIn(r, mk) {
+    if (r.startedOn && monthOf(r.startedOn) > mk) return false;
+    if (r.until && monthOf(r.until) < mk) return false;
+    return true;
+  }
+  /* The months it may be filed against, newest first. Anything already
+     recorded is included even if it falls outside the contract's dates, or
+     editing a mistake would mean the month it landed in could not be reached. */
+  function allowanceMonths(r) {
+    var end = thisMonth();
+    if (r.until && monthOf(r.until) < end) end = monthOf(r.until);
+    var first = r.startedOn ? monthOf(r.startedOn) : monthShift(end, -11);
+    Object.keys(state.allowanceDays || {}).forEach(function (k) {
+      var bits = k.split("|");
+      if (bits[0] === r.id && bits[1] < first) first = bits[1];
+      if (bits[0] === r.id && bits[1] > end) end = bits[1];
+    });
+    var out = [], mk = end;
+    while (mk >= first && out.length < 24) { out.push(mk); mk = monthShift(mk, -1); }
+    return out;
+  }
+
   // Months where a source has an allowance but nobody has said how many days.
   function allowancesAwaiting() {
     var out = [];
     allowanceSources().forEach(function (r) {
       [monthShift(thisMonth(), -1), thisMonth()].forEach(function (mk) {
         if (allowanceDays(r, mk)) return;
+        if (!allowanceLiveIn(r, mk)) return;   // the contract did not exist yet
         // the current month is only worth asking about once it has ended,
         // or once that month's pay has actually landed
         if (mk === thisMonth()) {
@@ -8386,6 +8416,29 @@
     return { payments: n, total: each * n, each: each };
   }
 
+  function allowanceLog(r) {
+    var said = allowanceMonths(r).filter(function (m) { return allowanceDays(r, m); });
+    var rows = said.slice(0, 6).map(function (m) {
+      var e = allowanceDays(r, m);
+      return '<div class="split-row"><span>' + esc(monthName(m, true)) + "</span>" +
+        '<span class="split-fig">' + num(e.days) + (num(e.days) === 1 ? " day" : " days") +
+        '<span class="fx" style="margin-left:0.45rem">' +
+        fmt(allowanceFor(r, m), { round: true }) + "</span></span>" +
+        '<button class="ibtn tiny" data-act="allowance-days" data-id="' + r.id +
+        '" data-mk="' + m + '" aria-label="Edit ' + esc(monthName(m, true)) +
+        '" title="Edit">\u270e</button></div>';
+    }).join("");
+    return '<div class="split" style="margin-top:0.75rem">' +
+      '<div class="split-row"><span class="label">Days you went in</span>' +
+      '<button class="btn sm" data-act="allowance-days" data-id="' + r.id + '">' +
+      (said.length ? "Another month" : "Say how many") + "</button></div>" +
+      (rows || '<div class="split-row"><span class="hint">Nothing said yet.</span></div>') +
+      (said.length > 6
+        ? '<div class="split-row"><span class="hint">' + (said.length - 6) +
+          " earlier month" + (said.length - 6 === 1 ? "" : "s") + " recorded.</span></div>"
+        : "") + "</div>";
+  }
+
   function contractCard(r) {
     var permo = monthlyEquivalent(toBase(r.amount, r.currency, r.rate), r.frequency);
     var ended = recurEnded(r);
@@ -8450,6 +8503,16 @@
         ? '<div class="split-row"><span>Of which ' + esc(r.allowance.category) + "</span><span>" +
           esc(fmtIn(num(r.allowance.rate), r.allowance.currency || baseCode())) + " a day</span></div>"
         : "") + "</div>" +
+
+      /* The days you said you went in, as a record that can be corrected.
+         They were an answer to a notice and nothing else: typed once, filed
+         against whichever month the notice named, and then visible on no
+         screen in the app. They are not transactions — the pay already
+         arrived as income and the taxis are already logged as spending, so an
+         entry here would count the same money a third time — but they are
+         still something you entered, and anything you entered has to be
+         findable and changeable. */
+      (r.allowance && r.allowance.category ? allowanceLog(r) : "") +
 
       (!ended && d != null
         ? '<div class="btn-row" style="margin-top:0.8rem">' +
@@ -11967,28 +12030,64 @@
       });
     },
 
+    /* The month is a FIELD, not whatever the notice happened to say. Asked
+       "how many days in August?" by the only prompt on the screen, someone
+       who meant September had nowhere to say so and no way to move it
+       afterwards. The picker carries what is already recorded in each month,
+       and changing it reloads the box, so a month with an answer cannot be
+       overwritten by one typed for another. Nought clears the month, which is
+       how a wrong answer is taken back. */
     "allowance-days": function (id, el) {
       var r = state.recurring.filter(function (x) { return x.id === id; })[0];
+      if (!r || !r.allowance) return;
+      var months = allowanceMonths(r);
+      if (!months.length) {
+        toast(r.name + " has not started yet, so there are no days to record.");
+        return;
+      }
       var mk = el && el.getAttribute("data-mk");
-      if (!r || !mk || !r.allowance) return;
+      if (!mk || months.indexOf(mk) < 0) mk = months[0];
       var cur = r.allowance.currency || baseCode();
+      var daysIn = function (m) { return (allowanceDays(r, m) || {}).days || ""; };
       openModal({
         title: "Days at " + r.name,
-        message: "How many days did you go in during " + monthName(mk, true) + "? At " +
-          fmtIn(num(r.allowance.rate), cur) + " a day, that much of the pay is spent on " +
-          r.allowance.category + " before your own budget is.",
+        message: "At " + fmtIn(num(r.allowance.rate), cur) + " a day, that much of the pay is spent on " +
+          esc(r.allowance.category) + " before your own budget is. It is filed against <b>the month you " +
+          "worked</b>, which is not always the month you are asked in — check the month below.",
         confirmLabel: "Save",
         fields: [
-          { key: "days", label: "Days", type: "number", min: 0, step: "1",
-            value: (allowanceDays(r, mk) || {}).days || "" }
+          { key: "mk", label: "Month", type: "select", value: mk,
+            options: months.map(function (m) {
+              var e = allowanceDays(r, m);
+              return { value: m, label: monthName(m, true) + (e ? " — " + e.days + " so far" : "") };
+            }),
+            // the box has to follow the month, or the figure prefilled for one
+            // month is saved against another
+            onChange: function (v, fieldEl) {
+              var box = fieldEl("days");
+              if (box) box.value = daysIn(v);
+            } },
+          { key: "days", label: "Days", type: "number", min: 0, step: "1", value: daysIn(mk) }
         ],
-        validate: function (v) { if (!(v.days >= 0)) return "Enter the number of days."; },
+        validate: function (v) {
+          if (!(v.days >= 0)) return "Enter the number of days.";
+          if (!v.mk) return "Pick the month you worked.";
+        },
         onConfirm: function (v) {
+          var m = v.mk || mk;
           if (!state.allowanceDays) state.allowanceDays = {};
-          state.allowanceDays[allowanceKey(r, mk)] = { days: num(v.days), rate: rateFor(cur) };
+          var key = allowanceKey(r, m), was = state.allowanceDays[key];
+          if (num(v.days) > 0) state.allowanceDays[key] = { days: num(v.days), rate: rateFor(cur) };
+          else delete state.allowanceDays[key];
           save(); render();
-          toast(fmt(allowanceFor(r, mk), { round: true }) + " of " + monthName(mk, true) +
-            "'s pay was " + r.allowance.category + " money.");
+          toast(num(v.days) > 0
+            ? num(v.days) + (num(v.days) === 1 ? " day" : " days") + " in " + monthName(m, true) +
+              " — " + fmt(allowanceFor(r, m), { round: true }) + " of that pay was " +
+              r.allowance.category + " money."
+            : monthName(m, true) + " cleared.",
+            function () {
+              if (was) state.allowanceDays[key] = was; else delete state.allowanceDays[key];
+            });
         }
       });
     },
